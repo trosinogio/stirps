@@ -204,7 +204,7 @@ Il codice vive in un repository GitHub privato. Vercel non è collegato a GitHub
   - Traduce solo le glosse delle voci nuove e compone `dati/*.tsv.gz` con `gzip -9 -n`.
   - Rimette il pacchetto sullo stesso ramo, con un commit.
   - Da una sandbox Kaikki di solito non si raggiunge: si passa da qui. Con il merge su `main` la pubblicazione rifà l'import, dopo il ramo di riserva.
-- **Collaudo** (`.github/workflows/collaudo.yml`): a ogni push controlla i tipi TypeScript e fa girare `scripts/collauda.sh` su un Postgres di prova, cioè gli 82 test del seme e i 69 dell'import. In locale: `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`.
+- **Collaudo** (`.github/workflows/collaudo.yml`): a ogni push controlla i tipi TypeScript e fa girare `scripts/collauda.sh` su un Postgres di prova, cioè gli 84 test del seme e i 69 dell'import. In locale: `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`.
 - **Copia della redazione** (`.github/workflows/copia-redazione.yml`): ogni notte `scripts/esporta-redazione.mjs` esporta tutto ciò che la redazione ha scritto o toccato (voci, ipotesi, passaggi, date, glosse, fonti, storico). Le righe sono JSON, ciascuna con gli indirizzi delle voci collegate. La copia va nel ramo `copia-redazione`, e ogni notte con dei cambiamenti diventa un commit. Il workflow richiede il segreto `DATABASE_URL_UNPOOLED` del repository, e si può lanciare a mano dalla scheda Actions.
 - **Ripristino:** la prima via è un ramo di Neon (`neon branches restore`); la seconda è la copia, leggibile e indipendente dagli identificativi del database.
 
@@ -228,7 +228,7 @@ Il piano Hobby di Vercel è riservato all'uso non commerciale.
 - **Bozze protette.** Senza `ANTEPRIMA=1` restano visibili solo le voci importate, riviste o verificate, e le catene si fermano dove un antenato è in bozza.
 - **Lingue dichiarate.** Se una glossa o una nota non esiste nella lingua dell'interfaccia, la pagina mostra quella disponibile e dice in che lingua è.
 - **Fonti dichiarate.** Un'ipotesi importata mostra lo strato da cui viene e la sua licenza; i dati di Wiktionary e del Perseus restano CC BY-SA 4.0.
-- **Pronta per la scala.** Le famiglie sono precalcolate (`mv_famiglia`), la pagina iniziale mostra le radici più ampie e rimanda agli elenchi completi, le lingue si sfogliano per iniziale. Dopo un import o una modifica si rinfrescano `mv_allotropi` e `mv_famiglia`.
+- **Pronta per la scala.** Le famiglie sono precalcolate (`mv_famiglia`), la pagina iniziale mostra le radici più ampie e rimanda agli elenchi completi, le lingue si sfogliano per iniziale, e oltre le 2000 parole per le prime due lettere (la Α del greco ne ha ventimila). Dopo un import o una modifica si rinfrescano `mv_allotropi` e `mv_famiglia`.
 
 ## Aggiungere una lingua d'interfaccia
 

@@ -21,11 +21,13 @@ export default async function Lingua({ params }: { params: Promise<{ lang: strin
   if (!isLang(lang)) notFound();
   if (iniziale && iniziale.length > 1) notFound();
   const t = TESTI[lang];
-  // le iniziali sono maiuscole (C); /it/l/it/c deve funzionare lo stesso
+  // le iniziali sono maiuscole (C, o CA per le prime due lettere); /it/l/it/c deve funzionare lo stesso
   const scelta = iniziale?.[0] ? decodeURIComponent(iniziale[0]).toLocaleUpperCase('it') : null;
+  if (scelta && Array.from(scelta).length > 2) notFound();
   const [ind, geo, pl] = await Promise.all([indice(lang, 0), lingueGeo(lang), paroleLingua(codice, lang, scelta)]);
   const l = ind.lingue.find((x) => x.codice === codice);
-  if (!l || (scelta && !pl.iniziali.some((x) => x.iniziale === scelta))) notFound();
+  if (!l || (scelta && !pl.iniziali.some((x) => x.iniziale === Array.from(scelta)[0]))) notFound();
+  const dueLettere = (x: string) => Array.from(x).map((c, i) => (i ? c.toLocaleLowerCase('it') : c)).join('');
   const nomi = new Map(geo.map((g) => [g.codice, g.nome]));
   const genitore = l.varieta_di ? t.varietaDi(nomi.get(l.varieta_di) ?? l.varieta_di)
     : l.antenato ? t.discendeDaLingua(nomi.get(l.antenato) ?? l.antenato) : null;
@@ -45,6 +47,14 @@ export default async function Lingua({ params }: { params: Promise<{ lang: strin
           {pl.iniziali.map((x) => (
             <Link key={x.iniziale} href={`/${lang}/l/${codice}/${encodeURIComponent(x.iniziale)}`}
               aria-current={x.iniziale === pl.iniziale ? 'page' : undefined} title={t.paroleN(x.n)}>{x.iniziale}</Link>
+          ))}
+        </nav>
+      )}
+      {pl.sottoiniziali.length > 1 && (
+        <nav className="iniziali sotto" aria-label={t.sottoIniziali}>
+          {pl.sottoiniziali.map((x) => (
+            <Link key={x.iniziale} href={`/${lang}/l/${codice}/${encodeURIComponent(x.iniziale)}`}
+              aria-current={x.iniziale === pl.sottoiniziale ? 'page' : undefined} title={t.paroleN(x.n)}>{dueLettere(x.iniziale)}</Link>
           ))}
         </nav>
       )}

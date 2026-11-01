@@ -367,4 +367,28 @@ select pg_temp.verifica(
   (scheda('la-med/cifra', true, 'it')->'lessema'->>'wiktionary_lingua') = 'Latin',
   'il latino medievale rimanda alla voce latina di Wiktionary');
 
+-- ---------------------------------------------------------------------
+\echo '— pagine delle lingue'
+-- ---------------------------------------------------------------------
+-- un'iniziale con più di 2000 parole (la Α del greco ne ha ventimila) si sfoglia per le prime due lettere
+do $$
+declare p jsonb;
+begin
+  begin
+    insert into lessema (lingua, lemma, glossa_lingua, stato_editoriale)
+      select 'la', 'z' || chr(97 + g % 3) || 'prova' || g, 'it', 'bozza' from generate_series(1, 2100) g;
+    p := parole_lingua('la', 'it', true, 'Z');
+    perform pg_temp.verifica(
+      p->>'iniziale' = 'Z' and p->>'sottoiniziale' = 'ZA' and jsonb_array_length(p->'parole') = 700
+      and (select string_agg(x->>'iniziale', ' ' order by x->>'iniziale') from jsonb_array_elements(p->'sottoiniziali') x) like 'ZA ZB ZC%'
+      and (parole_lingua('la', 'it', true, 'ZB')->>'sottoiniziale') = 'ZB',
+      'un''iniziale con più di 2000 parole si sfoglia per le prime due lettere (za, zb, zc)');
+    raise exception using errcode = 'P0098', message = 'annulla';
+  exception when sqlstate 'P0098' then null;
+  end;
+end $$;
+select pg_temp.verifica(
+  (select p->>'sottoiniziale' is null and jsonb_array_length(p->'sottoiniziali') = 0 from parole_lingua('la', 'it', true, 'C') p),
+  'un''iniziale con poche parole resta una pagina sola');
+
 \echo '— collaudo completato'

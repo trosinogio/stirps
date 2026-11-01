@@ -9,14 +9,16 @@
 -- strato «perseus», senza etimologia: la redazione può aggiungerla, e allora la voce resta anche quando Wiktionary
 -- arriva alla stessa parola (che la abbina per forma esatta, come le sue).
 insert into strato (codice, nome, licenza, share_alike, attribuzione, url) values
-('perseus', 'Perseus Digital Library: Lewis & Short, Liddell–Scott–Jones', 'CC BY-SA 4.0', true,
+('perseus', 'Perseus Digital Library, Lewis & Short e Liddell–Scott–Jones', 'CC BY-SA 4.0', true,
  'Contiene lemmi e glosse di A Latin Dictionary (Charlton T. Lewis e Charles Short, 1879) e di A Greek-English Lexicon (Henry George Liddell, Robert Scott, Henry Stuart Jones, 9ª ed., 1940), nell’edizione digitale del Perseus Digital Library (Tufts University, http://www.perseus.tufts.edu/), distribuita con licenza CC BY-SA 4.0 dal repository github.com/PerseusDL/lexica.',
  'https://github.com/PerseusDL/lexica')
-on conflict (codice) do nothing;
+on conflict (codice) do update set nome = excluded.nome, licenza = excluded.licenza, share_alike = excluded.share_alike,
+                                   attribuzione = excluded.attribuzione, url = excluded.url;
 insert into etichetta_lingua (vocabolario, codice, lingua, etichetta, breve, descrizione) values
-('strato', 'perseus', 'en', 'Perseus Digital Library: Lewis & Short, Liddell–Scott–Jones', 'CC BY-SA 4.0',
+('strato', 'perseus', 'en', 'Perseus Digital Library, Lewis & Short and Liddell–Scott–Jones', 'CC BY-SA 4.0',
  'Contains headwords and glosses from A Latin Dictionary (Charlton T. Lewis and Charles Short, 1879) and A Greek-English Lexicon (Henry George Liddell, Robert Scott, Henry Stuart Jones, 9th ed., 1940), in the digital edition of the Perseus Digital Library (Tufts University, http://www.perseus.tufts.edu/), distributed under CC BY-SA 4.0 from the github.com/PerseusDL/lexica repository.')
-on conflict do nothing;
+on conflict (vocabolario, codice, lingua) do update set etichetta = excluded.etichetta, breve = excluded.breve,
+                                                       descrizione = excluded.descrizione;
 
 -- le stesse colonne di stg_lessema (ricostruito è sempre falso)
 create unlogged table if not exists stg_dizionario (

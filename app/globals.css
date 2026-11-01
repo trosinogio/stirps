@@ -290,6 +290,8 @@ svg.cresce{animation:cresce .95s cubic-bezier(.3,0,.2,1) both}
 .iniziali{display:flex;flex-wrap:wrap;gap:4px 6px;margin:16px 0 4px;font:14px var(--sans)}
 .iniziali a{min-width:30px;text-align:center;padding:4px 6px;border:1px solid var(--filo);border-radius:4px;text-decoration:none;color:var(--ink-2)}
 .iniziali a[aria-current="page"]{border-color:var(--ink);color:var(--ink);font-weight:700}
+.iniziali.sotto{margin-top:6px;font-size:13px}
+.iniziali.sotto a{min-width:34px;padding:2px 5px}
 .totali{font:14px var(--sans);color:var(--ink-2);margin:10px 0 0}
 .altre{margin:14px 0 0}
 /* pagina iniziale: la radice in primo piano è l'unico gesto forte; tutto il resto è tipografia e spazio */

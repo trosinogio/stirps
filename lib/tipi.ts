@@ -70,7 +70,12 @@ export interface LinguaIndice {
 }
 export interface Indice { radici: RadiceIndice[]; lingue: LinguaIndice[]; totali: { lessemi: number; lingue: number; radici: number; capostipiti: number } }
 export interface ElencoRadici { totale: number; pagina: number; per_pagina: number; radici: (Nodo & { discendenti: number; lingue: number })[] }
-export interface ParoleLingua { totale: number; iniziale: string | null; iniziali: { iniziale: string; n: number }[]; parole: Nodo[] }
+export interface ParoleLingua {
+  totale: number; iniziale: string | null; iniziali: { iniziale: string; n: number }[];
+  // un'iniziale con molte parole si sfoglia per le prime due lettere
+  sottoiniziale: string | null; sottoiniziali: { iniziale: string; n: number }[];
+  parole: Nodo[];
+}
 export interface RisultatoRicerca { slug: string; punteggio: number; per_significato: boolean; voce: Nodo }
 export interface LinguaGeo { codice: string; nome: string; lat: number | null; lon: number | null; varieta_di: string | null; antenato: string | null }
 
