@@ -1,0 +1,118 @@
+# Rigenera il pacchetto dati (dati/*.tsv.gz) dai dump di Kaikki: italiano, con la chiusura su latino, francese antico e
+# greco antico, e latino e greco interi (import/importa.sh, SOLO_ANALISI=1). Le glosse del Wikizionario e di Wikidata
+# restano quelle del pacchetto; le glosse tradotte si aggiungono solo per le voci nuove. Il pacchetto torna come commit
+# sullo stesso ramo. Parte con un push su un ramo dati-*, oppure a mano dalla scheda Actions.
+name: Dati
+on:
+  push:
+    branches: ['dati-*']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: dati-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  dati:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Dump di Kaikki ed etimologie
+        run: |
+          cd import
+          SOLO_ANALISI=1 WIKIZIONARIO=0 INTERE=la,grc ./importa.sh
+          jq -c . dati/it/rapporto_parser.json
+          echo "::notice title=Parser::$(jq -c '{lessemi, ipotesi, relazioni, voci, intere_la, intere_grc}' dati/it/rapporto_parser.json)"
+
+      - name: Voci vere per il banco di prova
+        run: |
+          cd import/dati
+          echo "--- la/lemmi.jsonl: levir"; grep -m1 '"w": "levir"' la/lemmi.jsonl || true
+          echo "--- la/glosse.tsv: levir"; grep -m2 -P '^levir\t' la/glosse.tsv || true
+          echo "--- grc/lemmi.jsonl: δαήρ"; grep -m1 '"w": "δαήρ"' grc/lemmi.jsonl || true
+          echo "--- grc/glosse.tsv: δαήρ"; grep -m2 -P '^δαήρ\t' grc/glosse.tsv || true
+          echo "--- la/lemmi.jsonl: ricostruzioni"; grep -m3 '"rec": true' la/lemmi.jsonl || true
+
+      - name: Glosse tradotte per le voci nuove
+        run: |
+          cd import
+          mkdir -p modelli
+          ok=1
+          for m in en_it it_en; do
+            curl -sfL -o "modelli/$m.zip" "https://argos-net.com/v1/translate-${m}-1_0.argosmodel" && unzip -q -o "modelli/$m.zip" -d "modelli/$m" || ok=0
+          done
+          if [ "$ok" != 1 ]; then
+            echo "::warning title=Glosse tradotte::modelli Argos non scaricabili: restano le traduzioni del pacchetto"
+            exit 0
+          fi
+          dir() { dirname "$(find "modelli/$1" -name sentencepiece.model | head -1)"; }
+          andata=$(dir en_it); ritorno=$(dir it_en)
+          pip install -q ctranslate2 sentencepiece
+          # le voci straniere con una glossa inglese, senza glossa del Wikizionario e senza una traduzione già fatta
+          python3 - <<'PY'
+          import gzip
+          wz = {tuple(r.split('\t')[:2]) for r in gzip.open('../dati/glosse_it.tsv.gz', 'rt', encoding='utf-8')}
+          gia = {r.split('\t')[0] for r in gzip.open('../dati/glosse_tradotte.tsv.gz', 'rt', encoding='utf-8')}
+          n = 0
+          with open('chiavi.txt', 'w', encoding='utf-8') as out:
+              for r in open('dati/it/tsv/lessemi.tsv', encoding='utf-8'):
+                  c = r.rstrip('\n').split('\t')
+                  if len(c) < 8 or c[1] == 'it' or c[7] in ('', '\\N') or c[0] in gia or (c[1], c[2]) in wz:
+                      continue
+                  out.write(c[0] + '\n'); n += 1
+          print(f'voci da tradurre: {n}')
+          PY
+          for p in 1 2 3 4; do
+            python3 traduci_glosse.py dati/it/tsv/lessemi.tsv "$andata" "tradotte_$p.tsv" --ritorno "$ritorno" --chiavi chiavi.txt \
+              --parte "$p/4" --vocabolario ../dati/frequenze_it.tsv.gz,dati/it/tsv/lessemi.tsv &
+          done
+          wait
+          # le traduzioni di prima per le voci che ci sono ancora, più le nuove
+          python3 - <<'PY'
+          import glob, gzip
+          attuali = {r.split('\t')[0] for r in open('dati/it/tsv/lessemi.tsv', encoding='utf-8')}
+          righe = {}
+          for r in gzip.open('../dati/glosse_tradotte.tsv.gz', 'rt', encoding='utf-8'):
+              if r.split('\t')[0] in attuali:
+                  righe[r.split('\t')[0]] = r.rstrip('\n')
+          prima = len(righe)
+          for f in sorted(glob.glob('tradotte_*.tsv')):
+              for r in open(f, encoding='utf-8'):
+                  righe[r.split('\t')[0]] = r.rstrip('\n')
+          with open('glosse_tradotte.tsv', 'w', encoding='utf-8') as out:
+              for k in sorted(righe):
+                  out.write(righe[k] + '\n')
+          print(f'glosse tradotte: {prima} di prima, {len(righe) - prima} nuove')
+          PY
+          gzip -9 -n -c glosse_tradotte.tsv > ../dati/glosse_tradotte.tsv.gz
+          echo "::notice title=Glosse tradotte::$(zcat ../dati/glosse_tradotte.tsv.gz | wc -l) in tutto"
+
+      - name: Pacchetto dati
+        run: |
+          t=import/dati/it/tsv
+          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni; do
+            gzip -9 -n -c "$t/$f.tsv" > "dati/$f.tsv.gz"
+          done
+          # voci per lingua, prima e dopo
+          conta() { awk -F'\t' '{c[$2]++} END {for (k in c) print k, c[k]}' | sort; }
+          git show HEAD:dati/lessemi.tsv.gz | zcat | conta > /tmp/prima.txt
+          zcat dati/lessemi.tsv.gz | conta > /tmp/dopo.txt
+          join -a1 -a2 -e 0 -o 0,1.2,2.2 /tmp/prima.txt /tmp/dopo.txt | sort -k3 -n -r | head -12 > /tmp/confronto.txt
+          cat /tmp/confronto.txt
+          echo "::notice title=Voci per lingua (prima, dopo)::$(tr '\n' ';' < /tmp/confronto.txt)"
+          ls -la dati/
+
+      - name: Commit sul ramo
+        run: |
+          git config user.name "stirps-dati"
+          git config user.email "stirps-dati@users.noreply.github.com"
+          git add dati/
+          if git diff --cached --quiet; then echo "il pacchetto non è cambiato"; exit 0; fi
+          git commit -q -m "Pacchetto dati: italiano con latino e greco interi (Kaikki, $(date -u +%F))"
+          git push -q
+          echo "::notice title=Pacchetto::commit $(git rev-parse --short HEAD) sul ramo ${GITHUB_REF_NAME}"

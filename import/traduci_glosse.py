@@ -99,9 +99,10 @@ def main():
         print(f'vocabolario italiano: {len(vocabolario)} parole', file=sys.stderr)
     # il dizionario rovesciato, dalle glosse inglesi delle parole italiane del dizionario: «honey» → miele.
     # primi: le parole italiane il cui primo senso è proprio quello; tutti: quelle che lo hanno tra i sensi
-    import gzip
+    import gzip, os
     rango = {}
-    for r in gzip.open('/home/claude/web/dati/frequenze_it.tsv.gz', 'rt', encoding='utf-8'):
+    frequenze = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'dati', 'frequenze_it.tsv.gz')
+    for r in gzip.open(frequenze, 'rt', encoding='utf-8'):
         c = r.split('\t')
         if len(c) >= 3 and c[0] == 'it':
             rango.setdefault(c[1].lower(), int(c[2]))

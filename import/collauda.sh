@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Collaudo dell'importatore su import/esempio/: voci reali italiane, latine, del francese antico e del greco antico.
+# Latino e greco entrano interi (--intere): anche le voci che nessuna catena italiana raggiunge.
 # Richiede un database con 01–03 e 05 caricati: DATABASE_URL=… ./collauda.sh
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -7,7 +8,7 @@ rm -rf esempio/tsv
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \
   --chiudi fro=esempio/fro_lemmi.jsonl,esempio/fro_glosse.tsv,esempio/fro_forme.tsv \
-  --chiudi grc=esempio/grc_lemmi.jsonl,esempio/grc_glosse.tsv,esempio/grc_forme.tsv --passi 5 > /dev/null
+  --chiudi grc=esempio/grc_lemmi.jsonl,esempio/grc_glosse.tsv,esempio/grc_forme.tsv --passi 5 --intere la,grc > /dev/null
 cd esempio/tsv
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
 truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_radice, stg_attestazione, stg_wikizionario,

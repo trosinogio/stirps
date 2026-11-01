@@ -124,6 +124,16 @@ select pg_temp.verifica((select count(*) from lessema where lingua = 'grc' and s
 select pg_temp.verifica((select count(*) from lessema where lingua = 'arc' and slug like 'arc/abba%') = 1,
   'una sola voce aramaica per אבא: i segni vocalici non creano doppioni');
 
+\echo '— latino e greco interi (--intere la,grc)'
+select pg_temp.verifica(lx('la/carus') is not null and not exists (select 1 from relazione x where x.etimo_id = lx('la/carus')),
+  'una voce latina che nessuna catena italiana raggiunge entra lo stesso: cārus');
+select pg_temp.verifica(pg_temp.antenati_slug('la/carus') @> array['itc-pro/karos', 'ine-pro/keh2ros'],
+  'e porta con sé la sua catena: cārus < *kāros < *kéh₂ros');
+select pg_temp.verifica(pg_temp.antenati_slug('la/fundus') @> array['itc-pro/fundos', 'ine-pro/bhudhmnos'],
+  'fundus < *fundos < *bʰudʰ-(m)n-o-s: anche le voci intere chiudono le catene fino al protoindoeuropeo');
+select pg_temp.verifica((select count(*) from lessema where lingua = 'la' and slug like 'la/fundo%') >= 2,
+  'gli omografi latini entrano ciascuno con la sua etimologia (fundō, fundere e fundō, fundāre)');
+
 \echo '— glosse italiane dal Wikizionario e prime attestazioni'
 select pg_temp.verifica(
   (select testo from glossa where lessema_id = lx('it/carne') and lingua = 'it' and provenienza = 'wikizionario') like 'l''insieme dei tessuti muscolari%',

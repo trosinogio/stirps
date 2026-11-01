@@ -350,6 +350,7 @@ class Importatore:
         self.chiusura = {}           # lingua -> indici delle voci di chiusura
         self.participi = set()       # (lingua, pagina) dei participi citati come etimi
         self.attestazioni = {}       # chiave del lessema -> (anno_da, anno_a, precisione)
+        self.intere = set()          # lingue di chiusura importate intere (--intere la,grc), non solo dove le catene arrivano
         self.stat = Counter()
 
     # ---- lessemi ----
@@ -698,11 +699,14 @@ class Importatore:
         return lingua, pagina, omo, forma_extra
 
     def chiudi(self, passi=1):
-        """Importa le etimologie delle voci intermedie già presenti nel dizionario."""
+        """Importa le etimologie delle voci intermedie già presenti nel dizionario. Nelle lingue intere (--intere)
+        il primo passaggio prende anche le voci attestate che nessuna catena raggiunge (lēvir, δαήρ): così le
+        famiglie delle radici si completano. Le forme ricostruite entrano solo se una catena le cita."""
         fatte = set()
         for passo in range(passi):
             nuove = 0
             for lingua, idx in self.chiusura.items():
+                intera = passo == 0 and lingua in self.intere
                 for i, v in enumerate(idx['voci']):
                     if (lingua, i) in fatte:
                         continue
@@ -714,10 +718,13 @@ class Importatore:
                     else:
                         candidati = [(lingua, pagina)]
                     for lc, termine in candidati:
-                        if chiave(lc, termine, omo) in self.lessemi:
+                        raggiunta = chiave(lc, termine, omo) in self.lessemi
+                        if raggiunta or (intera and not v.get('rec')):
                             fatte.add((lingua, i))
                             self.voce(v, lingua_voce=lc, parola=termine)
                             nuove += 1
+                            if not raggiunta:
+                                self.stat[f'intere_{lingua}'] += 1
                             break
             self.stat[f'chiusura_passo_{passo + 1}'] = nuove
             if not nuove:
@@ -952,16 +959,20 @@ def completa_glosse(imp, percorso, lingua=None):
 
 if __name__ == '__main__':
     # wiktionary.py lemmi.jsonl uscita/ [glosse.tsv] [--chiudi la=lemmi.jsonl,glosse.tsv,forme.tsv]… [--passi N]
-    args, chiusure, passi = [], [], 1
+    #               [--intere la,grc]
+    args, chiusure, passi, intere = [], [], 1, set()
     it_ = iter(sys.argv[1:])
     for x in it_:
         if x == '--chiudi':
             chiusure.append(next(it_))
         elif x == '--passi':
             passi = int(next(it_))
+        elif x == '--intere':
+            intere = {c for c in next(it_).split(',') if c}
         else:
             args.append(x)
     imp = Importatore()
+    imp.intere = intere
     for c in chiusure:
         lingua, percorsi = c.split('=', 1)
         p = percorsi.split(',') + ['', '']

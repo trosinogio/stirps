@@ -4,6 +4,8 @@
 #   LINGUA=fr NOME=French CHIUSURA="la:Latin fro:Old French" DATABASE_URL=… ./importa.sh
 #   CHIUSURA="" DATABASE_URL=… ./importa.sh                                  # senza chiusura delle catene
 #   WIKIZIONARIO=0 DATABASE_URL=… ./importa.sh                               # senza glosse italiane del Wikizionario
+#   INTERE="" DATABASE_URL=… ./importa.sh                                    # latino e greco solo dove le catene arrivano
+#   SOLO_ANALISI=1 ./importa.sh                                              # si ferma alle tabelle (dati/it/tsv), senza database
 # Richiede python3, curl e psql. Lo schema (01–03) e db/05_import_wiktionary.sql devono essere già caricati.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -12,6 +14,8 @@ NOME=${NOME:-Italian}
 CHIUSURA=${CHIUSURA-la:Latin fro:Old French grc:Ancient Greek}
 PASSI=${PASSI:-5}   # la chiusura si ripete finché trova voci nuove: βούτυρον → βοῦς → *gʷṓws
 WIKIZIONARIO=${WIKIZIONARIO:-1}
+INTERE=${INTERE-la,grc}   # lingue di chiusura importate intere: anche le voci che nessuna catena raggiunge
+SOLO_ANALISI=${SOLO_ANALISI:-0}
 DATI=dati/$LINGUA
 mkdir -p "$DATI"
 
@@ -38,7 +42,12 @@ if [ "$WIKIZIONARIO" = 1 ]; then
 fi
 
 echo "2/4  leggo le etimologie"
-python3 wiktionary.py "$DATI/lemmi.jsonl" "$DATI/tsv" "$DATI/glosse.tsv" ${ARGOMENTI[@]+"${ARGOMENTI[@]}"} --passi "$PASSI" > "$DATI/rapporto_parser.json"
+python3 wiktionary.py "$DATI/lemmi.jsonl" "$DATI/tsv" "$DATI/glosse.tsv" ${ARGOMENTI[@]+"${ARGOMENTI[@]}"} --passi "$PASSI" \
+  ${INTERE:+--intere "$INTERE"} > "$DATI/rapporto_parser.json"
+if [ "$SOLO_ANALISI" = 1 ]; then
+  echo "     analisi finita: le tabelle sono in $DATI/tsv"
+  exit 0
+fi
 
 echo "3/4  carico le tabelle di appoggio"
 cd "$DATI/tsv"
