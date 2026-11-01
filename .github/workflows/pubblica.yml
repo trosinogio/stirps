@@ -1,0 +1,103 @@
+# Pubblicazione: dopo ogni collaudo riuscito su main, oppure a mano dalla scheda Actions.
+# In ordine: un ramo di riserva su Neon, il deploy su Vercel (la build applica da sola gli aggiornamenti datati),
+# il controllo delle ipotesi verificate. Se un passo fallisce, i successivi non partono: niente deploy senza riserva.
+# Richiede i segreti VERCEL_TOKEN, NEON_API_KEY e DATABASE_URL_UNPOOLED (Settings → Secrets and variables → Actions).
+name: Pubblica
+on:
+  workflow_run:
+    workflows: [Collaudo]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: pubblica
+  cancel-in-progress: false
+permissions:
+  contents: read
+env:
+  PROGETTO_NEON: aged-truth-35630140
+  RAMO_NEON: production
+  PROGETTO_VERCEL: dizionario-etimologico
+jobs:
+  pubblica:
+    # dal collaudo: solo se è riuscito e viene da un push su main, non da una pull request
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Segreti
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+        run: |
+          manca=""
+          for s in VERCEL_TOKEN NEON_API_KEY DATABASE_URL_UNPOOLED; do [ -n "${!s}" ] || manca="$manca $s"; done
+          if [ -n "$manca" ]; then
+            echo "### Pubblicazione non fatta: mancano i segreti$manca" >> "$GITHUB_STEP_SUMMARY"
+            echo "::error title=Pubblica::mancano i segreti$manca"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Ramo di riserva su Neon
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          api="https://console.neon.tech/api/v2/projects/$PROGETTO_NEON/branches"
+          aut="Authorization: Bearer $NEON_API_KEY"
+          padre=$(curl -sS --fail-with-body -H "$aut" "$api" | jq -r --arg n "$RAMO_NEON" '.branches[] | select(.name == $n) | .id')
+          if [ -z "$padre" ]; then echo "::error title=Pubblica::il ramo $RAMO_NEON non c'è su Neon"; exit 1; fi
+          nome="backup-$(date -u +%Y-%m-%d-%H%M)"
+          scade=$(date -u -d '+30 days' +%Y-%m-%dT%H:%M:%SZ)
+          crea() { curl -sS --fail-with-body -X POST -H "$aut" -H 'Content-Type: application/json' "$api" -d "$1" > /dev/null; }
+          # senza compute, con la scadenza a 30 giorni; se Neon non accetta la scadenza, senza
+          crea "$(jq -nc --arg p "$padre" --arg n "$nome" --arg s "$scade" '{branch: {parent_id: $p, name: $n, expires_at: $s}}')" \
+            || crea "$(jq -nc --arg p "$padre" --arg n "$nome" '{branch: {parent_id: $p, name: $n}}')"
+          echo "::notice title=Ramo di riserva::$nome"
+          echo "- Ramo di riserva su Neon: \`$nome\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Deploy su Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TELEMETRY_DISABLED: '1'
+        run: |
+          npx --yes vercel@65 link --yes --project "$PROGETTO_VERCEL" --token "$VERCEL_TOKEN" > /dev/null
+          url=$(npx --yes vercel@65 deploy --prod --yes --token "$VERCEL_TOKEN")
+          echo "::notice title=Deploy::$url"
+          echo "- Deploy su Vercel: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Controllo delle ipotesi verificate
+        env:
+          DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+        run: |
+          command -v psql > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client > /dev/null; }
+          sql() { psql "$DATABASE_URL_UNPOOLED" -X -At -v ON_ERROR_STOP=1 -c "$1"; }
+          # se la connessione non riesce, il passo si ferma qui con l'errore di psql
+          aggiornato=$(sql "select to_regprocedure('opere_a_sostegno(bigint)') is not null")
+          if [ "$aggiornato" != t ]; then
+            echo "::error title=Pubblica::gli aggiornamenti del database non risultano applicati"
+            exit 1
+          fi
+          # norme redazionali, «Fonti e citazioni»: un'opera che propone o accoglie, due per la certezza 4
+          righe=$(sql "select l.slug || ' «' || h.etichetta || '», certezza ' || h.confidenza || ', opere ' || opere_a_sostegno(h.id)
+                         from ipotesi h join lessema l on l.id = h.esito_id
+                        where h.stato_editoriale = 'verificato'
+                          and (opere_a_sostegno(h.id) = 0 or (h.confidenza = 4 and opere_a_sostegno(h.id) < 2))
+                        order by 1")
+          if [ -z "$righe" ]; then
+            echo "::notice title=Controllo::nessuna ipotesi verificata da rivedere"
+            echo "- Controllo: nessuna ipotesi verificata da rivedere." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Ipotesi verificate da rivedere (una fonte in più, o certezza 3):" >> "$GITHUB_STEP_SUMMARY"
+            while IFS= read -r r; do
+              echo "::warning title=Da rivedere::$r"
+              echo "  - $r" >> "$GITHUB_STEP_SUMMARY"
+            done <<< "$righe"
+          fi
