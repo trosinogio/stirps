@@ -12,6 +12,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 - **Il lavoro della redazione non si ricostruisce.** Prima di qualunque operazione che cambi i dati di produzione (nuovo import, migrazione, ricalcoli pesanti) crea un ramo di riserva su Neon: `neon branches create --name backup-AAAA-MM-GG --parent production --no-compute`. Non azzerare mai lo schema `public`: è stato fatto una volta, prima che la redazione cominciasse, e non va ripetuto.
 - **Mai segreti nel codice, nei log o in chat.** Le variabili stanno nelle impostazioni di Vercel e nei segreti di GitHub.
 - **Prima di un’operazione rischiosa in produzione chiedi conferma a Giovanni.**
+- **Un push su `main` va in produzione:** dopo il collaudo lo pubblica `.github/workflows/pubblica.yml`, che crea da sé il ramo di riserva. Si lavora su un ramo, e si unisce a `main` solo con il via libera di Giovanni.
 
 ## Comandi
 
@@ -21,6 +22,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 - `node scripts/applica-sql.mjs file.sql`: applica un file SQL in una transazione.
 - `node scripts/esporta-redazione.mjs cartella`: copia del lavoro della redazione in JSON; ogni notte la fa `.github/workflows/copia-redazione.yml` nel ramo `copia-redazione`.
 - Import completo da Wiktionary: `import/importa.sh` (scarica i dump di Kaikki); collaudo del parser: `import/collauda.sh`. Vedi `import/LEGGIMI.md`.
+- Pubblicazione: `.github/workflows/pubblica.yml`, dopo ogni collaudo riuscito su `main`, o a mano (`gh api repos/trosinogio/stirps/actions/workflows/pubblica.yml/dispatches -X POST -f ref=main`). Fa ramo di riserva su Neon, deploy su Vercel e controllo; l’esito sta nelle annotazioni del job. Vercel non è collegato a GitHub, e da una sandbox Neon e Vercel di solito non si raggiungono: si pubblica da qui.
 
 ## Mappa
 
