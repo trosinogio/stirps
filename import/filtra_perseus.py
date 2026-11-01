@@ -79,15 +79,21 @@ def testo(el):
     return SPAZI.sub(' ', ''.join(el.itertext())).strip() if el is not None else ''
 
 
+# una glossa che finisce con un articolo o una preposizione è tronca: il dizionario continua con una parola greca o
+# latina («like an ἀβάκιον», «the daughter of a grandson»)
+TRONCA = re.compile(r'\b(a|an|the|of|to|with|in|by|for|from|on|at|like|as|or|and)$', re.I)
+
+
 def breve(g):
     """La glossa in breve: senza le note grammaticali in coda («good; comp.» → «good»), e al primo punto e virgola
-    se è lunga."""
+    se è lunga. Se è tronca lo dice, con i puntini: «like an …»."""
     parti = [p.strip(' .,:') for p in g.split(';')]
     parti = [parti[0]] + [p for p in parti[1:] if p and not GRAMMATICA.match(p) and len(p.split()) > 1]
     g = '; '.join(p for p in parti if p)
     if len(g) > 80:
         g = parti[0]
-    return g[:200].rstrip(' .;,:')
+    g = g[:200].rstrip(' .;,:')
+    return g + ' …' if TRONCA.search(g) else g
 
 
 def abbreviazioni(g):

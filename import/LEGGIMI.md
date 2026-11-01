@@ -87,7 +87,7 @@ Le glosse inglesi passano dalla stessa traduzione automatica delle voci di Wikti
 
 **Licenza.** Il Perseus chiede di citare il Perseus Digital Library con un collegamento a http://www.perseus.tufts.edu/, di identificare ogni testo con il suo repository (qui sopra e nello strato `perseus`) e di offrirgli le correzioni: se la redazione corregge una glossa che viene da questi dizionari, va segnalata su https://github.com/PerseusDL/lexica/issues.
 
-**Limiti.** La glossa è la prima traduzione della voce, non sempre la più rappresentativa, e qualche volta è troncata («frenzied like a», dove l’LSJ continua in greco) o porta un refuso della digitalizzazione («carue on» per «carve on»). Circa 9 mila voci del Lewis & Short e 25 mila dell’LSJ non hanno una glossa: soprattutto nomi propri e rimandi a un’altra voce.
+**Limiti.** La glossa è la prima traduzione della voce, non sempre la più rappresentativa. Quando il dizionario continua con una parola greca o latina la traduzione resta tronca, e porta i puntini: «like an …», «the daughter of a …» (il 4% delle glosse latine, il 7% delle greche). Qualche glossa ha un refuso della digitalizzazione («carue on» per «carve on»). Circa 9 mila voci del Lewis & Short e 25 mila dell’LSJ non hanno una glossa: soprattutto nomi propri e rimandi a un’altra voce.
 
 ## Le prime attestazioni
 
