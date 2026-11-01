@@ -38,6 +38,7 @@ import/                          importatore da Wiktionary (Python), con banco d
 dati/                            etimologie, attestazioni, glosse italiane e frequenze già analizzate, caricate al primo deploy (CC BY-SA 4.0)
 scripts/inizializza-db.mjs       prepara il database prima della build, se è vuoto
 scripts/pubblica-vercel.sh       pubblica su Vercel dalla riga di comando
+scripts/pubblica-vercel-api.sh   pubblica su Vercel con l'API REST: lo usa il workflow Pubblica
 neon.ts, .neon                   servizi e collegamento del progetto Neon (neon init)
 .agents/skills/                  skill di Neon per gli agenti di programmazione
 ```
@@ -190,7 +191,7 @@ Il codice vive in un repository GitHub privato. Vercel non è collegato a GitHub
 
 - **Pubblicazione** (`.github/workflows/pubblica.yml`): parte dopo ogni collaudo riuscito su `main`, oppure a mano dalla scheda Actions.
   - Crea su Neon un ramo di riserva (`backup-AAAA-MM-GG-HHMM`, senza compute, che scade dopo 30 giorni).
-  - Pubblica su Vercel: la build applica gli aggiornamenti datati.
+  - Pubblica su Vercel con `scripts/pubblica-vercel-api.sh`, che usa l'API REST e non la CLI: il token è un token di progetto (`vcp_…`), che vede il progetto ma non l'utente, e la CLI con lui si ferma («User not found»). La build applica gli aggiornamenti datati.
   - Controlla che gli aggiornamenti siano nel database, ed elenca le ipotesi verificate che non rispettano le norme.
   - Se un passo fallisce, i successivi non partono.
   - Richiede i segreti `VERCEL_TOKEN`, `NEON_API_KEY` e `DATABASE_URL_UNPOOLED`.

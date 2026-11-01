@@ -22,7 +22,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 - `node scripts/applica-sql.mjs file.sql`: applica un file SQL in una transazione.
 - `node scripts/esporta-redazione.mjs cartella`: copia del lavoro della redazione in JSON; ogni notte la fa `.github/workflows/copia-redazione.yml` nel ramo `copia-redazione`.
 - Import completo da Wiktionary: `import/importa.sh` (scarica i dump di Kaikki); collaudo del parser: `import/collauda.sh`. Vedi `import/LEGGIMI.md`.
-- Pubblicazione: `.github/workflows/pubblica.yml`, dopo ogni collaudo riuscito su `main`, o a mano (`gh api repos/trosinogio/stirps/actions/workflows/pubblica.yml/dispatches -X POST -f ref=main`). Fa ramo di riserva su Neon, deploy su Vercel e controllo; l’esito sta nelle annotazioni del job. Vercel non è collegato a GitHub, e da una sandbox Neon e Vercel di solito non si raggiungono: si pubblica da qui.
+- Pubblicazione: `.github/workflows/pubblica.yml`, dopo ogni collaudo riuscito su `main`, o a mano (`gh api repos/trosinogio/stirps/actions/workflows/pubblica.yml/dispatches -X POST -f ref=main`). Fa ramo di riserva su Neon, deploy su Vercel e controllo; l’esito sta nelle annotazioni del job. Il deploy passa da `scripts/pubblica-vercel-api.sh` (API REST): `VERCEL_TOKEN` è un token di progetto, e la CLI di Vercel con lui non funziona. Vercel non è collegato a GitHub, e da una sandbox Neon e Vercel di solito non si raggiungono: si pubblica da qui.
 
 ## Mappa
 
