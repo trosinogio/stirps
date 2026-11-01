@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Collaudo dell'importatore su import/esempio/: voci reali italiane, latine, del francese antico e del greco antico.
+# Latino e greco entrano interi (--intere): anche le voci che nessuna catena italiana raggiunge. In più alcuni lemmi
+# dei dizionari del Perseus (esempio/dizionari.tsv, l'uscita di filtra_perseus.py).
 # Richiede un database con 01–03 e 05 caricati: DATABASE_URL=… ./collauda.sh
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -7,11 +9,11 @@ rm -rf esempio/tsv
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \
   --chiudi fro=esempio/fro_lemmi.jsonl,esempio/fro_glosse.tsv,esempio/fro_forme.tsv \
-  --chiudi grc=esempio/grc_lemmi.jsonl,esempio/grc_glosse.tsv,esempio/grc_forme.tsv --passi 5 > /dev/null
+  --chiudi grc=esempio/grc_lemmi.jsonl,esempio/grc_glosse.tsv,esempio/grc_forme.tsv --passi 5 --intere la,grc > /dev/null
 cd esempio/tsv
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
 truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_radice, stg_attestazione, stg_wikizionario,
-         stg_glossa_wikidata, stg_glossa_tradotta;
+         stg_glossa_wikidata, stg_glossa_tradotta, stg_dizionario;
 \copy stg_lingua from 'lingue.tsv'
 \copy stg_lessema from 'lessemi.tsv'
 \copy stg_ipotesi from 'ipotesi.tsv'
@@ -22,7 +24,9 @@ truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_
 \copy stg_wikizionario from '../glosse_it.tsv'
 \copy stg_glossa_wikidata from '../glosse_wikidata.tsv'
 \copy stg_glossa_tradotta from '../glosse_tradotte.tsv'
+\copy stg_dizionario from '../dizionari.tsv'
 select importa_wiktionary();
+select importa_dizionari();
 select importa_glosse_wikizionario();
 select importa_glosse_aggiuntive();
 refresh materialized view mv_allotropi;

@@ -85,9 +85,9 @@ Ogni parola ha al più una glossa italiana. Le fonti, in ordine di rango:
 1. la redazione;
 2. il Wikizionario (CC BY-SA 4.0);
 3. le definizioni dei lessemi di Wikidata (CC0), per le parole italiane senza voce nel Wikizionario: solo con la stessa parte del discorso, senza omografi e senza «etichette» con la maiuscola;
-4. la traduzione automatica delle glosse inglesi di Wiktionary, per gli etimi stranieri.
+4. la traduzione automatica delle glosse inglesi di Wiktionary e dei dizionari del Perseus, per gli etimi stranieri.
 
-Una fonte di rango più basso non scavalca mai una più alta. Prima del Wikizionario le glosse importate di Wikidata e della traduzione si tolgono, e `importa_glosse_aggiuntive()` le rimette dove servono ancora; quelle riviste dalla redazione restano.
+Una fonte di rango più basso non scavalca mai una più alta. Una glossa importata di Wikidata o della traduzione lascia il posto a quella del Wikizionario quando arriva; `importa_glosse_aggiuntive()` toglie quelle che non valgono più e aggiunge le nuove, lasciando dove sono le altre. Quelle riviste dalla redazione restano.
 
 La traduzione automatica (`import/traduci_glosse.py`) usa un modello OPUS-MT di Argos Translate con CTranslate2, sul processore, senza servizi esterni. Lavora un senso alla volta, e tiene un senso solo se passa tutti i controlli:
 
@@ -153,9 +153,12 @@ Il pacchetto `dati/*.tsv.gz` ha un'impronta (SHA-256 dei file e della logica d'i
 1. carica le tabelle di appoggio;
 2. esegue `importa_wiktionary()`, che non tocca nulla di ciò che la redazione ha rivisto o verificato, nemmeno gli archi rimasti «importato» delle sue ipotesi;
 3. esegue `pulisci_wiktionary()`, che toglie ipotesi e voci che Wiktionary non dà più se nessuno le ha toccate, riattiva le ipotesi accolte e toglie i numeri di omografo diventati inutili;
-4. aggiorna glosse e viste.
+4. esegue `importa_dizionari()`, che aggiunge i lemmi latini e greci del Lewis & Short e del Liddell–Scott–Jones che Wiktionary non ha (strato `perseus`, vedi `import/LEGGIMI.md`);
+5. aggiorna glosse e viste.
 
-Se qualcosa va storto, il database resta com'era e il deploy si ferma.
+Se qualcosa va storto, il database resta com'era e il deploy si ferma. Dopo il commit svuota le tabelle di appoggio, fa il vacuum e scrive nel registro lo spazio occupato.
+
+**Lo spazio.** Il piano gratuito di Neon ha 0,5 GB. L'import scrive solo ciò che cambia: voci, ipotesi, archi e glosse uguali restano dove sono, perché in Postgres ogni riga riscritta lascia una copia morta fino al vacuum. Prima ogni reimport riscriveva quasi tutto. Con latino e greco completi (novembre 2026, 293 mila voci) un caricamento da zero occupa circa 290 MB, e un reimport con gli stessi dati non lo fa crescere.
 
 Prima di un deploy che cambia i dati conviene una copia del ramo di produzione, che su Neon è istantanea:
 
@@ -192,10 +195,16 @@ Il codice vive in un repository GitHub privato. Vercel non è collegato a GitHub
 - **Pubblicazione** (`.github/workflows/pubblica.yml`): parte dopo ogni collaudo riuscito su `main`, oppure a mano dalla scheda Actions.
   - Crea su Neon un ramo di riserva (`backup-AAAA-MM-GG-HHMM`, senza compute, che scade dopo 30 giorni).
   - Pubblica su Vercel con `scripts/pubblica-vercel-api.sh`, che usa l'API REST e non la CLI: il token è un token di progetto (`vcp_…`), che vede il progetto ma non l'utente, e la CLI con lui si ferma («User not found»). La build applica gli aggiornamenti datati.
-  - Controlla che gli aggiornamenti siano nel database, ed elenca le ipotesi verificate che non rispettano le norme.
+  - Controlla che gli aggiornamenti siano nel database, elenca le ipotesi verificate che non rispettano le norme e riporta lo spazio occupato (il piano gratuito di Neon ha 0,5 GB).
   - Se un passo fallisce, i successivi non partono.
   - Richiede i segreti `VERCEL_TOKEN`, `NEON_API_KEY` e `DATABASE_URL_UNPOOLED`.
-- **Collaudo** (`.github/workflows/collaudo.yml`): a ogni push controlla i tipi TypeScript e fa girare `scripts/collauda.sh` su un Postgres di prova, cioè gli 82 test del seme e i 50 dell'import. In locale: `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`.
+- **Dati** (`.github/workflows/dati.yml`): rigenera il pacchetto `dati/` con un push su un ramo `dati-*`, oppure a mano.
+  - Scarica i dump di Kaikki e analizza le etimologie, con latino e greco interi (`import/importa.sh`, `SOLO_ANALISI=1`).
+  - Aggiunge i lemmi del Lewis & Short e dell'LSJ che Wiktionary non ha, dai file TEI del Perseus fissati a un commit (`dati/dizionari.tsv.gz`).
+  - Traduce solo le glosse delle voci nuove e compone `dati/*.tsv.gz` con `gzip -9 -n`.
+  - Rimette il pacchetto sullo stesso ramo, con un commit.
+  - Da una sandbox Kaikki di solito non si raggiunge: si passa da qui. Con il merge su `main` la pubblicazione rifà l'import, dopo il ramo di riserva.
+- **Collaudo** (`.github/workflows/collaudo.yml`): a ogni push controlla i tipi TypeScript e fa girare `scripts/collauda.sh` su un Postgres di prova, cioè gli 84 test del seme e i 69 dell'import. In locale: `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`.
 - **Copia della redazione** (`.github/workflows/copia-redazione.yml`): ogni notte `scripts/esporta-redazione.mjs` esporta tutto ciò che la redazione ha scritto o toccato (voci, ipotesi, passaggi, date, glosse, fonti, storico). Le righe sono JSON, ciascuna con gli indirizzi delle voci collegate. La copia va nel ramo `copia-redazione`, e ogni notte con dei cambiamenti diventa un commit. Il workflow richiede il segreto `DATABASE_URL_UNPOOLED` del repository, e si può lanciare a mano dalla scheda Actions.
 - **Ripristino:** la prima via è un ramo di Neon (`neon branches restore`); la seconda è la copia, leggibile e indipendente dagli identificativi del database.
 
@@ -218,8 +227,8 @@ Il piano Hobby di Vercel è riservato all'uso non commerciale.
 - **Stemma progressivo.** Il server genera lo stemma verticale, leggibile anche senza JavaScript e dai motori di ricerca. Su schermo largo il browser lo sostituisce con lo stemma orizzontale interattivo.
 - **Bozze protette.** Senza `ANTEPRIMA=1` restano visibili solo le voci importate, riviste o verificate, e le catene si fermano dove un antenato è in bozza.
 - **Lingue dichiarate.** Se una glossa o una nota non esiste nella lingua dell'interfaccia, la pagina mostra quella disponibile e dice in che lingua è.
-- **Fonti dichiarate.** Un'ipotesi importata mostra lo strato da cui viene e la sua licenza; i dati di Wiktionary restano CC BY-SA 4.0.
-- **Pronta per la scala.** Le famiglie sono precalcolate (`mv_famiglia`), la pagina iniziale mostra le radici più ampie e rimanda agli elenchi completi, le lingue si sfogliano per iniziale. Dopo un import o una modifica si rinfrescano `mv_allotropi` e `mv_famiglia`.
+- **Fonti dichiarate.** Un'ipotesi importata mostra lo strato da cui viene e la sua licenza; i dati di Wiktionary e del Perseus restano CC BY-SA 4.0.
+- **Pronta per la scala.** Le famiglie sono precalcolate (`mv_famiglia`), la pagina iniziale mostra le radici più ampie e rimanda agli elenchi completi, le lingue si sfogliano per iniziale, e oltre le 2000 parole per le prime due lettere (la Α del greco ne ha ventimila). Dopo un import o una modifica si rinfrescano `mv_allotropi` e `mv_famiglia`.
 
 ## Aggiungere una lingua d'interfaccia
 

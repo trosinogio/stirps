@@ -104,3 +104,7 @@ jobs:
               echo "  - $r" >> "$GITHUB_STEP_SUMMARY"
             done <<< "$righe"
           fi
+          # lo spazio occupato: il piano gratuito di Neon ha 0,5 GB
+          spazio=$(sql "select pg_size_pretty(pg_database_size(current_database())) || ', ' || (select count(*) from lessema) || ' voci'")
+          echo "::notice title=Spazio::$spazio"
+          echo "- Spazio occupato: $spazio." >> "$GITHUB_STEP_SUMMARY"

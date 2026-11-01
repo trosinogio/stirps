@@ -26,6 +26,7 @@ const APPOGGIO = [
   ['stg_relazione', 'relazioni'], ['stg_doppione', 'doppioni'], ['stg_radice', 'radici'],
   ['stg_attestazione', 'attestazioni'], ['stg_wikizionario', 'glosse_it'],
   ['stg_glossa_wikidata', 'glosse_wikidata'], ['stg_glossa_tradotta', 'glosse_tradotte'],
+  ['stg_dizionario', 'dizionari'],
 ];
 const BLOCCO = 5000;
 // impronta del pacchetto dati: se cambia, al deploy si rifà l'import
@@ -39,8 +40,10 @@ const impronta = (() => {
 const t0 = Date.now();
 const secondi = () => ((Date.now() - t0) / 1000).toFixed(1);
 
-// tabelle di appoggio dal pacchetto dati, fusione nel dizionario, glosse, viste; registra l'impronta.
-// Tutto in una transazione: se qualcosa va storto il database resta com'era e il deploy si ferma.
+// tabelle di appoggio dal pacchetto dati, fusione nel dizionario, lemmi dei dizionari, glosse, viste; registra
+// l'impronta. Tutto in una transazione: se qualcosa va storto il database resta com'era e il deploy si ferma.
+// Dopo il commit le tabelle di appoggio si svuotano e il vacuum rende riusabile lo spazio delle righe sostituite
+// (il piano gratuito di Neon ha 0,5 GB).
 async function importa(client, pulisci) {
   await client.query('begin');
   try {
@@ -49,12 +52,15 @@ async function importa(client, pulisci) {
       const k = await carica(client, tabella, file);
       console.log(`[db]   ${tabella}: ${k} righe (${secondi()} s)`);
     }
+    await client.query(`analyze ${APPOGGIO.map(([t]) => t).join(', ')}`);   // stime giuste per i piani della fusione
     const { rows: [r] } = await client.query('select importa_wiktionary() as r');
     console.log('[db] fusione:', JSON.stringify(r.r));
     if (pulisci) {
       const { rows: [p] } = await client.query('select pulisci_wiktionary() as p');
       console.log('[db] pulizia:', JSON.stringify(p.p));
     }
+    const { rows: [d] } = await client.query('select importa_dizionari() as d');
+    console.log('[db] dizionari:', JSON.stringify(d.d));
     const { rows: [g] } = await client.query('select importa_glosse_wikizionario() as g');
     console.log('[db] glosse italiane:', JSON.stringify(g.g));
     const { rows: [ga] } = await client.query('select importa_glosse_aggiuntive() as g');
@@ -70,7 +76,10 @@ async function importa(client, pulisci) {
     await client.query('rollback').catch(() => {});
     throw e;
   }
-  await client.query('analyze');
+  await client.query(`truncate ${APPOGGIO.map(([t]) => t).join(', ')}`);
+  await client.query('vacuum (analyze)');
+  const { rows: [dim] } = await client.query('select pg_size_pretty(pg_database_size(current_database())) as d');
+  console.log(`[db] spazio occupato: ${dim.d}`);
 }
 
 async function connetti() {
@@ -95,6 +104,8 @@ async function connetti() {
 const campo = (x) => (x === '\\N' ? null : x.replace(/\\\\/g, '\\'));
 
 async function carica(client, tabella, file) {
+  // i dizionari possono mancare in un pacchetto vecchio: la tabella resta vuota e importa_dizionari() non fa nulla
+  if (file === 'dizionari' && !existsSync(`dati/${file}.tsv.gz`)) return 0;
   const { rows: colonne } = await client.query(
     `select attname as nome, format_type(atttypid, atttypmod) as tipo from pg_attribute
       where attrelid = $1::regclass and attnum > 0 and not attisdropped order by attnum`, [tabella]);

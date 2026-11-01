@@ -350,10 +350,11 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
       )}
 
       {(() => {
-        // la stessa parola nelle opere di riferimento in rete, più Wiktionary (anche per le forme ricostruite)
+        // la stessa parola nelle opere di riferimento in rete, più Wiktionary (anche per le forme ricostruite), salvo per
+        // le voci dei dizionari del Perseus: sono proprio quelle che Wiktionary non ha
         const L = sc.lessema;
         const enc = encodeURIComponent(L.lemma);
-        const ling = (L.wiktionary_lingua ?? '').replace(/ /g, '_');
+        const ling = L.provenienza === 'perseus' ? '' : (L.wiktionary_lingua ?? '').replace(/ /g, '_');
         const wikt = ling ? (L.ricostruito ? `https://en.wiktionary.org/wiki/Reconstruction:${ling}/${enc}` : `https://en.wiktionary.org/wiki/${enc}#${ling}`) : null;
         const voci = (sc.consultabili ?? []).map((o) => ({ chiave: o.sigla, titolo: o.titolo, meta: [o.autore, o.anno].filter(Boolean).join(', '), url: o.modello.replace('{lemma}', enc) }));
         if (wikt) voci.push({ chiave: 'Wiktionary', titolo: 'Wiktionary', meta: '', url: wikt });

@@ -33,9 +33,11 @@ for riga in sys.stdin:
         et = set(f.get('tags') or [])
         if ({'infinitive', 'present', 'active'} <= et or {'genitive', 'singular'} <= et) and len(distintive) < 4:
             distintive.append(f.get('form', ''))
+    # sesta colonna: 1 per le forme ricostruite (pagine Reconstruction:), che non sono parole attestate
     glosse.write('\t'.join((v['word'], str(v.get('etymology_number') or 1), v.get('pos') or '',
                              (g[0] if g else '').replace('\t', ' ').replace('\n', ' ')[:200],
-                             ','.join(x.replace(',', ' ') for x in distintive if x))) + '\n')
+                             ','.join(x.replace(',', ' ') for x in distintive if x),
+                             '1' if (v.get('original_title') or '').startswith('Reconstruction:') else '')) + '\n')
     tpl = [{'n': t['name'], 'a': t.get('args', {}), 'e': t.get('expansion', '')} for t in tpl if t.get('name') in UTILI]
     if not tpl: senza += 1; continue
     heads = [{'n': h.get('name'), 'a': h.get('args', {})} for h in (v.get('head_templates') or [])[:1]]

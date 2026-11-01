@@ -350,6 +350,7 @@ class Importatore:
         self.chiusura = {}           # lingua -> indici delle voci di chiusura
         self.participi = set()       # (lingua, pagina) dei participi citati come etimi
         self.attestazioni = {}       # chiave del lessema -> (anno_da, anno_a, precisione)
+        self.intere = set()          # lingue di chiusura importate intere (--intere la,grc), non solo dove le catene arrivano
         self.stat = Counter()
 
     # ---- lessemi ----
@@ -613,7 +614,8 @@ class Importatore:
     def carica_chiusura(self, lingua, lemmi, forme=None, glosse=None):
         """Indici di una lingua di chiusura, da caricare prima delle voci principali."""
         voci = [json.loads(r) for r in open(lemmi, encoding='utf-8')]
-        idx = {'voci': voci, 'lemmi': set(), 'omografi': defaultdict(list), 'forme': {}, 'participi': {}, 'flesse': {}}
+        idx = {'voci': voci, 'lemmi': set(), 'omografi': defaultdict(list), 'forme': {}, 'participi': {}, 'flesse': {},
+               'file_glosse': glosse}
         forme_omografi = defaultdict(dict)
         if glosse and os.path.exists(glosse):
             # tutti i lemmi, anche senza etimologia: pugnō è un lemma, non il dativo di pugnus
@@ -698,11 +700,14 @@ class Importatore:
         return lingua, pagina, omo, forma_extra
 
     def chiudi(self, passi=1):
-        """Importa le etimologie delle voci intermedie già presenti nel dizionario."""
+        """Importa le etimologie delle voci intermedie già presenti nel dizionario. Nelle lingue intere (--intere)
+        il primo passaggio prende anche le voci attestate che nessuna catena raggiunge (lēvir, δαήρ): così le
+        famiglie delle radici si completano. Le forme ricostruite entrano solo se una catena le cita."""
         fatte = set()
         for passo in range(passi):
             nuove = 0
             for lingua, idx in self.chiusura.items():
+                intera = passo == 0 and lingua in self.intere
                 for i, v in enumerate(idx['voci']):
                     if (lingua, i) in fatte:
                         continue
@@ -714,15 +719,38 @@ class Importatore:
                     else:
                         candidati = [(lingua, pagina)]
                     for lc, termine in candidati:
-                        if chiave(lc, termine, omo) in self.lessemi:
+                        raggiunta = chiave(lc, termine, omo) in self.lessemi
+                        if raggiunta or (intera and not v.get('rec')):
                             fatte.add((lingua, i))
                             self.voce(v, lingua_voce=lc, parola=termine)
                             nuove += 1
+                            if not raggiunta:
+                                self.stat[f'intere_{lingua}'] += 1
                             break
             self.stat[f'chiusura_passo_{passo + 1}'] = nuove
             if not nuove:
                 break
 
+
+    def aggiungi_lemmi_interi(self):
+        """Nelle lingue intere entrano anche i lemmi senza etimologia, con glossa e parte del discorso: la lingua è
+        completa, non solo le sue famiglie. Le forme ricostruite (sesta colonna di glosse.tsv) restano fuori."""
+        for lingua in sorted(self.intere):
+            percorso = (self.chiusura.get(lingua) or {}).get('file_glosse')
+            if not percorso or not os.path.exists(percorso):
+                continue
+            for riga in open(percorso, encoding='utf-8'):
+                c = riga.rstrip('\n').split('\t') + ['', '', '', '', '', '']
+                parola, etimn, pos, glossa, ricostruita = c[0], c[1], c[2], c[3], c[5]
+                if not parola or ricostruita == '1' or parola.startswith('*'):
+                    continue
+                omo = int(etimn) if etimn.isdigit() else 1
+                pagina = nome_pagina(lingua, parola)
+                if chiave(lingua, pagina, omo) in self.lessemi:
+                    continue
+                self.lessema(lingua, pagina, glossa=glossa[:200] if glossa else None,
+                             pos=POS.get(pos) or ('s.' if pos == 'noun' else None), omografo=omo)
+                self.stat[f'lemmi_interi_{lingua}'] += 1
 
     def collega_participi(self):
         """Le forme citate come etimi si legano al loro lemma: il participio (aperto < apertus < aperiō) per
@@ -952,16 +980,20 @@ def completa_glosse(imp, percorso, lingua=None):
 
 if __name__ == '__main__':
     # wiktionary.py lemmi.jsonl uscita/ [glosse.tsv] [--chiudi la=lemmi.jsonl,glosse.tsv,forme.tsv]… [--passi N]
-    args, chiusure, passi = [], [], 1
+    #               [--intere la,grc]
+    args, chiusure, passi, intere = [], [], 1, set()
     it_ = iter(sys.argv[1:])
     for x in it_:
         if x == '--chiudi':
             chiusure.append(next(it_))
         elif x == '--passi':
             passi = int(next(it_))
+        elif x == '--intere':
+            intere = {c for c in next(it_).split(',') if c}
         else:
             args.append(x)
     imp = Importatore()
+    imp.intere = intere
     for c in chiusure:
         lingua, percorsi = c.split('=', 1)
         p = percorsi.split(',') + ['', '']
@@ -981,5 +1013,6 @@ if __name__ == '__main__':
     imp.risolvi_intermedi()
     imp.chiudi_su_radici()
     imp.togli_cicli()
+    imp.aggiungi_lemmi_interi()
     st = imp.scrivi(args[1])
     print(json.dumps(dict(st), indent=1))

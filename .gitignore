@@ -11,3 +11,4 @@ import/esempio/tsv/
 .neon
 .vercel
 .env*
+__pycache__/
