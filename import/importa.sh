@@ -5,6 +5,7 @@
 #   CHIUSURA="" DATABASE_URL=… ./importa.sh                                  # senza chiusura delle catene
 #   WIKIZIONARIO=0 DATABASE_URL=… ./importa.sh                               # senza glosse italiane del Wikizionario
 #   INTERE="" DATABASE_URL=… ./importa.sh                                    # latino e greco solo dove le catene arrivano
+#   DIZIONARI=0 DATABASE_URL=… ./importa.sh                                  # senza i lemmi del Lewis & Short e dell'LSJ
 #   SOLO_ANALISI=1 ./importa.sh                                              # si ferma alle tabelle (dati/it/tsv), senza database
 # Richiede python3, curl e psql. Lo schema (01–03) e db/05_import_wiktionary.sql devono essere già caricati.
 set -euo pipefail
@@ -16,6 +17,8 @@ PASSI=${PASSI:-5}   # la chiusura si ripete finché trova voci nuove: βούτυ
 WIKIZIONARIO=${WIKIZIONARIO:-1}
 INTERE=${INTERE-la,grc}   # lingue di chiusura importate intere: anche le voci che nessuna catena raggiunge
 SOLO_ANALISI=${SOLO_ANALISI:-0}
+DIZIONARI=${DIZIONARI:-1}   # i lemmi del Lewis & Short e dell'LSJ che Wiktionary non ha (Perseus, CC BY-SA 4.0)
+PERSEUS=${PERSEUS:-1c34cdf756c63cf37db61bd366d733431dbd7aa0}   # commit di PerseusDL/lexica
 DATI=dati/$LINGUA
 mkdir -p "$DATI"
 
@@ -44,6 +47,22 @@ fi
 echo "2/4  leggo le etimologie"
 python3 wiktionary.py "$DATI/lemmi.jsonl" "$DATI/tsv" "$DATI/glosse.tsv" ${ARGOMENTI[@]+"${ARGOMENTI[@]}"} --passi "$PASSI" \
   ${INTERE:+--intere "$INTERE"} > "$DATI/rapporto_parser.json"
+if [ "$DIZIONARI" = 1 ]; then
+  echo "     dizionari del Perseus: Lewis & Short e Liddell–Scott–Jones"
+  mkdir -p dati/perseus
+  file=(lat/ls/lat.ls.perseus-eng2.xml)
+  for i in $(seq 1 27); do file+=("grc/lsj/grc.lsj.perseus-eng$i.xml"); done
+  locali=()
+  for f in "${file[@]}"; do
+    locale="dati/perseus/$(basename "$f")"; locali+=("$locale")
+    [ -s "$locale" ] || curl -sfL --retry 3 -o "$locale" \
+      "https://raw.githubusercontent.com/PerseusDL/lexica/$PERSEUS/CTS_XML_TEI/perseus/pdllex/$f"
+  done
+  if ! python3 filtra_perseus.py "$DATI/tsv/dizionari.tsv" --escludi "$DATI/tsv/lessemi.tsv" "${locali[@]}" 2> "$DATI/rapporto_perseus.txt"; then
+    cat "$DATI/rapporto_perseus.txt" >&2; exit 1
+  fi
+  cat "$DATI/rapporto_perseus.txt"
+fi
 if [ "$SOLO_ANALISI" = 1 ]; then
   echo "     analisi finita: le tabelle sono in $DATI/tsv"
   exit 0
@@ -52,7 +71,8 @@ fi
 echo "3/4  carico le tabelle di appoggio"
 cd "$DATI/tsv"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
-truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_radice, stg_attestazione, stg_wikizionario;
+truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_radice, stg_attestazione, stg_wikizionario,
+         stg_dizionario;
 \copy stg_lingua from 'lingue.tsv'
 \copy stg_lessema from 'lessemi.tsv'
 \copy stg_ipotesi from 'ipotesi.tsv'
@@ -64,9 +84,13 @@ SQL
 if [ -f ../glosse_it.tsv ]; then
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "\\copy stg_wikizionario from '../glosse_it.tsv'"
 fi
+if [ "$DIZIONARI" = 1 ] && [ -f dizionari.tsv ]; then
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "\\copy stg_dizionario from 'dizionari.tsv'"
+fi
 
 echo "4/4  fondo nel dizionario e ricalcolo allotropi e famiglie"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -At -c "select jsonb_pretty(importa_wiktionary())"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -At -c "select jsonb_pretty(importa_dizionari())"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -At -c "select jsonb_pretty(importa_glosse_wikizionario())"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "refresh materialized view mv_allotropi" -c "refresh materialized view mv_famiglia" -c "analyze"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "select * from v_validazione_wiktionary"

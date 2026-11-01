@@ -12,7 +12,9 @@ CHIUSURA="la:Latin" DATABASE_URL="postgres://…" ./importa.sh                  
 CHIUSURA="" DATABASE_URL="postgres://…" ./importa.sh                          # senza chiusura
 WIKIZIONARIO=0 DATABASE_URL="postgres://…" ./importa.sh                       # senza glosse italiane
 LINGUA=fr NOME=French CHIUSURA="la:Latin fro:Old French" DATABASE_URL="…" ./importa.sh   # un'altra lingua
-DATABASE_URL="postgres://…" ./collauda.sh           # 33 test su voci reali (esempio/)
+INTERE="" DATABASE_URL="postgres://…" ./importa.sh                            # latino e greco solo dove arrivano le catene
+SOLO_ANALISI=1 ./importa.sh                         # solo le tabelle (dati/it/tsv), senza database
+DATABASE_URL="postgres://…" ./collauda.sh           # test su voci reali (esempio/)
 ```
 
 Lo script lavora in quattro fasi e impiega circa quattro minuti:
@@ -20,9 +22,9 @@ Lo script lavora in quattro fasi e impiega circa quattro minuti:
 1. **Download e filtro, circa 2 minuti e mezzo.** `filtra.py` scarica in streaming i dump di Kaikki (italiano 779 MB, latino 1,25 GB, francese antico 37 MB). Tiene i lemmi con un’etimologia, l’elenco di tutti i lemmi con le forme che distinguono gli omografi, e per le lingue di chiusura la mappa forme flesse → lemma. `filtra_wikizionario.py` scarica il Wikizionario (665 MB) e tiene una glossa italiana per parola, lingua e parte del discorso.
 2. **Analisi, circa 1 minuto.** `wiktionary.py` legge le etimologie e scrive i file delle tabelle di appoggio.
 3. **Caricamento:** `psql \copy` riempie le tabelle di appoggio.
-4. **Fusione, circa 30 secondi, più 8 di ricalcoli.** `importa_wiktionary()` fonde etimologie e attestazioni, `importa_glosse_wikizionario()` le glosse italiane; poi si ricalcolano allotropi e famiglie.
+4. **Fusione, circa 30 secondi, più 8 di ricalcoli.** `importa_wiktionary()` fonde etimologie e attestazioni, `importa_dizionari()` aggiunge i lemmi del Perseus, `importa_glosse_wikizionario()` le glosse italiane; poi si ricalcolano allotropi e famiglie.
 
-L’import si può rilanciare: è idempotente.
+L’import si può rilanciare: è idempotente. E scrive solo ciò che cambia: voci, ipotesi, archi e glosse uguali restano dove sono (lo verifica un test sullo `xmin` delle righe). In Postgres ogni riga riscritta lascia una copia morta che occupa spazio fino al vacuum: prima, ogni reimport riscriveva quasi tutto e raddoppiava le tabelle, e il piano gratuito di Neon ha 0,5 GB. Dopo il commit `scripts/inizializza-db.mjs` svuota le tabelle di appoggio e fa il vacuum.
 
 ## La chiusura delle catene
 
@@ -52,6 +54,40 @@ Risultato, ottobre 2026:
 - **Etimi:** 4.975 hanno una glossa italiana, tra cui 2.833 latini e 953 greci.
 
 Dove la glossa italiana manca, l’interfaccia mostra quella inglese e lo dichiara.
+
+## I dizionari del Perseus: latino e greco completi
+
+Wiktionary ha circa 45 mila lemmi latini e 23 mila greci antichi. Perché le due lingue siano complete entrano anche i lemmi dei due dizionari di riferimento che Wiktionary non ha, dall’edizione digitale del Perseus Digital Library (Tufts University, http://www.perseus.tufts.edu/), con licenza CC BY-SA 4.0:
+
+- *A Latin Dictionary* di Charlton T. Lewis e Charles Short (1879): `lat.ls.perseus-eng2.xml`;
+- *A Greek-English Lexicon* di Henry George Liddell, Robert Scott e Henry Stuart Jones (9ª ed., 1940): `grc.lsj.perseus-eng1.xml` … `grc.lsj.perseus-eng27.xml`.
+
+I file TEI vengono dal repository [PerseusDL/lexica](https://github.com/PerseusDL/lexica), fissati a un commit nel workflow «Dati». Entrano come strato `perseus`, con stato `importato` e senza etimologia: la redazione può aggiungerla.
+
+```bash
+python3 filtra_perseus.py dati/it/tsv/dizionari.tsv --escludi dati/it/tsv/lessemi.tsv lat.ls.perseus-eng2.xml grc.lsj.perseus-eng*.xml
+```
+
+`filtra_perseus.py` usa solo la libreria standard e scrive le stesse colonne di `lessemi.tsv`:
+
+- **Il lemma come il titolo di Wiktionary.** Senza quantità, e per il latino *i* al posto di *j* (*iam*, non *jam*). Il greco dell’LSJ è in Beta Code (`*)/abrwn` → Ἄβρων) e diventa Unicode.
+- **La glossa è la prima traduzione.** Nel Lewis & Short è il primo corsivo che sia una definizione, saltando le note grammaticali («doub. dim.», «P. a. fin.») e i pezzi di parola (POSIER*unt*). Nell’LSJ è la prima traduzione del primo senso che ne ha, saltando i titoli citati («Aus Lydien»). Le glosse lunghe si fermano al primo punto e virgola.
+- **La traslitterazione del greco** segue lo schema di Wiktionary e dà l’indirizzo: ἀκρίς → `grc/akris`.
+- **Gli omografi** si numerano nell’ordine del dizionario: *abactus*¹, *abactus*².
+- **Restano fuori** le voci spurie del Lewis & Short, le voci dell’LSJ che non sono in greco (142) e, con `--escludi`, i lemmi che Wiktionary ha già, con la stessa forma.
+
+Nel database li fonde `importa_dizionari()`, dopo `pulisci_wiktionary()`:
+
+- **Le voci nuove** sono i lemmi che non ci sono già, né in Wiktionary con la stessa forma né nella redazione con la stessa forma normalizzata. Se l’indirizzo è occupato da un’altra parola (ἀκρίς «cavalletta» e ἄκρις «cima» danno entrambi `grc/akris`), la nuova prende il numero d’omografo libero successivo. Le voci già presenti tengono il loro.
+- **Le voci che nessuno ha toccato** si aggiornano (glossa e parte del discorso), e si tolgono se il pacchetto non le ha più.
+- **Quando Wiktionary arriva a una parola del dizionario,** `importa_wiktionary()` toglie la voce del dizionario e le prende il posto e l’indirizzo, se nessuno l’ha toccata. Se la redazione l’ha toccata (una glossa, un’ipotesi, un rimando), la voce resta e Wiktionary la abbina per lingua e lemma, senza doppioni.
+- **Mai per forma normalizzata:** come tra voci di Wiktionary, maiuscola e accento distinguono parole diverse (*carus* e *Carus*).
+
+Le glosse inglesi passano dalla stessa traduzione automatica delle voci di Wiktionary, con il segno ≈. La pagina della voce cita il Perseus tra le fonti, con la licenza.
+
+**Licenza.** Il Perseus chiede di citare il Perseus Digital Library con un collegamento a http://www.perseus.tufts.edu/, di identificare ogni testo con il suo repository (qui sopra e nello strato `perseus`) e di offrirgli le correzioni: se la redazione corregge una glossa che viene da questi dizionari, va segnalata su https://github.com/PerseusDL/lexica/issues.
+
+**Limiti.** La glossa è la prima traduzione della voce, non sempre la più rappresentativa, e qualche volta è troncata («frenzied like a», dove l’LSJ continua in greco) o porta un refuso della digitalizzazione («carue on» per «carve on»). Circa 9 mila voci del Lewis & Short e 25 mila dell’LSJ non hanno una glossa: soprattutto nomi propri e rimandi a un’altra voce.
 
 ## Le prime attestazioni
 
@@ -106,14 +142,14 @@ Entrano come attestazioni di tipo lessicografico, con la precisione dichiarata (
 
 ## Limiti noti
 
-- **Prosa libera.** Le etimologie scritte in prosa senza template restano fuori, così come i lemmi latini senza etimologia strutturata: solo 10 mila su 54 mila ne hanno una.
+- **Prosa libera.** Le etimologie scritte in prosa senza template restano fuori: dei 54 mila lemmi latini solo 10 mila hanno un’etimologia strutturata. Gli altri entrano lo stesso, senza catena, perché latino e greco entrano interi.
 - **Formazioni tra lingue.** 1.261 sono segnalate in `v_anomalie`: per lo più radici indoeuropee collegate direttamente a una parola latina, senza il derivato intermedio.
 - **Traslitterazioni mancanti.** 477 parole in scritture non latine ne sono prive: il loro indirizzo contiene caratteri non latini.
 - **Radici omografe.** 195 citazioni senza identificativo restano sul nodo generico.
 - **Glosse.** Circa 38 mila parole italiane restano con la sola glossa inglese, perché il Wikizionario non le registra; l’interfaccia italiana lo dichiara. Le lingue rare hanno ancora il nome inglese.
 - **Date.** Le prime attestazioni importate sono 231: la linea del tempo richiede il lavoro di redazione.
 
-`esempio/` contiene voci reali di Wiktionary e del Wikizionario (CC BY-SA 4.0) usate dal collaudo. Per l’italiano ci sono `lemmi.jsonl` e `glosse.tsv`; per la chiusura `la_*` e `fro_*`; per le glosse italiane `glosse_it.tsv`.
+`esempio/` contiene voci reali di Wiktionary e del Wikizionario (CC BY-SA 4.0) usate dal collaudo. Per l’italiano ci sono `lemmi.jsonl` e `glosse.tsv`; per la chiusura `la_*`, `fro_*` e `grc_*`; per le glosse italiane `glosse_it.tsv`; per i dizionari del Perseus `dizionari.tsv`, l’uscita vera di `filtra_perseus.py` per dieci lemmi (CC BY-SA 4.0).
 
 ## Caricare i dati già analizzati, senza Python
 

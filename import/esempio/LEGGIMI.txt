@@ -2,3 +2,8 @@ Voci estratte da Wiktionary (en.wiktionary.org) tramite Kaikki/wiktextract, dump
 Licenza CC BY-SA 4.0. Servono solo come banco di prova dell'importatore (06_test_import.sql):
 lemmi.jsonl e glosse.tsv per l'italiano; la_* e fro_* per la chiusura delle catene su latino e francese antico
 (voci con etimologia, elenco completo dei lemmi citati con le forme distintive, mappa forme → lemma).
+Dal dump del 1° novembre 2026, per il latino e il greco interi (--intere la,grc): lēvir e δαήρ, che nessuna voce
+italiana raggiunge, e la forma ricostruita *baba, che nessuna catena cita.
+dizionari.tsv: dieci righe dell'uscita di filtra_perseus.py, dai file TEI del Perseus Digital Library (Lewis & Short
+e Liddell–Scott–Jones, github.com/PerseusDL/lexica, CC BY-SA 4.0, http://www.perseus.tufts.edu/): lemmi nuovi
+(Carus, abactus¹ e abactus², ἄκρις e ἀκρίς, βαβαί) e lemmi che Wiktionary ha già (carus, levir, δαήρ, τυρός).

@@ -324,7 +324,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
       { titolo: 'In tutte le lingue', testo: 'Il dizionario è nato dall’italiano, ma ogni parola di ogni lingua può entrarvi: le famiglie si allargano a mano a mano che le lingue crescono.' },
     ],
     statoTitolo: 'A che punto siamo',
-    statoTesto: (r, i) => `La redazione ha scritto ${r.toLocaleString('it-IT')} voci, ancora in bozza. Le altre ${i.toLocaleString('it-IT')} vengono da Wiktionary e dal Wikizionario e attendono la revisione: lo stato di ogni voce è dichiarato nella voce stessa.`,
+    statoTesto: (r, i) => `La redazione ha scritto ${r.toLocaleString('it-IT')} voci, ancora in bozza. Le altre ${i.toLocaleString('it-IT')} vengono da Wiktionary, dal Wikizionario e dai dizionari del Perseus e attendono la revisione: lo stato di ogni voce è dichiarato nella voce stessa.`,
     statoLegenda: { redazione: 'scritte dalla redazione', importate: 'importate, da rivedere' },
     paroleTitolo: 'Le parole',
     tutteLeStorie: 'Tutte le storie',
@@ -333,7 +333,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     leggiChiSiamo: 'Chi siamo',
     piede: {
       progetto: 'Progetto', esplora: 'Esplora', dati: 'Dati',
-      datiTesto: 'Etimologie da Wiktionary e glosse dal Wikizionario, con licenza CC BY-SA 4.0; definizioni da Wikidata (CC0); glosse tradotte automaticamente segnate con ≈. Licenza dei contenuti di redazione in via di definizione.',
+      datiTesto: 'Etimologie da Wiktionary e glosse dal Wikizionario, con licenza CC BY-SA 4.0; lemmi latini e greci dal Lewis & Short e dal Liddell–Scott–Jones del Perseus Digital Library (CC BY-SA 4.0); definizioni da Wikidata (CC0); glosse tradotte automaticamente segnate con ≈. Licenza dei contenuti di redazione in via di definizione.',
       prototipo: 'Prototipo: i contenuti sono in bozza e vanno verificati sulle fonti.',
     },
     daConsultare: 'Da consultare',
@@ -344,7 +344,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     inRete: 'in rete',
     pubblicoDominio: 'pubblico dominio',
     dalleVoci: 'collegata dalle voci',
-    datiTesto: (p, l, r) => `${p.toLocaleString('it-IT')} parole in ${l} lingue, ${r.toLocaleString('it-IT')} radici. Le etimologie vengono da Wiktionary e le glosse italiane dal Wikizionario, con licenza CC BY-SA 4.0; la redazione le rivede e le verifica sulle fonti. La licenza dei contenuti di redazione è in via di definizione.`,
+    datiTesto: (p, l, r) => `${p.toLocaleString('it-IT')} parole in ${l} lingue, ${r.toLocaleString('it-IT')} radici. Le etimologie vengono da Wiktionary e le glosse italiane dal Wikizionario, con licenza CC BY-SA 4.0; i lemmi latini e greci che Wiktionary non ha, dal Lewis & Short e dal Liddell–Scott–Jones del Perseus Digital Library (CC BY-SA 4.0). La redazione li rivede e li verifica sulle fonti. La licenza dei contenuti di redazione è in via di definizione.`,
   },
   en: {
     nomeInterfaccia: 'English',
@@ -502,7 +502,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
       { titolo: 'In every language', testo: 'The dictionary started from Italian, but any word of any language can join it: families widen as the languages grow.' },
     ],
     statoTitolo: 'Where we are',
-    statoTesto: (r, i) => `The editors have written ${r.toLocaleString('en-GB')} entries, still in draft. The other ${i.toLocaleString('en-GB')} come from Wiktionary and the Italian Wiktionary and await review: each entry states its own status.`,
+    statoTesto: (r, i) => `The editors have written ${r.toLocaleString('en-GB')} entries, still in draft. The other ${i.toLocaleString('en-GB')} come from Wiktionary, the Italian Wiktionary and the Perseus dictionaries and await review: each entry states its own status.`,
     statoLegenda: { redazione: 'written by the editors', importate: 'imported, awaiting review' },
     paroleTitolo: 'The words',
     tutteLeStorie: 'All stories',
@@ -511,7 +511,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     leggiChiSiamo: 'About',
     piede: {
       progetto: 'Project', esplora: 'Explore', dati: 'Data',
-      datiTesto: 'Etymologies from Wiktionary and glosses from the Italian Wiktionary, under CC BY-SA 4.0; definitions from Wikidata (CC0); machine-translated glosses marked with ≈. The licence for editorial content is being defined.',
+      datiTesto: 'Etymologies from Wiktionary and glosses from the Italian Wiktionary, under CC BY-SA 4.0; Latin and Greek headwords from Lewis & Short and Liddell–Scott–Jones in the Perseus Digital Library (CC BY-SA 4.0); definitions from Wikidata (CC0); machine-translated glosses marked with ≈. The licence for editorial content is being defined.',
       prototipo: 'Prototype: the content is draft and must be checked against the sources.',
     },
     daConsultare: 'Look it up',
@@ -522,6 +522,6 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     inRete: 'online',
     pubblicoDominio: 'public domain',
     dalleVoci: 'linked from entries',
-    datiTesto: (p, l, r) => `${p.toLocaleString('en-GB')} words in ${l} languages, ${r.toLocaleString('en-GB')} roots. Etymologies come from Wiktionary and Italian glosses from the Italian Wiktionary, under CC BY-SA 4.0; the editors review them and check them against the sources. The licence for editorial content is being defined.`,
+    datiTesto: (p, l, r) => `${p.toLocaleString('en-GB')} words in ${l} languages, ${r.toLocaleString('en-GB')} roots. Etymologies come from Wiktionary and Italian glosses from the Italian Wiktionary, under CC BY-SA 4.0; the Latin and Greek headwords that Wiktionary lacks, from Lewis & Short and Liddell–Scott–Jones in the Perseus Digital Library (CC BY-SA 4.0). The editors review them and check them against the sources. The licence for editorial content is being defined.`,
   },
 }/*@@FINE*/;

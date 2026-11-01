@@ -133,6 +133,14 @@ select pg_temp.verifica(pg_temp.antenati_slug('la/fundus') @> array['itc-pro/fun
   'fundus < *fundos < *bʰudʰ-(m)n-o-s: anche le voci intere chiudono le catene fino al protoindoeuropeo');
 select pg_temp.verifica((select count(*) from lessema where lingua = 'la' and slug like 'la/fundo%') >= 2,
   'gli omografi latini entrano ciascuno con la sua etimologia (fundō, fundere e fundō, fundāre)');
+select pg_temp.verifica(pg_temp.antenati_slug('la/levir') @> array['ine-pro/dayh2wer']
+                        and pg_temp.antenati_slug('grc/daer') @> array['ine-pro/dayh2wer'],
+  'lēvir e δαήρ, «cognato», entrano interi e si ritrovano nella stessa radice *dayh₂wḗr');
+select pg_temp.verifica(not exists (select 1 from lessema where slug in ('la/baba', 'la-vul/baba')),
+  'una forma ricostruita che nessuna catena cita resta fuori, anche con il latino intero (*baba)');
+select pg_temp.verifica((select glossa from lessema where slug = 'la/caros') = 'heavy sleep, stupor, torpor'
+                        and not exists (select 1 from ipotesi where esito_id = lx('la/caros')),
+  'un lemma latino senza etimologia entra lo stesso, con la sua glossa e senza catena: la lingua è completa (cāros)');
 
 \echo '— glosse italiane dal Wikizionario e prime attestazioni'
 select pg_temp.verifica(
@@ -177,12 +185,30 @@ select pg_temp.verifica((select testo || '|' || provenienza from glossa where le
 select pg_temp.verifica((nodo_json(lx('la/mobilis'), 'it')->>'glossa_automatica')::boolean
                         and not (nodo_json(lx('la/caro'), 'it')->>'glossa_automatica')::boolean,
   'le glosse tradotte automaticamente sono segnate come tali');
+create temp table glosse_xmin as select id, xmin::text as x from glossa;
 select importa_glosse_wikizionario();
 select importa_glosse_aggiuntive();
 select pg_temp.verifica((select count(*) from glossa where provenienza in ('wikidata', 'traduzione-automatica')) = 2,
   'un nuovo import delle glosse rimette le stesse glosse aggiuntive, senza doppioni');
+select pg_temp.verifica(
+  (select count(*) from glosse_xmin p join glossa g on g.id = p.id and g.xmin::text = p.x) = (select count(*) from glosse_xmin)
+  and (select count(*) from glossa) = (select count(*) from glosse_xmin),
+  'e non riscrive nessuna glossa');
 
 \echo '— reimport'
+-- con gli stessi dati un nuovo import non riscrive niente: ogni riga riscritta occupa spazio fino al vacuum
+create temp table righe_prima as
+  select 'lessema' as t, id, xmin::text as x from lessema where provenienza = 'wiktionary'
+  union all select 'ipotesi', id, xmin::text from ipotesi where provenienza = 'wiktionary'
+  union all select 'relazione', id, xmin::text from relazione where provenienza = 'wiktionary';
+select importa_wiktionary();
+select pg_temp.verifica(
+  (select count(*) from righe_prima p
+    where p.x is distinct from case p.t when 'lessema' then (select xmin::text from lessema where id = p.id)
+                                        when 'ipotesi' then (select xmin::text from ipotesi where id = p.id)
+                                        else (select xmin::text from relazione where id = p.id) end) = 0
+  and (select count(*) from righe_prima) > 100,
+  'un nuovo import con gli stessi dati non riscrive nessuna voce, ipotesi o arco: lo spazio non cresce');
 create temp table prima as select count(*) as n from relazione where provenienza = 'wiktionary';
 update relazione set stato_editoriale = 'rivisto'
  where esito_id = lx('it/carne') and etimo_id = lx('la/caro') and provenienza = 'wiktionary';
@@ -220,5 +246,75 @@ select pg_temp.verifica(
   and (select bool_or(e.lemma = 'τυρός') and not bool_or(e.lemma = 'Τύρος')
          from relazione x join lessema e on e.id = x.etimo_id where x.esito_id = lx('grc/bouturon')),
   'un nuovo import non fonde parole diverse per maiuscola o accento: Τύρος non è τυρός');
+
+\echo '— dizionari del Perseus (Lewis & Short, LSJ)'
+select pg_temp.verifica(
+  (select l.provenienza = 'perseus' and l.glossa = 'grasshopper, locust, cricket' and l.glossa_lingua = 'en'
+          and l.stato_editoriale = 'importato' and l.translit = 'akrís' and l.id_esterno = 'perseus:lsj:n3486'
+     from lessema l where l.slug = 'grc/akris')
+  and not exists (select 1 from ipotesi where esito_id = lx('grc/akris')),
+  'un lemma che ha solo il dizionario entra con la sua glossa, come strato «perseus», senza catena: ἀκρίς, «cavalletta»');
+select pg_temp.verifica(
+  (select lemma from lessema where slug = 'grc/akris-2') = 'ἄκρις'
+  and (select provenienza from lessema where slug = 'la/carus') = 'wiktionary'
+  and (select lemma || ' ' || provenienza from lessema where slug = 'la/carus-2') = 'Carus perseus',
+  'due parole con lo stesso indirizzo (ἀκρίς e ἄκρις, carus e Carus): la nuova prende il numero d''omografo libero');
+select pg_temp.verifica(
+  (select glossa from lessema where slug = 'la/abactus') is null
+  and (select glossa from lessema where slug = 'la/abactus-2') = 'a driving away, robbing',
+  'gli omografi del dizionario entrano nel suo ordine (abactus¹, abactus²)');
+select pg_temp.verifica(
+  not exists (select 1 from lessema where provenienza = 'perseus' and lemma in ('carus', 'levir', 'τυρός', 'δαήρ'))
+  and (select count(*) from lessema where lingua = 'la' and lemma = 'levir') = 1,
+  'i lemmi che Wiktionary ha già restano fuori, anche se il pacchetto li elenca (carus, lēvir, τυρός, δαήρ)');
+select pg_temp.verifica(
+  exists (select 1 from jsonb_array_elements(scheda('grc/akris', true, 'it')->'strati') x
+           where x->>'codice' = 'perseus' and x->>'licenza' = 'CC BY-SA 4.0' and x->>'attribuzione' like '%perseus.tufts.edu%')
+  and exists (select 1 from jsonb_array_elements(scheda('grc/akris', true, 'en')->'strati') x
+               where x->>'codice' = 'perseus' and x->>'attribuzione' like 'Contains headwords%'),
+  'la pagina della voce cita il Perseus e la licenza CC BY-SA 4.0, in italiano e in inglese');
+create temp table d_prima as select id, slug, glossa from lessema where provenienza = 'perseus';
+select pg_temp.verifica(
+  (select (r->>'voci_nuove')::int = 0 and (r->>'voci_tolte')::int = 0 and (r->>'voci_aggiornate')::int = 0
+     from importa_dizionari() r)
+  and (select count(*) from lessema l join d_prima p on p.id = l.id and p.slug = l.slug
+                                                    and p.glossa is not distinct from l.glossa) = (select count(*) from d_prima)
+  and (select count(*) from lessema where provenienza = 'perseus') = (select count(*) from d_prima),
+  'un nuovo import dei dizionari non cambia niente: stesse voci, stessi indirizzi');
+insert into stg_glossa_tradotta values ('perseus:lsj:n3486', 'grasshopper, locust, cricket', 'cavalletta, locusta, grillo');
+select importa_glosse_wikizionario();
+select importa_glosse_aggiuntive();
+select pg_temp.verifica(
+  (select testo from glossa where lessema_id = lx('grc/akris') and lingua = 'it' and provenienza = 'traduzione-automatica')
+    = 'cavalletta, locusta, grillo'
+  and (nodo_json(lx('grc/akris'), 'it')->>'glossa_automatica')::boolean,
+  'anche le voci dei dizionari ricevono la glossa tradotta, segnata ≈');
+-- Wiktionary arriva a una parola che c'era solo nel dizionario
+insert into stg_lessema (chiave, lingua, lemma, omografo, ricostruito, translit, pos, glossa)
+  values ('enwikt:grc:βαβαί', 'grc', 'βαβαί', 1, false, 'babaí', 'inter.', 'bless me!');
+select importa_wiktionary();
+select importa_dizionari();
+select pg_temp.verifica(
+  (select provenienza || ' ' || lemma from lessema where slug = 'grc/babai') = 'wiktionary βαβαί'
+  and not exists (select 1 from lessema where provenienza = 'perseus' and lemma = 'βαβαί'),
+  'quando Wiktionary arriva a una parola del dizionario, la voce del dizionario gli cede il posto e l''indirizzo (βαβαί)');
+-- … e a una che la redazione ha già toccato
+insert into glossa (lessema_id, lingua, testo, provenienza, stato_editoriale)
+  values (lx('la/carus-2'), 'it', 'cognome romano', 'redazione', 'rivisto');
+insert into stg_lessema (chiave, lingua, lemma, omografo, ricostruito, translit, pos, glossa)
+  values ('enwikt:la:Carus', 'la', 'Carus', 1, false, null, 'np', 'a Roman cognomen');
+select importa_wiktionary();
+select importa_dizionari();
+select pg_temp.verifica(
+  (select count(*) from lessema where lingua = 'la' and lemma = 'Carus') = 1
+  and (select provenienza from lessema where slug = 'la/carus-2') = 'perseus'
+  and (select testo from glossa where lessema_id = lx('la/carus-2') and lingua = 'it') = 'cognome romano',
+  'una voce del dizionario toccata dalla redazione resta, e Wiktionary la abbina senza doppioni (Carus)');
+delete from stg_dizionario where chiave = 'perseus:ls:n8';
+select importa_dizionari();
+select pg_temp.verifica(
+  not exists (select 1 from lessema where id_esterno = 'perseus:ls:n8')
+  and (select glossa from lessema where slug = 'la/abactus-2') = 'a driving away, robbing',
+  'una voce del dizionario che il pacchetto non ha più si toglie, se nessuno l''ha toccata; le altre restano dove sono');
 
 \echo '— collaudo dell’import completato'

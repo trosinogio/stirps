@@ -1,7 +1,9 @@
 # Rigenera il pacchetto dati (dati/*.tsv.gz) dai dump di Kaikki: italiano, con la chiusura su latino, francese antico e
-# greco antico, e latino e greco interi (import/importa.sh, SOLO_ANALISI=1). Le glosse del Wikizionario e di Wikidata
-# restano quelle del pacchetto; le glosse tradotte si aggiungono solo per le voci nuove. Il pacchetto torna come commit
-# sullo stesso ramo. Parte con un push su un ramo dati-*, oppure a mano dalla scheda Actions.
+# greco antico, e latino e greco interi, con i lemmi del Lewis & Short e del Liddell–Scott–Jones che Wiktionary non ha
+# (Perseus Digital Library, CC BY-SA 4.0, file TEI fissati a un commit): import/importa.sh con SOLO_ANALISI=1.
+# Le glosse del Wikizionario e di Wikidata restano quelle del pacchetto; le glosse tradotte si aggiungono solo per le
+# voci nuove. Il pacchetto torna come commit sullo stesso ramo. Parte con un push su un ramo dati-*, oppure a mano
+# dalla scheda Actions.
 name: Dati
 on:
   push:
@@ -27,7 +29,8 @@ jobs:
           cd import
           SOLO_ANALISI=1 WIKIZIONARIO=0 INTERE=la,grc ./importa.sh
           jq -c . dati/it/rapporto_parser.json
-          echo "::notice title=Parser::$(jq -c '{lessemi, ipotesi, relazioni, voci, intere_la, intere_grc}' dati/it/rapporto_parser.json)"
+          echo "::notice title=Parser::$(jq -c '{lessemi, ipotesi, relazioni, voci, intere_la, intere_grc, lemmi_interi_la, lemmi_interi_grc}' dati/it/rapporto_parser.json)"
+          echo "::notice title=Perseus::$(tail -1 dati/it/rapporto_perseus.txt)"
 
       - name: Voci vere per il banco di prova
         run: |
@@ -53,14 +56,16 @@ jobs:
           dir() { dirname "$(find "modelli/$1" -name sentencepiece.model | head -1)"; }
           andata=$(dir en_it); ritorno=$(dir it_en)
           pip install -q ctranslate2 sentencepiece
-          # le voci straniere con una glossa inglese, senza glossa del Wikizionario e senza una traduzione già fatta
+          # le voci straniere con una glossa inglese, senza glossa del Wikizionario e senza una traduzione già fatta:
+          # quelle di Wiktionary e quelle dei dizionari, che hanno lo stesso formato
+          cat dati/it/tsv/lessemi.tsv dati/it/tsv/dizionari.tsv > voci.tsv
           python3 - <<'PY'
           import gzip
           wz = {tuple(r.split('\t')[:2]) for r in gzip.open('../dati/glosse_it.tsv.gz', 'rt', encoding='utf-8')}
           gia = {r.split('\t')[0] for r in gzip.open('../dati/glosse_tradotte.tsv.gz', 'rt', encoding='utf-8')}
           n = 0
           with open('chiavi.txt', 'w', encoding='utf-8') as out:
-              for r in open('dati/it/tsv/lessemi.tsv', encoding='utf-8'):
+              for r in open('voci.tsv', encoding='utf-8'):
                   c = r.rstrip('\n').split('\t')
                   if len(c) < 8 or c[1] == 'it' or c[7] in ('', '\\N') or c[0] in gia or (c[1], c[2]) in wz:
                       continue
@@ -68,14 +73,14 @@ jobs:
           print(f'voci da tradurre: {n}')
           PY
           for p in 1 2 3 4; do
-            python3 traduci_glosse.py dati/it/tsv/lessemi.tsv "$andata" "tradotte_$p.tsv" --ritorno "$ritorno" --chiavi chiavi.txt \
+            python3 traduci_glosse.py voci.tsv "$andata" "tradotte_$p.tsv" --ritorno "$ritorno" --chiavi chiavi.txt \
               --parte "$p/4" --vocabolario ../dati/frequenze_it.tsv.gz,dati/it/tsv/lessemi.tsv &
           done
           wait
           # le traduzioni di prima per le voci che ci sono ancora, più le nuove
           python3 - <<'PY'
           import glob, gzip
-          attuali = {r.split('\t')[0] for r in open('dati/it/tsv/lessemi.tsv', encoding='utf-8')}
+          attuali = {r.split('\t')[0] for r in open('voci.tsv', encoding='utf-8')}
           righe = {}
           for r in gzip.open('../dati/glosse_tradotte.tsv.gz', 'rt', encoding='utf-8'):
               if r.split('\t')[0] in attuali:
@@ -95,13 +100,17 @@ jobs:
       - name: Pacchetto dati
         run: |
           t=import/dati/it/tsv
-          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni; do
+          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni dizionari; do
             gzip -9 -n -c "$t/$f.tsv" > "dati/$f.tsv.gz"
           done
           # voci per lingua, prima e dopo
           conta() { awk -F'\t' '{c[$2]++} END {for (k in c) print k, c[k]}' | sort; }
-          git show HEAD:dati/lessemi.tsv.gz | zcat | conta > /tmp/prima.txt
-          zcat dati/lessemi.tsv.gz | conta > /tmp/dopo.txt
+          prima() {
+            git show HEAD:dati/lessemi.tsv.gz | zcat
+            if git cat-file -e HEAD:dati/dizionari.tsv.gz 2> /dev/null; then git show HEAD:dati/dizionari.tsv.gz | zcat; fi
+          }
+          prima | conta > /tmp/prima.txt
+          zcat dati/lessemi.tsv.gz dati/dizionari.tsv.gz | conta > /tmp/dopo.txt
           join -a1 -a2 -e 0 -o 0,1.2,2.2 /tmp/prima.txt /tmp/dopo.txt | sort -k3 -n -r | head -12 > /tmp/confronto.txt
           cat /tmp/confronto.txt
           echo "::notice title=Voci per lingua (prima, dopo)::$(tr '\n' ';' < /tmp/confronto.txt)"
@@ -113,6 +122,6 @@ jobs:
           git config user.email "stirps-dati@users.noreply.github.com"
           git add dati/
           if git diff --cached --quiet; then echo "il pacchetto non è cambiato"; exit 0; fi
-          git commit -q -m "Pacchetto dati: italiano con latino e greco interi (Kaikki, $(date -u +%F))"
+          git commit -q -m "Pacchetto dati: italiano con latino e greco interi e i dizionari del Perseus (Kaikki, $(date -u +%F))"
           git push -q
           echo "::notice title=Pacchetto::commit $(git rev-parse --short HEAD) sul ramo ${GITHUB_REF_NAME}"

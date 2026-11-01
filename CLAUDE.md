@@ -18,10 +18,11 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 - `npm run dev`: sviluppo (con un `DATABASE_URL` locale).
 - `npx tsc --noEmit`: controllo dei tipi.
-- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, gli 82 del seme (`db/04_test.sql`) e i 50 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
+- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, gli 82 del seme (`db/04_test.sql`) e i 69 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
 - `node scripts/applica-sql.mjs file.sql`: applica un file SQL in una transazione.
 - `node scripts/esporta-redazione.mjs cartella`: copia del lavoro della redazione in JSON; ogni notte la fa `.github/workflows/copia-redazione.yml` nel ramo `copia-redazione`.
-- Import completo da Wiktionary: `import/importa.sh` (scarica i dump di Kaikki); collaudo del parser: `import/collauda.sh`. Vedi `import/LEGGIMI.md`.
+- Import completo da Wiktionary: `import/importa.sh` (scarica i dump di Kaikki; latino e greco entrano interi, `INTERE=la,grc`, con i lemmi del Lewis & Short e dell’LSJ che Wiktionary non ha, dal Perseus: `DIZIONARI=1`); collaudo del parser: `import/collauda.sh`. Vedi `import/LEGGIMI.md`.
+- Pacchetto dati: si rigenera su GitHub con un push su un ramo `dati-*` (`.github/workflows/dati.yml`), che rimette `dati/*.tsv.gz` sul ramo. Da una sandbox Kaikki di solito non si raggiunge.
 - Pubblicazione: `.github/workflows/pubblica.yml`, dopo ogni collaudo riuscito su `main`, o a mano (`gh api repos/trosinogio/stirps/actions/workflows/pubblica.yml/dispatches -X POST -f ref=main`). Fa ramo di riserva su Neon, deploy su Vercel e controllo; l’esito sta nelle annotazioni del job. Il deploy passa da `scripts/pubblica-vercel-api.sh` (API REST): `VERCEL_TOKEN` è un token di progetto, e la CLI di Vercel con lui non funziona. Vercel non è collegato a GitHub, e da una sandbox Neon e Vercel di solito non si raggiungono: si pubblica da qui.
 
 ## Mappa
@@ -31,25 +32,25 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 - `lib/`: `dati.ts` (letture), `redazione.ts` (letture della redazione), `storie.ts`, `db.ts` (`query`, `transazione`), `auth/` (Neon Auth), testi in `i18n.ts`, `testi-redazione.ts`, `testi-storie.ts`.
 - `db/`: `01_schema.sql`, `02_logica.sql`, `03_seed_pilota.sql`, `05_import_wiktionary.sql`, i test `04` e `06`, e `aggiornamenti/` (file datati).
 - `dati/`: il pacchetto dati compresso (TSV di Wiktionary, glosse del Wikizionario, di Wikidata e tradotte, frequenze).
-- `import/`: parser (`wiktionary.py`), filtri dei dump, traduzione delle glosse, banco di prova di voci reali (`esempio/`).
+- `import/`: parser (`wiktionary.py`), filtri dei dump e dei dizionari del Perseus (`filtra_perseus.py`), traduzione delle glosse, banco di prova di voci reali (`esempio/`).
 - `scripts/`: inizializzazione del database, aggiornamenti, collaudo, copia.
 
 ## Il database
 
-Tabelle principali: `lessema` (le voci, con `slug` generato), `ipotesi` (una sola `accolta` per voce), `relazione` (i passaggi), `attestazione`, `glossa`, `rimando` (le fonti, con posizione), `opera`, `strato` (provenienze e licenze), `frequenza`, `lista_lavoro`, `storico` (firmato), `meta`. Viste materializzate: `mv_famiglia`, `mv_allotropi`, `mv_storie`. Funzioni principali: `scheda()`, `nodo_json()`, `storie()`, `indovinello()`, `importa_wiktionary()`, `pulisci_wiktionary()`, `importa_glosse_wikizionario()`, `importa_glosse_aggiuntive()`.
+Tabelle principali: `lessema` (le voci, con `slug` generato), `ipotesi` (una sola `accolta` per voce), `relazione` (i passaggi), `attestazione`, `glossa`, `rimando` (le fonti, con posizione), `opera`, `strato` (provenienze e licenze), `frequenza`, `lista_lavoro`, `storico` (firmato), `meta`. Viste materializzate: `mv_famiglia`, `mv_allotropi`, `mv_storie`. Funzioni principali: `scheda()`, `nodo_json()`, `storie()`, `indovinello()`, `importa_wiktionary()`, `pulisci_wiktionary()`, `importa_dizionari()`, `importa_glosse_wikizionario()`, `importa_glosse_aggiuntive()`.
 
 Come cambia il database:
 
 1. **Due posti.** La modifica va nel file canonico (`db/01`, `02`, `05`) per le installazioni nuove, e in un file datato di `db/aggiornamenti/` per il database esistente. Il file datato dev’essere ripetibile senza danni: `create or replace`, `if not exists`, aggiornamenti idempotenti.
 2. **Gli aggiornamenti si applicano da soli** a ogni build (`scripts/inizializza-db.mjs`), in ordine di nome, dopo l’eventuale primo caricamento. Una vista materializzata si ricrea solo se cambia la versione scritta nel suo commento (vedi `2026-10-31-storie.sql`).
-3. **Dati nuovi, nuovo import.** L’impronta del pacchetto `dati/` e di `05_import_wiktionary.sql` sta in `meta`: se cambia, la build rifà l’import in una transazione (import, pulizia, glosse, viste). Se fallisce, il database resta com’era e il deploy si ferma. I file del pacchetto si comprimono con `gzip -9 -n`, così l’impronta dipende solo dal contenuto.
+3. **Dati nuovi, nuovo import.** L’impronta del pacchetto `dati/` e di `05_import_wiktionary.sql` sta in `meta`: se cambia, la build rifà l’import in una transazione (import, pulizia, dizionari, glosse, viste), poi svuota le tabelle di appoggio e fa il vacuum. Se fallisce, il database resta com’era e il deploy si ferma. I file del pacchetto si comprimono con `gzip -9 -n`, così l’impronta dipende solo dal contenuto.
 4. **Un file datato che contiene una funzione dell’import** va rigenerato dal file canonico, altrimenti riporta la versione vecchia.
 5. **Ogni cambiamento di comportamento ha il suo test** in `04` o `06`, e i test girano prima del push.
 
 ## Regole che non si violano
 
-- **L’import tocca solo ciò che non è stato toccato:** record con `provenienza = 'wiktionary'` e `stato_editoriale = 'importato'`. Un’ipotesi rivista o verificata resta congelata con tutti i suoi passaggi; `pulisci_wiktionary()` toglie solo ciò che nessuno ha toccato.
-- **Tra voci di Wiktionary l’abbinamento è esatto.** La forma normalizzata abbina solo voci della redazione (Τύρος, la città, non è τυρός, il formaggio).
+- **L’import tocca solo ciò che non è stato toccato:** record con `provenienza` `'wiktionary'` o `'perseus'` e `stato_editoriale = 'importato'`. Un’ipotesi rivista o verificata resta congelata con tutti i suoi passaggi; `pulisci_wiktionary()` e `importa_dizionari()` tolgono solo ciò che nessuno ha toccato (`voce_intatta()`).
+- **Tra voci importate l’abbinamento è esatto.** La forma normalizzata abbina solo voci della redazione, mai di Wiktionary o del Perseus (Τύρος, la città, non è τυρός, il formaggio). Una voce del Perseus intatta cede il posto a Wiktionary quando Wiktionary ha la stessa parola.
 - **Ogni azione della redazione** passa da `richiediRedattore()` e da `transazione(email, …)`, che firma lo storico. Se cambia un’ipotesi accolta, dopo la risposta si ricalcolano `mv_famiglia`, `mv_allotropi` e `mv_storie` (`after()`).
 - **Le glosse italiane hanno un ordine di rango:** redazione, poi Wikizionario, poi Wikidata, poi traduzione automatica. Le tradotte portano il segno ≈ (`glossa_automatica`); salvarle nell’editor le rende «riviste».
 - **Un’ipotesi verificata ha almeno un’opera della bibliografia che la propone o la accoglie,** e due se la certezza è 4; Wiktionary, Wikizionario, Etymonline e Logeion (opere `in_rete`) non contano. Lo impone `controlla_ipotesi_verificata()` al commit, anche quando cambiano la certezza o le fonti di un’ipotesi già verificata; l’editor lo dice con gli esiti `servono-fonti` e `servono-due-fonti`.
@@ -72,6 +73,8 @@ Come cambia il database:
 - **Da una sandbox la porta 5432 di Neon può essere chiusa:** gli script ricadono sul driver WebSocket `@neondatabase/serverless`.
 - **Wiktionary scrive l’incertezza nel testo** («possibly», «uncertain»): il parser la legge senza le glosse tra virgolette, perché «obscure» in una glossa non è un dubbio.
 - **Il Postgres locale della sandbox si ferma spesso:** se una query dice «connection refused», riavvialo.
+- **Lo spazio su Neon (0,5 GB nel piano gratuito):** l’import scrive solo ciò che cambia, perché ogni riga riscritta lascia una copia morta fino al vacuum; un test controlla lo `xmin` delle righe. Prima di un import grande misura in locale (`[db] spazio occupato` nel registro della build).
+- **Un confronto per forma normalizzata su molte righe** (`lemma_norm = norm(x)`) usa l’indice a trigrammi una riga alla volta e diventa lentissimo: confronta con un insieme piccolo e precalcolato (vedi `importa_dizionari()`).
 
 ## Lavoro editoriale
 
