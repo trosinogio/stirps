@@ -59,17 +59,20 @@ jobs:
           echo "::notice title=Ramo di riserva::$nome"
           echo "- Ramo di riserva su Neon: \`$nome\`" >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
       - name: Deploy su Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_TELEMETRY_DISABLED: '1'
+          PROGETTO: ${{ env.PROGETTO_VERCEL }}
         run: |
-          npx --yes vercel@65 link --yes --project "$PROGETTO_VERCEL" --token "$VERCEL_TOKEN" > /dev/null
-          url=$(npx --yes vercel@65 deploy --prod --yes --token "$VERCEL_TOKEN")
+          # con l'API REST, non con la CLI: il token è un token di progetto (vcp_…), che non vede l'utente,
+          # e la CLI con lui si ferma («User not found»)
+          if ! out=$(bash scripts/pubblica-vercel-api.sh production 2>&1); then
+            echo "$out" | tail -45
+            echo "::error title=Deploy::la pubblicazione su Vercel non è riuscita (le ultime righe sono nel registro)"
+            exit 1
+          fi
+          echo "$out"
+          url=$(echo "$out" | tail -1)
           echo "::notice title=Deploy::$url"
           echo "- Deploy su Vercel: $url" >> "$GITHUB_STEP_SUMMARY"
 
