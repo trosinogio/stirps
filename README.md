@@ -158,7 +158,7 @@ Il pacchetto `dati/*.tsv.gz` ha un'impronta (SHA-256 dei file e della logica d'i
 
 Se qualcosa va storto, il database resta com'era e il deploy si ferma. Dopo il commit svuota le tabelle di appoggio, fa il vacuum e scrive nel registro lo spazio occupato.
 
-**Lo spazio.** Il piano gratuito di Neon ha 0,5 GB. L'import scrive solo ciò che cambia: voci, ipotesi, archi e glosse uguali restano dove sono, perché in Postgres ogni riga riscritta lascia una copia morta fino al vacuum. Prima ogni reimport riscriveva quasi tutto. Con latino e greco completi (novembre 2026, circa 270 mila voci) un caricamento da zero occupa circa 270 MB.
+**Lo spazio.** Il piano gratuito di Neon ha 0,5 GB. L'import scrive solo ciò che cambia: voci, ipotesi, archi e glosse uguali restano dove sono, perché in Postgres ogni riga riscritta lascia una copia morta fino al vacuum. Prima ogni reimport riscriveva quasi tutto. Con latino e greco completi (novembre 2026, 293 mila voci) un caricamento da zero occupa circa 290 MB, e un reimport con gli stessi dati non lo fa crescere.
 
 Prima di un deploy che cambia i dati conviene una copia del ramo di produzione, che su Neon è istantanea:
 
