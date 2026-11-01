@@ -195,7 +195,7 @@ Il codice vive in un repository GitHub privato. Vercel non è collegato a GitHub
 - **Pubblicazione** (`.github/workflows/pubblica.yml`): parte dopo ogni collaudo riuscito su `main`, oppure a mano dalla scheda Actions.
   - Crea su Neon un ramo di riserva (`backup-AAAA-MM-GG-HHMM`, senza compute, che scade dopo 30 giorni).
   - Pubblica su Vercel con `scripts/pubblica-vercel-api.sh`, che usa l'API REST e non la CLI: il token è un token di progetto (`vcp_…`), che vede il progetto ma non l'utente, e la CLI con lui si ferma («User not found»). La build applica gli aggiornamenti datati.
-  - Controlla che gli aggiornamenti siano nel database, ed elenca le ipotesi verificate che non rispettano le norme.
+  - Controlla che gli aggiornamenti siano nel database, elenca le ipotesi verificate che non rispettano le norme e riporta lo spazio occupato (il piano gratuito di Neon ha 0,5 GB).
   - Se un passo fallisce, i successivi non partono.
   - Richiede i segreti `VERCEL_TOKEN`, `NEON_API_KEY` e `DATABASE_URL_UNPOOLED`.
 - **Dati** (`.github/workflows/dati.yml`): rigenera il pacchetto `dati/` con un push su un ramo `dati-*`, oppure a mano.
