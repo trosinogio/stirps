@@ -86,6 +86,8 @@ export interface Testi {
   allotropiNota: string;
   stessoEtimo: string;
   nessunaAttestazione: string;
+  primaAttestazione: string;
+  dataPassaggio: string;
   forma: string;
   apriStemmaDa: string;
   legame: (tipo: string) => string;
@@ -243,6 +245,8 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     allotropiNota: 'Parole della stessa lingua venute dallo stesso etimo per vie diverse.',
     stessoEtimo: 'stesso etimo:',
     nessunaAttestazione: 'Nessuna attestazione ancora inserita.',
+    primaAttestazione: 'prima attestazione',
+    dataPassaggio: 'data del passaggio, secondo le fonti',
     forma: 'forma',
     apriStemmaDa: 'Apri lo stemma da questa parola',
     legame: (t) => `legame ${t} con`,
@@ -422,6 +426,8 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     allotropiNota: 'Words of the same language that came from the same etymon by different routes.',
     stessoEtimo: 'same etymon:',
     nessunaAttestazione: 'No attestation entered yet.',
+    primaAttestazione: 'first attestation',
+    dataPassaggio: 'date of the step, according to the sources',
     forma: 'form',
     apriStemmaDa: 'Open the stemma from this word',
     legame: (t) => `${t} link with`,

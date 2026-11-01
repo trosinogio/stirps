@@ -81,7 +81,7 @@ export default async function EditorVoce({ params, searchParams }: { params: Pro
     ipotesiRedazione(v.id, lang), opereScelta(), tipiRelazione(lang), lingueScelta(lang), attestazioniRedazione(v.id), postoInLista(v.id),
   ]);
   const ambiti = [...new Set(opere.map((o) => o.ambito ?? ''))];
-  const negativi = new Set(['errore', 'servono-fonti', 'ciclo', 'gia-presente', 'etimo-mancante', 'etichetta-usata', 'dati-non-validi']);
+  const negativi = new Set(['errore', 'servono-fonti', 'servono-due-fonti', 'ciclo', 'gia-presente', 'etimo-mancante', 'etichetta-usata', 'dati-non-validi']);
   const nascosti = (extra: Record<string, string | number>) => (
     <>
       <input type="hidden" name="lang" value={lang} />

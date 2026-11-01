@@ -115,7 +115,7 @@ export async function salvaIpotesi(fd: FormData) {
                       stato_editoriale = case when stato_editoriale = 'importato' then 'rivisto'::stato_editoriale else stato_editoriale end
                 where id = $1`, [id, stato, confidenza, nota]);
     });
-  } catch { esito = 'errore'; ricalcola = false; }
+  } catch (e) { esito = esitoFonti(e) ?? 'errore'; ricalcola = false; }
   chiudi(lang, slug, esito, ricalcola);
 }
 
@@ -147,7 +147,7 @@ export async function togliFonte(fd: FormData) {
       `delete from rimando where id = $1
           and ipotesi_id in (select h.id from ipotesi h join lessema l on l.id = h.esito_id where l.slug = $2)`,
       [Number(fd.get('rimando')), slug]));
-  } catch { esito = 'errore'; }
+  } catch (e) { esito = esitoFonti(e) ?? 'errore'; }
   chiudi(lang, slug, esito, false);
 }
 
@@ -159,16 +159,27 @@ export async function verificaIpotesi(fd: FormData) {
   let esito = 'verificata';
   try {
     await transazione(r.email, async (q) => {
-      const [h] = await q<{ fonti: number }>(
-        `select (select count(*)::int from rimando m where m.ipotesi_id = h.id) as fonti
+      const [h] = await q<{ opere: number; certezza: number }>(
+        `select opere_a_sostegno(h.id) as opere, h.confidenza as certezza
            from ipotesi h join lessema l on l.id = h.esito_id where h.id = $1 and l.slug = $2`, [id, slug]);
       if (!h) throw new Error('ipotesi non trovata');
-      if (h.fonti === 0) { esito = 'servono-fonti'; return; }
-      // il vincolo del database lo ricontrolla al commit: niente ipotesi verificate senza fonti
+      // le regole delle norme («Fonti e citazioni»), che il vincolo del database ricontrolla al commit:
+      // un'opera della bibliografia che propone o accoglie l'ipotesi, due per la certezza 4
+      if (h.opere === 0) { esito = 'servono-fonti'; return; }
+      if (h.certezza === 4 && h.opere < 2) { esito = 'servono-due-fonti'; return; }
       await q(`update ipotesi set stato_editoriale = 'verificato' where id = $1`, [id]);
     });
-  } catch { esito = 'errore'; }
+  } catch (e) { esito = esitoFonti(e) ?? 'errore'; }
   chiudi(lang, slug, esito, false);
+}
+
+// il vincolo sulle fonti di un'ipotesi verificata (controlla_ipotesi_verificata) diventa un esito comprensibile:
+// scatta anche alzando a 4 la certezza o togliendo l'ultima fonte che la sostiene
+function esitoFonti(e: unknown): string | null {
+  const msg = String((e as { message?: string })?.message ?? e);
+  if (/certezza 4/.test(msg)) return 'servono-due-fonti';
+  if (/deve citare almeno/.test(msg)) return 'servono-fonti';
+  return null;
 }
 
 // ---- catene: ipotesi, passaggi, etimi ----
@@ -178,6 +189,8 @@ const intero = (fd: FormData, k: string) => { const v = String(fd.get(k) ?? '').
 function esitoDa(e: unknown): string {
   const err = e as { code?: string; message?: string };
   const msg = String(err?.message ?? e);
+  const fonti = esitoFonti(e);
+  if (fonti) return fonti;
   if (/cicl/i.test(msg)) return 'ciclo';
   if (msg === 'etimo-mancante') return 'etimo-mancante';
   if (err?.code === '23505') return 'gia-presente';

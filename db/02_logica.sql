@@ -70,37 +70,50 @@ create trigger relazione_senza_cicli
   before insert or update of etimo_id, esito_id on relazione
   for each row execute function impedisci_cicli();
 
--- Nessuna ipotesi verificata senza fonti (controllo differito al commit,
--- così ipotesi e rimandi si inseriscono nella stessa transazione)
+-- Le condizioni della verifica che si possono contare (norme redazionali, «Fonti e citazioni»):
+-- un'ipotesi verificata ha almeno un'opera della bibliografia che la propone o la accoglie, e due se la
+-- certezza è 4. Le opere in rete (Wiktionary, Wikizionario, Etymonline, Logeion) non contano.
+create function opere_a_sostegno(p_ipotesi bigint) returns int language sql stable as $$
+  select count(distinct r.opera_id)::int
+    from rimando r join opera o on o.id = r.opera_id
+   where o.tipo <> 'in_rete' and r.posizione in ('propone', 'accoglie')
+     and (r.ipotesi_id = p_ipotesi
+          or r.relazione_id in (select x.id from relazione x where x.ipotesi_id = p_ipotesi))
+$$;
+comment on function opere_a_sostegno(bigint) is
+  'Opere della bibliografia, non in rete, che propongono o accolgono l''ipotesi (anche su un suo passaggio).';
+
+-- Il controllo è differito al commit, così ipotesi e rimandi si inseriscono nella stessa transazione
 create function controlla_ipotesi_verificata() returns trigger language plpgsql as $$
-declare v_ip bigint; v_etichetta text;
+declare v_ip bigint; v_etichetta text; v_certezza smallint; v_opere int;
 begin
   if tg_table_name = 'ipotesi' then
     v_ip := new.id;
   else
     v_ip := coalesce(old.ipotesi_id, (select ipotesi_id from relazione where id = old.relazione_id));
   end if;
-  if v_ip is not null and exists (
-    select 1 from ipotesi h
-    where h.id = v_ip and h.stato_editoriale = 'verificato'
-      and not exists (select 1 from rimando r where r.ipotesi_id = h.id)
-      and not exists (select 1 from rimando r join relazione x on x.id = r.relazione_id where x.ipotesi_id = h.id)
-  ) then
-    select etichetta into v_etichetta from ipotesi where id = v_ip;
-    raise exception 'ipotesi % «%»: una ipotesi verificata deve citare almeno una fonte', v_ip, v_etichetta
-      using errcode = 'check_violation';
+  select h.etichetta, h.confidenza into v_etichetta, v_certezza
+    from ipotesi h where h.id = v_ip and h.stato_editoriale = 'verificato';
+  if not found then return null; end if;
+  v_opere := opere_a_sostegno(v_ip);
+  if v_opere = 0 then
+    raise exception 'ipotesi % «%»: un''ipotesi verificata deve citare almeno un''opera che la proponga o la accolga',
+      v_ip, v_etichetta using errcode = 'check_violation';
+  elsif v_certezza = 4 and v_opere < 2 then
+    raise exception 'ipotesi % «%»: la certezza 4 chiede due opere che propongano o accolgano l''ipotesi',
+      v_ip, v_etichetta using errcode = 'check_violation';
   end if;
   return null;
 end $$;
 
 create constraint trigger ipotesi_verificata_con_fonte
-  after insert or update of stato_editoriale on ipotesi
+  after insert or update of stato_editoriale, confidenza on ipotesi
   deferrable initially deferred
   for each row when (new.stato_editoriale = 'verificato')
   execute function controlla_ipotesi_verificata();
 
 create constraint trigger rimando_ultima_fonte
-  after delete or update of ipotesi_id, relazione_id on rimando
+  after delete or update of ipotesi_id, relazione_id, posizione, opera_id on rimando
   deferrable initially deferred
   for each row execute function controlla_ipotesi_verificata();
 
@@ -616,7 +629,14 @@ select jsonb_build_object(
       -- la prima attestazione del nodo: le date entrano nella catena
       'attestata', (select jsonb_build_object('anno_da', a.anno_da, 'anno_a', a.anno_a, 'precisione', a.precisione)
                       from attestazione a where a.lessema_id = c.lessema_id and visibile(a.stato_editoriale, p_anteprima)
-                     order by a.anno_da limit 1))
+                     order by a.anno_da limit 1),
+      -- la data del passaggio dal nodo all'esito, se una fonte la dà: è un'altra cosa dalla prima attestazione
+      -- (norme redazionali, «Date e prime attestazioni»), e la pagina la mostra accanto al tipo di passaggio
+      'passaggio_data', (select jsonb_build_object('anno_da', x.anno_da, 'anno_a', x.anno_a, 'precisione', x.precisione)
+                           from relazione x
+                          where x.ipotesi_id = c.ipotesi[c.profondita] and x.etimo_id = c.lessema_id
+                            and x.esito_id = c.percorso[c.profondita] and x.tipo = c.tipi[c.profondita]
+                            and x.anno_da is not null))
       order by c.profondita, c.lessema_id) from cat c), '[]'::jsonb),
   'discendenti', coalesce((select jsonb_agg(nodo_json(d.lessema_id, p_lingua, p_anteprima) || jsonb_build_object(
       'profondita', d.profondita, 'etimo', d.percorso[d.profondita], 'tipo', d.tipi[d.profondita],

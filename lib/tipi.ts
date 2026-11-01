@@ -14,7 +14,7 @@ export interface Nodo {
   glossa_lingua?: string | null;
   glossa_automatica?: boolean;
 }
-export interface NodoCatena extends Nodo { profondita: number; esito: number; tipo: string; tipo_etichetta?: string | null; confidenza_catena: number; attestata?: { anno_da: number; anno_a: number | null; precisione: string } | null }
+export interface NodoCatena extends Nodo { profondita: number; esito: number; tipo: string; tipo_etichetta?: string | null; confidenza_catena: number; attestata?: { anno_da: number; anno_a: number | null; precisione: string } | null; passaggio_data?: { anno_da: number; anno_a: number | null; precisione: string | null } | null }
 export interface NodoDiscendente extends Nodo { profondita: number; etimo: number; tipo: string; tipo_etichetta?: string | null }
 export interface Cognato extends Nodo { tipo: 'stretto' | 'per_prestito'; antenato_comune: Nodo; distanza: number }
 export interface Allotropo extends Nodo { antenato_comune: Nodo }

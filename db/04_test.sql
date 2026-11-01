@@ -161,6 +161,39 @@ select pg_temp.attendi_errore(array[
   $q$update ipotesi set stato_editoriale = 'verificato' where id = ip('it/fegato')$q$,
   'set constraints all immediate'],
   'tolte le fonti, la verifica non regge', '23514');
+-- norme redazionali, «Fonti e citazioni»: un'opera della bibliografia che propone o accoglie, due per la certezza 4
+select pg_temp.attendi_errore(array[
+  $q$update ipotesi set stato_editoriale = 'verificato' where id = ip('it/andare', 'da ambulare')$q$,
+  'set constraints all immediate'],
+  'una fonte che discute soltanto non basta a verificare', '23514');
+select pg_temp.attendi_errore(array[
+  $q$insert into rimando (opera_id, sv, posizione, ipotesi_id)
+     select id, 'sincerus', 'accoglie', ip('la/sincerus', 'di una sola crescita') from opera where sigla = 'Wiktionary'$q$,
+  $q$update ipotesi set stato_editoriale = 'verificato' where id = ip('la/sincerus', 'di una sola crescita')$q$,
+  'set constraints all immediate'],
+  'un''opera in rete (Wiktionary) non basta a verificare', '23514');
+select pg_temp.attendi_errore(array[
+  $q$update ipotesi set stato_editoriale = 'verificato', confidenza = 4 where id = ip('it/zero')$q$,
+  'set constraints all immediate'],
+  'certezza 4 con una sola opera (DELI): rifiutata', '23514');
+select pg_temp.prova_e_annulla(array[
+  $q$update ipotesi set stato_editoriale = 'verificato', confidenza = 4 where id = ip('it/fegato')$q$,
+  'set constraints all immediate'],
+  'certezza 4 con due opere concordi (DELI, REW): accettata');
+select pg_temp.attendi_errore(array[
+  $q$update ipotesi set stato_editoriale = 'verificato' where id = ip('it/zero')$q$,
+  'set constraints all immediate',
+  $q$update ipotesi set confidenza = 4 where id = ip('it/zero')$q$,
+  'set constraints all immediate'],
+  'alzare a 4 la certezza di un''ipotesi verificata con una sola opera: rifiutato', '23514');
+select pg_temp.attendi_errore(array[
+  $q$update ipotesi set stato_editoriale = 'verificato' where id = ip('it/zero')$q$,
+  'set constraints all immediate',
+  $q$update rimando set posizione = 'respinge' where ipotesi_id = ip('it/zero')$q$,
+  'set constraints all immediate'],
+  'se l''unica opera a sostegno passa a «respinge», la verifica non regge', '23514');
+select pg_temp.verifica(opere_a_sostegno(ip('it/fegato')) = 2 and opere_a_sostegno(ip('it/andare', 'da ambulare')) = 0,
+  'opere a sostegno: DELI e REW per fegato, nessuna per andare (il DELI discute)');
 select pg_temp.attendi_errore(array[
   $q$update lessema set provenienza = 'redazione' where slug = 'es/higado'$q$],
   'la provenienza Wiktionary non si cancella con una modifica', '23514');
@@ -205,6 +238,20 @@ select pg_temp.verifica(
 select pg_temp.verifica(
   (scheda('it/fegato', true) #>> '{ipotesi,0,relazioni,0,etimo_accezione}') = 'fegato',
   'scheda di fegato: l''arco parte dall''accezione «fegato» di ficatum (ellissi)');
+-- norme redazionali, «Date e prime attestazioni»: la data del passaggio e la prima attestazione restano distinte
+select pg_temp.verifica(
+  not exists (select 1 from jsonb_array_elements(scheda('it/zero', true) -> 'catena') x
+               where jsonb_typeof(x -> 'passaggio_data') = 'object'),
+  'catena di zero: senza date dei passaggi, nessuna data del passaggio');
+select pg_temp.prova_e_annulla(array[
+  $q$update relazione set anno_da = 1201, anno_a = 1300, precisione = 'secolo'
+      where esito_id = lx('it/zefiro-2') and etimo_id = lx('la-med/zephirum')$q$,
+  $q$select pg_temp.verifica(
+       (select (x #>> '{passaggio_data,precisione}') = 'secolo' and (x #>> '{passaggio_data,anno_da}')::int = 1201
+               and (x #>> '{attestata,anno_da}')::int = 1202
+          from jsonb_array_elements(scheda('it/zero', true) -> 'catena') x where x ->> 'slug' = 'la-med/zephirum'),
+       'zephirum nella catena di zero: passaggio nel sec. XIII, prima attestazione 1202')$q$],
+  'la data del passaggio entra nella catena accanto alla prima attestazione, senza sostituirla');
 select pg_temp.verifica(
   (scheda('it/sincero', true) #>> '{falsi_miti,0,etichetta}') = 'sine cera',
   'scheda di sincero: il falso mito risale dalla catena latina');
