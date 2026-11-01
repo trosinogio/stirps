@@ -8,7 +8,7 @@ App Next.js di Stirps, il dizionario etimologico per radici. Legge il database P
 
 L'interfaccia è in italiano e in inglese (`/it`, `/en`). Le pagine si generano alla prima visita e restano in cache per cinque minuti (ISR).
 
-Collaudata con Next.js 16.4.2, React 19.3.1 e PostgreSQL 16: build di produzione riuscita, 72 test SQL sul seme e 33 sull'import superati, pagine verificate nel browser in entrambe le lingue, su desktop e telefono.
+Collaudata con Next.js 16.4.2, React 19.3.1 e PostgreSQL 16: build di produzione riuscita, 82 test SQL sul seme e 33 sull'import superati, pagine verificate nel browser in entrambe le lingue, su desktop e telefono.
 
 ## Struttura
 
@@ -52,7 +52,7 @@ Servono Node 20.9 o successivo, PostgreSQL 14 o successivo e `psql`.
 cp .env.example .env.local      # imposta DATABASE_URL; ANTEPRIMA=1 per vedere il seme in bozza
 npm install
 npm run db:init                 # schema, logica, seme pilota e tabelle d'import
-npm run db:test                 # 72 test sul seme: si ferma al primo errore
+npm run db:test                 # 82 test sul seme: si ferma al primo errore
 npm run db:import               # etimologie di Wiktionary chiuse su latino e francese antico, glosse del Wikizionario: circa 4 minuti
 npm run db:test-import          # 33 test dell'import, su un database con il solo seme
 npm run dev                     # http://localhost:3000
@@ -128,9 +128,9 @@ L'area di redazione è su `/it/redazione` (e `/en/redazione`). L'accesso passa d
 
 - **Chi entra.** Le registrazioni pubbliche sono chiuse. I redattori li crea l'amministratore con `neon neon-auth user create --email … --name …` e ricevono il ruolo con `neon neon-auth user set-role <id> --roles redattore`. Si entra con un codice di sei cifre inviato per email, oppure con una password.
 - **Dove si controlla.** `proxy.ts` è la prima barriera; ogni pagina e ogni azione ricontrollano sessione e ruolo prima di leggere o modificare (`lib/auth/redattore.ts`).
-- **Che cosa si fa.** La coda di verifica parte dalle parole più usate. Per ogni voce si regolano lo stato e la glossa italiana. Per ogni ipotesi si regolano stato, certezza, nota e fonti, cioè opera, «s.v.», luogo e posizione. «Segna come verificata» richiede almeno una fonte, e il database lo impone comunque.
+- **Che cosa si fa.** La coda di verifica parte dalle parole più usate. Per ogni voce si regolano lo stato e la glossa italiana. Per ogni ipotesi si regolano stato, certezza, nota e fonti, cioè opera, «s.v.», luogo e posizione. «Segna come verificata» richiede almeno un'opera della bibliografia che propone o accoglie l'ipotesi, e due per la certezza 4; Wiktionary, Wikizionario, Etymonline e Logeion non contano. Il database lo impone comunque, anche quando cambiano la certezza o le fonti di un'ipotesi già verificata (`controlla_ipotesi_verificata()`, `opere_a_sostegno()`).
 - **Catene.** Ogni ipotesi mostra i suoi passaggi, che si modificano o si tolgono. Un etimo si aggiunge scegliendolo tra le voci (la ricerca è la stessa del sito) o creando una voce nuova, ricostruita o no; se la lingua e il lemma esistono già, si usa la voce esistente. Si possono scrivere ipotesi della redazione, con origine, stato e certezza. Il database rifiuta i cicli e i doppioni, e l'editor lo dice in chiaro.
-- **Date.** Le prime attestazioni hanno anno, precisione (esatta, circa, prima del, dopo il, intervallo, secolo), testo, tipo di testimonianza e, facoltativa, la fonte con posizione «attesta». La prima attestazione di ogni parola compare nella catena della voce pubblica. Anche un passaggio può avere la sua data.
+- **Date.** Le prime attestazioni hanno anno, precisione (esatta, circa, prima del, dopo il, intervallo, secolo), testo, tipo di testimonianza e, facoltativa, la fonte con posizione «attesta». La prima attestazione di ogni parola compare nella catena della voce pubblica. Anche un passaggio può avere la sua data, se una fonte la dà: nella catena compare accanto al tipo di passaggio («prestito, sec. XII»), distinta dalla prima attestazione, che resta accanto alla parola.
 - **Firma.** Ogni modifica entra nello storico con l'indirizzo del redattore (`app.utente`). Le pagine pubbliche si aggiornano subito; se cambia l'ipotesi accolta, famiglie e allotropi si ricalcolano dopo la risposta.
 - **Variabili.** `NEON_AUTH_BASE_URL` arriva da `neon deploy` con `auth: true` in `neon.ts`; `NEON_AUTH_COOKIE_SECRET` va generata (`openssl rand -base64 32`) e impostata anche su Vercel.
 
@@ -188,7 +188,7 @@ Cambiare la regola cambia gli indirizzi. Prima del lancio si ricarica il databas
 
 Il codice vive in un repository GitHub privato collegato a Vercel: ogni push sul ramo principale pubblica il sito, senza token.
 
-- **Collaudo** (`.github/workflows/collaudo.yml`): a ogni push controlla i tipi TypeScript e fa girare `scripts/collauda.sh` su un Postgres di prova, cioè i 72 test del seme e i 50 dell'import. In locale: `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`.
+- **Collaudo** (`.github/workflows/collaudo.yml`): a ogni push controlla i tipi TypeScript e fa girare `scripts/collauda.sh` su un Postgres di prova, cioè gli 82 test del seme e i 50 dell'import. In locale: `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`.
 - **Copia della redazione** (`.github/workflows/copia-redazione.yml`): ogni notte `scripts/esporta-redazione.mjs` esporta tutto ciò che la redazione ha scritto o toccato (voci, ipotesi, passaggi, date, glosse, fonti, storico). Le righe sono JSON, ciascuna con gli indirizzi delle voci collegate. La copia va nel ramo `copia-redazione`, e ogni notte con dei cambiamenti diventa un commit. Il workflow richiede il segreto `DATABASE_URL_UNPOOLED` del repository, e si può lanciare a mano dalla scheda Actions.
 - **Ripristino:** la prima via è un ramo di Neon (`neon branches restore`); la seconda è la copia, leggibile e indipendente dagli identificativi del database.
 

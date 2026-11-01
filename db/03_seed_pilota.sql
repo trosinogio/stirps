@@ -50,7 +50,7 @@ insert into lingua (codice, nome, sigla, famiglia, ramo, iso639_3, antenato, var
 -- ---------------------------------------------------------------------
 insert into tipo_relazione (codice, etichetta, categoria, ereditario, descrizione) values
 ('eredita',         'eredità (trafila popolare)', 'trasmissione', true,  'Passaggio per tradizione ininterrotta, con gli esiti fonetici regolari.'),
-('variante',        'variante',                   'trasmissione', true,  'Forma alternativa della stessa parola: dialettale, grafica, sincopata, ridotta.'),
+('variante',        'variante',                   'trasmissione', true,  'Forma alternativa della stessa parola nella stessa lingua: grafica, sincopata, ridotta. Una forma dialettale si collega con eredità o prestito.'),
 ('prestito',        'prestito',                   'trasmissione', false, 'Parola entrata da un''altra lingua.'),
 ('prestito_dotto',  'prestito dotto',             'trasmissione', false, 'Ripresa colta dal latino o dal greco, senza gli esiti della trafila popolare.'),
 ('semidotto',       'voce semidotta',             'trasmissione', false, 'Ripresa colta solo in parte adattata alla fonetica popolare.'),
@@ -867,7 +867,7 @@ insert into etichetta_lingua (vocabolario, codice, lingua, etichetta, breve, des
 ('tipo_relazione', 'influsso',        'it', 'incrocio o influsso',        'influsso',         null),
 ('tipo_relazione', 'paretimologia',   'it', 'paretimologia',              'paretimologia',    null),
 ('tipo_relazione', 'eredita',         'en', 'inheritance (popular descent)', 'inherited',     'Uninterrupted transmission, with regular sound changes.'),
-('tipo_relazione', 'variante',        'en', 'variant',                    'variant',          'Alternative form of the same word: dialectal, spelling, syncopated, reduced.'),
+('tipo_relazione', 'variante',        'en', 'variant',                    'variant',          'Alternative form of the same word in the same language: spelling, syncopated, reduced. A dialect form is linked by inheritance or borrowing.'),
 ('tipo_relazione', 'prestito',        'en', 'borrowing',                  'borrowed',         'Word taken from another language.'),
 ('tipo_relazione', 'prestito_dotto',  'en', 'learned borrowing',          'learned borrowing', 'Scholarly borrowing from Latin or Greek, without popular sound changes.'),
 ('tipo_relazione', 'semidotto',       'en', 'semi-learned word',          'semi-learned',     'Learned borrowing only partly adapted to popular phonology.'),

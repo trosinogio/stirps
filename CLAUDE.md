@@ -17,7 +17,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 - `npm run dev`: sviluppo (con un `DATABASE_URL` locale).
 - `npx tsc --noEmit`: controllo dei tipi.
-- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, i 72 del seme (`db/04_test.sql`) e i 50 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
+- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, gli 82 del seme (`db/04_test.sql`) e i 50 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
 - `node scripts/applica-sql.mjs file.sql`: applica un file SQL in una transazione.
 - `node scripts/esporta-redazione.mjs cartella`: copia del lavoro della redazione in JSON; ogni notte la fa `.github/workflows/copia-redazione.yml` nel ramo `copia-redazione`.
 - Import completo da Wiktionary: `import/importa.sh` (scarica i dump di Kaikki); collaudo del parser: `import/collauda.sh`. Vedi `import/LEGGIMI.md`.
@@ -50,6 +50,7 @@ Come cambia il database:
 - **Tra voci di Wiktionary l’abbinamento è esatto.** La forma normalizzata abbina solo voci della redazione (Τύρος, la città, non è τυρός, il formaggio).
 - **Ogni azione della redazione** passa da `richiediRedattore()` e da `transazione(email, …)`, che firma lo storico. Se cambia un’ipotesi accolta, dopo la risposta si ricalcolano `mv_famiglia`, `mv_allotropi` e `mv_storie` (`after()`).
 - **Le glosse italiane hanno un ordine di rango:** redazione, poi Wikizionario, poi Wikidata, poi traduzione automatica. Le tradotte portano il segno ≈ (`glossa_automatica`); salvarle nell’editor le rende «riviste».
+- **Un’ipotesi verificata ha almeno un’opera della bibliografia che la propone o la accoglie,** e due se la certezza è 4; Wiktionary, Wikizionario, Etymonline e Logeion (opere `in_rete`) non contano. Lo impone `controlla_ipotesi_verificata()` al commit, anche quando cambiano la certezza o le fonti di un’ipotesi già verificata; l’editor lo dice con gli esiti `servono-fonti` e `servono-due-fonti`.
 - **Le storie usano solo passaggi con certezza 3 o 4,** e mai archi «sospetti» (una forma ricostruita che discende da un’altra famiglia linguistica).
 - **Gli indirizzi li calcola solo `slug_di()`.** Cambiarla, o cambiare `norm()`, cambia gli URL: dopo il lancio pubblico serve una migrazione con i reindirizzamenti.
 
@@ -72,7 +73,13 @@ Come cambia il database:
 
 ## Lavoro editoriale
 
-- **Le norme redazionali** sono una bozza in un Claude Doc di Giovanni, con nove questioni aperte: quante fonti per «verificata», l’italiano antico, i dialetti, la variante, la notazione delle ricostruzioni, la data del passaggio, la lingua delle note, chi corregge una voce verificata da altri, la licenza dei testi della redazione. Non decidere al suo posto: proponi.
+- **Le norme redazionali** sono una bozza in un Claude Doc di Giovanni («Stirps — Norme redazionali (bozza)»). Restano aperte quattro questioni: l’italiano antico, i dialetti, chi corregge una voce verificata da altri, la licenza dei testi della redazione. Non decidere al suo posto: proponi.
+- **Le cinque questioni decise il 1° novembre 2026:**
+  - per «verificata» basta un’opera della bibliografia che propone o accoglie l’ipotesi, e ne servono due per la certezza 4; le opere in rete non contano;
+  - la variante è un tipo di passaggio solo dentro una lingua; una forma dialettale è una voce del suo dialetto, collegata con eredità o prestito;
+  - il lemma di una ricostruzione segue la notazione di Wiktionary, e la forma della fonte va nel campo «s.v.» della citazione;
+  - la data del passaggio sta nella catena accanto al tipo, distinta dalla prima attestazione;
+  - le note si scrivono solo in italiano.
 - **Le liste di lavoro:** `prime-100` (cento voci scelte per provenienza, da `db/aggiornamenti/2026-10-31-prime-100.sql`) e `catene-da-sistemare` (ricalcolata a ogni deploy).
 
 ## Prossimi passi
@@ -82,3 +89,4 @@ Come cambia il database:
 - Un nuovo filtro del dump italiano che conservi i modelli di menzione (`m`, `l`), per le etimologie scritte solo nel testo («From the verb segare»).
 - Licenza, «Chi siamo», dominio, mappa del sito, «come citare questa voce».
 - Il dataset su Zenodo con DOI.
+- La traduzione automatica delle note per il sito inglese, segnata ≈ come le glosse: le note si scrivono solo in italiano, e oggi il sito inglese le mostra con «(in Italian)».

@@ -102,7 +102,8 @@ function Origine({ sc, t, lang }: { sc: Scheda; t: Testi; lang: Lang }) {
               <div className={`passo ${classeRamo(c.ramo)}`}>
                 <span className="lt" aria-hidden="true">&lt;</span>
                 <div>
-                  <div className="passo-1"><VoceLink n={c} lang={lang} /><span className="tp">{c.tipo_etichetta ?? c.tipo}</span>{c.attestata && <span className="data-catena">{datazione(c.attestata as Attestazione, t)}</span>}</div>
+                  {/* due date diverse: quella del passaggio accanto al tipo, la prima attestazione accanto alla parola */}
+                  <div className="passo-1"><VoceLink n={c} lang={lang} /><span className="tp">{c.tipo_etichetta ?? c.tipo}{c.passaggio_data && <>, <span title={t.dataPassaggio}>{datazione(c.passaggio_data as Attestazione, t)}</span></>}</span>{c.attestata && <span className="data-catena" title={t.primaAttestazione}>{datazione(c.attestata as Attestazione, t)}</span>}</div>
                   {c.glossa && <div className="gl">{c.glossa_automatica && <Automatica lang={lang} />}{G(c.glossa, lang)}</div>}
                 </div>
               </div>
