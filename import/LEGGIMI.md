@@ -1,0 +1,167 @@
+# Import da Wiktionary
+
+L’importatore porta nel dizionario le etimologie del Wiktionary inglese, attraverso i dump strutturati di Kaikki (wiktextract). Tutto entra come strato `wiktionary` (CC BY-SA 4.0) con stato `importato`, separato dalla redazione.
+
+## Uso
+
+Servono `python3` (solo libreria standard), `curl` e `psql`. Il database deve avere già lo schema: `db/01`–`03` e `db/05_import_wiktionary.sql`.
+
+```bash
+DATABASE_URL="postgres://…" ./importa.sh            # italiano, con la chiusura su latino e francese antico
+CHIUSURA="la:Latin" DATABASE_URL="postgres://…" ./importa.sh                  # chiusura sul solo latino
+CHIUSURA="" DATABASE_URL="postgres://…" ./importa.sh                          # senza chiusura
+WIKIZIONARIO=0 DATABASE_URL="postgres://…" ./importa.sh                       # senza glosse italiane
+LINGUA=fr NOME=French CHIUSURA="la:Latin fro:Old French" DATABASE_URL="…" ./importa.sh   # un'altra lingua
+DATABASE_URL="postgres://…" ./collauda.sh           # 33 test su voci reali (esempio/)
+```
+
+Lo script lavora in quattro fasi e impiega circa quattro minuti:
+
+1. **Download e filtro, circa 2 minuti e mezzo.** `filtra.py` scarica in streaming i dump di Kaikki (italiano 779 MB, latino 1,25 GB, francese antico 37 MB). Tiene i lemmi con un’etimologia, l’elenco di tutti i lemmi con le forme che distinguono gli omografi, e per le lingue di chiusura la mappa forme flesse → lemma. `filtra_wikizionario.py` scarica il Wikizionario (665 MB) e tiene una glossa italiana per parola, lingua e parte del discorso.
+2. **Analisi, circa 1 minuto.** `wiktionary.py` legge le etimologie e scrive i file delle tabelle di appoggio.
+3. **Caricamento:** `psql \copy` riempie le tabelle di appoggio.
+4. **Fusione, circa 30 secondi, più 8 di ricalcoli.** `importa_wiktionary()` fonde etimologie e attestazioni, `importa_glosse_wikizionario()` le glosse italiane; poi si ricalcolano allotropi e famiglie.
+
+L’import si può rilanciare: è idempotente.
+
+## La chiusura delle catene
+
+Una voce italiana dice da dove viene la parola italiana, ma il legame tra un antenato e l’altro lo descrive bene solo la voce dell’antenato. Il caso esemplare è *burro*. La voce italiana scrive «from Old French *bure*, from Latin *butyrum*» con un `der`, che resta un legame indeterminato. È la voce del francese antico *bure* a dichiarare l’eredità da *butyrum*, e solo con quella *burro* e *butirro* risultano allotropi.
+
+Per ogni lingua di chiusura (per impostazione predefinita latino e francese antico) l’importatore legge le etimologie delle voci già presenti nel dizionario, comprese le forme ricostruite del latino volgare. La voce dell’antenato prevale sulle spiegazioni che le voci italiane danno di passaggio. Il perimetro è un solo passaggio: le parole nuove che la chiusura introduce non vengono a loro volta chiuse, salvo con `--passi N`.
+
+Il latino ha richiesto regole proprie:
+
+- **Solo le forme di citazione sono la parola.** *noctem* è *nox*: nominativo e accusativo singolari e infinito si riconducono al lemma.
+- **Participi, gerundi, supini, comparativi e superlativi sono parole a sé.** Derivano dalla loro base: *aperto* < *apertus* < *aperiō*. Fonderli faceva di *aprire*/*aperto* e *forte*/*fortissimo* due falsi allotropi.
+- **Le altre forme flesse si legano al lemma con un legame indeterminato.** *loro* < *illōrum*, forma di *ille*: così *loro* non risulta allotropo di *egli*.
+- **Una pagina che è un lemma non si riconduce a un altro lemma.** *pugnō* è un verbo, anche se è pure il dativo di *pugnus*. Per questo l’indice comprende tutti i lemmi latini (54.627), non solo i 10.068 con un’etimologia.
+- **Gli omografi si distinguono con le forme citate.** Forma canonica, infinito e genitivo: *fondare* viene da *fundō* «fondare» (*fundāre*), *fondere* da *fundō* «versare» (*fundere*). A parità vince l’etimologia principale.
+- **Più forme nello stesso template valgono come una.** In «ἀββα,ἀββᾶς» vale la forma già presente nel dizionario.
+
+## Le glosse italiane del Wikizionario
+
+Le glosse di Wiktionary sono inglesi. Il Wikizionario (it.wiktionary.org), estratto anch’esso da Kaikki, dà definizioni scritte in italiano: entrano come traduzioni nella tabella `glossa`, con lo strato `wikizionario` (CC BY-SA 4.0), e la voce lo cita tra le fonti quando ne mostra una, anche per le parole collegate.
+
+- **Una definizione vera.** Per ogni voce vale la prima definizione che non sia una forma flessa o un rimando («plurale di…», «terza persona di…», «variante di…»), senza etichette iniziali come «(botanica)» e accorciata a un confine naturale.
+- **Nessuna glossa indovinata.** Una glossa si assegna solo se la parte del discorso combacia, oppure se la parola non ha omografi e il Wikizionario ne dà una sola parte del discorso. *torta* e *torta*², entrambi sostantivi femminili, restano senza.
+- **La redazione prevale.** Le parole con una glossa italiana di redazione non ricevono la glossa del Wikizionario.
+
+Risultato, ottobre 2026:
+- **Parole italiane:** 34.600 su 73.069 hanno una glossa italiana. Sono il 73% delle parole ereditate dal latino e il 58% dei prestiti; il resto sono in gran parte derivati rari che il Wikizionario non registra.
+- **Etimi:** 4.975 hanno una glossa italiana, tra cui 2.833 latini e 953 greci.
+
+Dove la glossa italiana manca, l’interfaccia mostra quella inglese e lo dichiara.
+
+## Le prime attestazioni
+
+Wiktionary data poche parole italiane: il template `etydate` compare in 187 voci, e altre 50 hanno una data nella prosa («First attested in 1590», «Attested from the 1560s»). Le attestazioni importate sono 231. Si legge solo la data che ha per soggetto la parola stessa: «From Old French *bure* (attested 1150)» data l’etimo, non la parola italiana.
+
+Entrano come attestazioni di tipo lessicografico, con la precisione dichiarata (anno, circa, ante, intervallo, secolo), e la voce le presenta «secondo Wiktionary». Le datazioni sistematiche delle parole italiane stanno nei dizionari storici (DELI, TLIO), che non hanno licenza libera: sono lavoro di redazione.
+
+## Le regole generali
+
+**Le catene si leggono dal testo, non solo dai template.** In «From Latin *carnem*, from Proto-Italic \*karō, from Proto-Indo-European \*(s)ker-» ogni «from» fa proseguire la catena. Le parole che la interrompono sono «or», «compare», «cf.», «cognate», «influenced». Si ferma anche quando il testo comincia a spiegare gli elementi di un composto: in «First element *con-* derives from *cum*…» quello che segue riguarda una parte, non la parola.
+
+**Il tipo di un anello intermedio non viene dal template.** In una voce il template descrive il rapporto tra la parola e ciascun antenato, non quello tra un antenato e l’altro. Per gli anelli intermedi valgono quindi tre regole:
+- un’eredità resta tale solo tra lingue in linea genealogica;
+- qualunque trasmissione tra due parole diverse della stessa lingua (\*terraceus e *terra*) diventa un legame indeterminato;
+- se la forma più recente allunga di almeno tre lettere quella più antica, è un derivato.
+
+**`der` è un legame indeterminato, anche al primo livello.** Wiktionary lo usa sia per «la stessa parola per via non precisata» sia per le derivazioni. Un collaudo con `der` trattato come trasmissione ha raddoppiato gli allotropi calcolati, ma metà dei nuovi erano falsi. Gli allotropi si calcolano quindi solo su eredità e prestiti espliciti.
+
+**Una radice non è una parola.** Dalla radice si arriva per formazione o per legame indeterminato, mai per eredità. Gli affissi (*ex-*, *-oso*) non diventano lessemi: restano testo dell’arco.
+
+**Le radici dichiarate chiudono le catene, ma non sopra un’altra radice.** Se una voce dichiara la radice (template `root`) e la catena si ferma prima, la cima della catena viene attaccata alla radice con un legame indeterminato: «risale a questa radice, percorso da completare». Se la cima è già una radice, la dichiarazione è in conflitto e non si applica.
+
+**Le radici omografe restano distinte.** \*(s)ker- «tagliare» e \*(s)ker- «girare» diventano due nodi grazie all’identificativo dei template (`id=cut`, `id=turn`), con numeri di omografo in ordine alfabetico dell’identificativo. Le citazioni senza identificativo restano su un nodo generico, senza glossa, da smistare in redazione.
+
+**Wiktionary vale al massimo «probabile».** Quello che Wiktionary afferma vale 3, mai 4: la certezza è un giudizio di redazione. Gli altri casi:
+- «perhaps», «possibly» o un «or» davanti al primo anello abbassano a 2 e l’ipotesi diventa alternativa;
+- «uncertain» abbassa a 1;
+- la catena vale quanto il suo anello più debole.
+
+**I periodi del latino sono la stessa voce.** Latino tardo, medievale, classico ed ecclesiastico confluiscono nel latino. I titoli latini e greci perdono macron e brevi (*carō* → *caro*); la forma citata li conserva.
+
+**Tra più spiegazioni di un etimo intermedio vince la più vicina, poi la più frequente.** Per *rēx* vince \*rēks, perché discende a sua volta da \*h₃rḗǵs; le altre spiegazioni restano ipotesi alternative.
+
+**La redazione prevale sempre.** Il trattamento dei record dipende da chi li ha toccati:
+- se una parola ha già un’ipotesi accolta, quella di Wiktionary entra come alternativa;
+- i record di redazione non si toccano;
+- i record importati che un redattore ha portato a «rivisto» o «verificato» sopravvivono al reimport.
+
+**Niente cicli.** Il parser toglie l’arco che chiude un ciclo, tipicamente un prestito di ritorno; la fusione controlla i cicli che coinvolgono archi di redazione.
+
+## Validazione
+
+`v_validazione_wiktionary` confronta i calcoli con quello che Wiktionary dichiara. Italiano con chiusura su latino e francese antico, dump del 21 ottobre 2026:
+
+| misura | valore |
+|---|---|
+| allotropi dichiarati da Wiktionary (`doublet`) | 971 |
+| di questi, trovati anche dal calcolo | 279 |
+| allotropi calcolati in totale | 822 |
+| radici dichiarate da Wiktionary (`root`) | 1.453 |
+| di queste, raggiunte dalle catene | 1.246 (86%) |
+
+## Limiti noti
+
+- **Prosa libera.** Le etimologie scritte in prosa senza template restano fuori, così come i lemmi latini senza etimologia strutturata: solo 10 mila su 54 mila ne hanno una.
+- **Formazioni tra lingue.** 1.261 sono segnalate in `v_anomalie`: per lo più radici indoeuropee collegate direttamente a una parola latina, senza il derivato intermedio.
+- **Traslitterazioni mancanti.** 477 parole in scritture non latine ne sono prive: il loro indirizzo contiene caratteri non latini.
+- **Radici omografe.** 195 citazioni senza identificativo restano sul nodo generico.
+- **Glosse.** Circa 38 mila parole italiane restano con la sola glossa inglese, perché il Wikizionario non le registra; l’interfaccia italiana lo dichiara. Le lingue rare hanno ancora il nome inglese.
+- **Date.** Le prime attestazioni importate sono 231: la linea del tempo richiede il lavoro di redazione.
+
+`esempio/` contiene voci reali di Wiktionary e del Wikizionario (CC BY-SA 4.0) usate dal collaudo. Per l’italiano ci sono `lemmi.jsonl` e `glosse.tsv`; per la chiusura `la_*` e `fro_*`; per le glosse italiane `glosse_it.tsv`.
+
+## Caricare i dati già analizzati, senza Python
+
+`dati-wiktionary-it.tar.gz` contiene i file delle tabelle di appoggio prodotti dall’analisi di ottobre 2026, con la chiusura su latino e francese antico, le prime attestazioni e le glosse del Wikizionario (CC BY-SA 4.0). Basta `psql`; l’app fa lo stesso da sola al primo deploy (`scripts/inizializza-db.mjs`):
+
+```bash
+tar xzf dati-wiktionary-it.tar.gz && cd tsv
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_radice, stg_attestazione, stg_wikizionario;
+\copy stg_lingua from 'lingue.tsv'
+\copy stg_lessema from 'lessemi.tsv'
+\copy stg_ipotesi from 'ipotesi.tsv'
+\copy stg_relazione from 'relazioni.tsv'
+\copy stg_doppione from 'doppioni.tsv'
+\copy stg_radice from 'radici.tsv'
+\copy stg_attestazione from 'attestazioni.tsv'
+\copy stg_wikizionario from 'glosse_it.tsv'
+select importa_wiktionary();
+select importa_glosse_wikizionario();
+refresh materialized view mv_allotropi;
+refresh materialized view mv_famiglia;
+SQL
+```
+
+## Greco antico (ottobre 2026)
+
+L'import chiude le catene anche sul greco antico (`CHIUSURA="la:Latin fro:Old French grc:Ancient Greek"`). La chiusura si ripete finché trova voci nuove (`PASSI=5`, si ferma da sola al quarto passaggio), perché il greco forma parole dentro sé stesso: *βούτυρον* da *βοῦς* e *τυρός*, *βοῦς* da \*gʷṓws.
+
+- **Traslitterazione:** le parole greche citate senza `tr=` ricevono una traslitterazione con lo schema di Wiktionary (χ kh, φ ph, υ u, η ē, ω ō, spirito aspro h, γ nasale n). L'indirizzo resta in caratteri latini: *ὄφελος* diventa `grc/ophelos`.
+- **Segni vocalici:** ebraico, aramaico, arabo e siriaco li perdono nei titoli, come in Wiktionary (*אַבָּא* → *אבא*). La hamza resta: è una lettera.
+- **Incisi tra parentesi:** un inciso chiuso dentro un connettore non interrompe più la catena («from \*gʷous (compare Mycenaean qo-o), from \*gʷṓws»).
+- **Radici ambigue:** una radice dichiarata da una voce formata con un prefisso o da più basi non va più in cima alla catena, perché può appartenere a un altro elemento. *Εὔβοια* dichiara \*h₁es- per *εὐ-*, non per *βοῦς*.
+
+Risultati sui dati di ottobre 2026: le parole italiane che arrivano al protoindoeuropeo passano da 10.150 a 12.529 (+23%), quelle nelle famiglie indoeuropee da 14.515 a 19.620 (+35%), quelle che arrivano al protoellenico da 24 a 1.742.
+
+## Glosse italiane aggiuntive (ottobre 2026)
+
+- `filtra_wikidata.py` filtra il dump dei lessemi di Wikidata e ne tiene i lessemi italiani con una definizione in italiano: 21.377 su 65.130. Nel pacchetto dati entrano quelli i cui lemmi sono nel dizionario, ed entrano nel database solo con la stessa parte del discorso: 1.194 parole.
+- `traduci_glosse.py` traduce le glosse inglesi degli etimi stranieri senza glossa italiana. Ne tiene 5.657 su 13.486, verificate per ritorno e con il dizionario rovesciato; sono segnate con ≈ nell'interfaccia. Comandi e controlli sono descritti nel README dell'app.
+- `stg_glossa_wikidata` e `stg_glossa_tradotta` sono le tabelle di appoggio; `importa_glosse_aggiuntive()` va chiamata dopo `importa_glosse_wikizionario()`.
+
+## Catene ricostruite meglio (31 ottobre 2026)
+
+Quattro regole nuove del parser danno una catena a 3.425 parole italiane che ne erano prive. Le parole che arrivano al protoindoeuropeo passano da 12.529 a 17.767.
+
+- **Le glosse non sono dubbi.** L'incertezza si legge senza le glosse tra virgolette e senza le parentesi: in *chiaroscuro* l'«obscure» della glossa di *oscuro* non è un dubbio.
+- **Le voci-affisso hanno per etimo un affisso:** *foto-* < *φωτο-*, *-grafia* < *-γραφία*.
+- **Le formazioni di soli elementi si legano agli elementi:** *fotografia* = *foto-* + *-grafia*, due passaggi di composizione. Così i composti dotti raggiungono le loro radici greche e latine (2.635 parole).
+- **L'unica ipotesi è accolta, anche se incerta,** e conserva la sua certezza bassa (1 o 2). Il lettore vede l'etimologia con il suo dubbio, invece del vuoto; un'origine ignota diventa un'ipotesi accolta di origine ignota. Le storie del sito seguono solo i passaggi con certezza 3 o 4.
+
+Restano fuori le etimologie scritte solo nel testo, come *sega*: «From the verb segare», senza modello. Il filtro non conserva i modelli di menzione (`m`, `l`); è un lavoro per un import futuro.

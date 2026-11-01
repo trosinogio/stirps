@@ -1,0 +1,33 @@
+{
+  "name": "dizionario-etimologico",
+  "version": "0.3.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "node scripts/inizializza-db.mjs && next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:init": "for f in db/01_schema.sql db/02_logica.sql db/03_seed_pilota.sql db/05_import_wiktionary.sql; do psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -q -f $f || exit 1; done",
+    "db:test": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -q -f db/04_test.sql",
+    "db:import": "cd import && ./importa.sh",
+    "db:test-import": "cd import && ./collauda.sh"
+  },
+  "dependencies": {
+    "@neon/config": "^1.9.4",
+    "@neon/env": "^1.6.5",
+    "@neondatabase/auth": "^0.7.0-beta",
+    "@neondatabase/serverless": "^1.2.0",
+    "@vercel/functions": "^3.10.3",
+    "next": "16.4.2",
+    "pg": "8.23.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3"
+  }
+}

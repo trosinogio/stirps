@@ -1,0 +1,4 @@
+Voci estratte da Wiktionary (en.wiktionary.org) tramite Kaikki/wiktextract, dump del 21 ottobre 2026.
+Licenza CC BY-SA 4.0. Servono solo come banco di prova dell'importatore (06_test_import.sql):
+lemmi.jsonl e glosse.tsv per l'italiano; la_* e fro_* per la chiusura delle catene su latino e francese antico
+(voci con etimologia, elenco completo dei lemmi citati con le forme distintive, mappa forme → lemma).

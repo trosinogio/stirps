@@ -1,0 +1,33 @@
+# Ogni notte: copia del lavoro della redazione nel ramo «copia-redazione» di questo repository.
+# Ogni notte in cui qualcosa è cambiato diventa un commit: la storia del ramo è la storia delle copie.
+# Richiede il segreto DATABASE_URL_UNPOOLED (Settings → Secrets and variables → Actions).
+name: Copia della redazione
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  copia:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/esporta-redazione.mjs /tmp/copia
+        env:
+          DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+      - name: Salva nel ramo copia-redazione
+        run: |
+          git config user.name "stirps-copie"
+          git config user.email "stirps-copie@users.noreply.github.com"
+          if git fetch origin copia-redazione; then git switch -c copia-redazione FETCH_HEAD; else git switch --orphan copia-redazione; fi
+          rm -rf redazione && cp -r /tmp/copia redazione
+          git add redazione
+          if git diff --cached --quiet; then echo "nessun cambiamento"; exit 0; fi
+          git commit -m "Copia della redazione, $(date -u +%F)"
+          git push origin copia-redazione

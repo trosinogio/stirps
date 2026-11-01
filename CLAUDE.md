@@ -1,0 +1,84 @@
+# Stirps — istruzioni per Claude Code
+
+Stirps è un dizionario etimologico per radici: per ogni parola mostra la catena degli etimi fino alla radice, la famiglia, la linea del tempo, le fonti. In produzione su https://dizionario-etimologico.vercel.app (Next.js su Vercel, Postgres su Neon, regione Francoforte). Lo cura Giovanni, che è anche il primo redattore.
+
+Tutto il progetto è in italiano: identificatori, commenti, messaggi di commit, testi dell’interfaccia, risposte. L’inglese compare solo nei testi `en` dell’interfaccia.
+
+Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi, deploy) e `import/LEGGIMI.md` (parser e import da Wiktionary). Leggili prima di toccare le parti che descrivono.
+
+## Prima di tutto: sicurezza dei dati
+
+- **`.env.local` punta al database di produzione.** `npm run build` esegue prima `scripts/inizializza-db.mjs`, che scrive nel database: per prove in locale passa sempre `DATABASE_URL` e `DATABASE_URL_UNPOOLED` espliciti verso un Postgres locale.
+- **Il lavoro della redazione non si ricostruisce.** Prima di qualunque operazione che cambi i dati di produzione (nuovo import, migrazione, ricalcoli pesanti) crea un ramo di riserva su Neon: `neon branches create --name backup-AAAA-MM-GG --parent production --no-compute`. Non azzerare mai lo schema `public`: è stato fatto una volta, prima che la redazione cominciasse, e non va ripetuto.
+- **Mai segreti nel codice, nei log o in chat.** Le variabili stanno nelle impostazioni di Vercel e nei segreti di GitHub.
+- **Prima di un’operazione rischiosa in produzione chiedi conferma a Giovanni.**
+
+## Comandi
+
+- `npm run dev`: sviluppo (con un `DATABASE_URL` locale).
+- `npx tsc --noEmit`: controllo dei tipi.
+- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, i 72 del seme (`db/04_test.sql`) e i 50 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
+- `node scripts/applica-sql.mjs file.sql`: applica un file SQL in una transazione.
+- `node scripts/esporta-redazione.mjs cartella`: copia del lavoro della redazione in JSON; ogni notte la fa `.github/workflows/copia-redazione.yml` nel ramo `copia-redazione`.
+- Import completo da Wiktionary: `import/importa.sh` (scarica i dump di Kaikki); collaudo del parser: `import/collauda.sh`. Vedi `import/LEGGIMI.md`.
+
+## Mappa
+
+- `app/[lang]/`: le pagine (`w/` voce, `r/` famiglia, `l/` lingua, `radici`, `lingue`, `storie`, `metodo`, `chi-siamo`, `bibliografia`) e `redazione/` (accesso, cruscotto, editor, `azioni.ts`).
+- `components/`: `LineaTempo`, `StoriaCarta`, `Indovinello`, `StemmaAdattivo`, `Mappa`, `Ricerca`, `Automatica` (il segno ≈)…
+- `lib/`: `dati.ts` (letture), `redazione.ts` (letture della redazione), `storie.ts`, `db.ts` (`query`, `transazione`), `auth/` (Neon Auth), testi in `i18n.ts`, `testi-redazione.ts`, `testi-storie.ts`.
+- `db/`: `01_schema.sql`, `02_logica.sql`, `03_seed_pilota.sql`, `05_import_wiktionary.sql`, i test `04` e `06`, e `aggiornamenti/` (file datati).
+- `dati/`: il pacchetto dati compresso (TSV di Wiktionary, glosse del Wikizionario, di Wikidata e tradotte, frequenze).
+- `import/`: parser (`wiktionary.py`), filtri dei dump, traduzione delle glosse, banco di prova di voci reali (`esempio/`).
+- `scripts/`: inizializzazione del database, aggiornamenti, collaudo, copia.
+
+## Il database
+
+Tabelle principali: `lessema` (le voci, con `slug` generato), `ipotesi` (una sola `accolta` per voce), `relazione` (i passaggi), `attestazione`, `glossa`, `rimando` (le fonti, con posizione), `opera`, `strato` (provenienze e licenze), `frequenza`, `lista_lavoro`, `storico` (firmato), `meta`. Viste materializzate: `mv_famiglia`, `mv_allotropi`, `mv_storie`. Funzioni principali: `scheda()`, `nodo_json()`, `storie()`, `indovinello()`, `importa_wiktionary()`, `pulisci_wiktionary()`, `importa_glosse_wikizionario()`, `importa_glosse_aggiuntive()`.
+
+Come cambia il database:
+
+1. **Due posti.** La modifica va nel file canonico (`db/01`, `02`, `05`) per le installazioni nuove, e in un file datato di `db/aggiornamenti/` per il database esistente. Il file datato dev’essere ripetibile senza danni: `create or replace`, `if not exists`, aggiornamenti idempotenti.
+2. **Gli aggiornamenti si applicano da soli** a ogni build (`scripts/inizializza-db.mjs`), in ordine di nome, dopo l’eventuale primo caricamento. Una vista materializzata si ricrea solo se cambia la versione scritta nel suo commento (vedi `2026-10-31-storie.sql`).
+3. **Dati nuovi, nuovo import.** L’impronta del pacchetto `dati/` e di `05_import_wiktionary.sql` sta in `meta`: se cambia, la build rifà l’import in una transazione (import, pulizia, glosse, viste). Se fallisce, il database resta com’era e il deploy si ferma. I file del pacchetto si comprimono con `gzip -9 -n`, così l’impronta dipende solo dal contenuto.
+4. **Un file datato che contiene una funzione dell’import** va rigenerato dal file canonico, altrimenti riporta la versione vecchia.
+5. **Ogni cambiamento di comportamento ha il suo test** in `04` o `06`, e i test girano prima del push.
+
+## Regole che non si violano
+
+- **L’import tocca solo ciò che non è stato toccato:** record con `provenienza = 'wiktionary'` e `stato_editoriale = 'importato'`. Un’ipotesi rivista o verificata resta congelata con tutti i suoi passaggi; `pulisci_wiktionary()` toglie solo ciò che nessuno ha toccato.
+- **Tra voci di Wiktionary l’abbinamento è esatto.** La forma normalizzata abbina solo voci della redazione (Τύρος, la città, non è τυρός, il formaggio).
+- **Ogni azione della redazione** passa da `richiediRedattore()` e da `transazione(email, …)`, che firma lo storico. Se cambia un’ipotesi accolta, dopo la risposta si ricalcolano `mv_famiglia`, `mv_allotropi` e `mv_storie` (`after()`).
+- **Le glosse italiane hanno un ordine di rango:** redazione, poi Wikizionario, poi Wikidata, poi traduzione automatica. Le tradotte portano il segno ≈ (`glossa_automatica`); salvarle nell’editor le rende «riviste».
+- **Le storie usano solo passaggi con certezza 3 o 4,** e mai archi «sospetti» (una forma ricostruita che discende da un’altra famiglia linguistica).
+- **Gli indirizzi li calcola solo `slug_di()`.** Cambiarla, o cambiare `norm()`, cambia gli URL: dopo il lancio pubblico serve una migrazione con i reindirizzamenti.
+
+## Interfaccia
+
+- **Componenti:** server per default; client solo per l’interazione (`'use client'`). A un componente client non si passano funzioni: solo dati serializzabili.
+- **HTML valido:** niente `<p>` dentro `<p>` (una `Catena` è un paragrafo).
+- **Server actions:** `redirect()` va fuori dal `try/catch`, perché funziona lanciando un’eccezione.
+- **Testi:** nei file di testi, mai sparsi nei componenti. Nel testo per il lettore apostrofo tipografico (’) e caporali (« »); nel codice apici diritti.
+- **Colori:** variabili CSS in `app/globals.css`. La classe `r-<ramo>` imposta `--pig`, il colore del ramo linguistico.
+- **Pagine dinamiche:** `storie` e `redazione` sono `force-dynamic`; le voci usano ISR (`revalidate`).
+
+## Trappole già incontrate
+
+- **Il lessico di frequenza conta forme, non lemmi,** e viene dai sottotitoli: *stia*, *sulla*, *era* sono forme di altre parole, e ci sono molte volgarità. Filtrare prima di usarlo per scegliere parole.
+- **Ricorsioni sul grafo:** si visitano le parole, non i percorsi (`union`, non `union all` con l’array del cammino). I composti dotti (*-logia*, *-grafia*) creano migliaia di percorsi convergenti, e contarli bloccava `mv_famiglia`.
+- **Da una sandbox la porta 5432 di Neon può essere chiusa:** gli script ricadono sul driver WebSocket `@neondatabase/serverless`.
+- **Wiktionary scrive l’incertezza nel testo** («possibly», «uncertain»): il parser la legge senza le glosse tra virgolette, perché «obscure» in una glossa non è un dubbio.
+- **Il Postgres locale della sandbox si ferma spesso:** se una query dice «connection refused», riavvialo.
+
+## Lavoro editoriale
+
+- **Le norme redazionali** sono una bozza in un Claude Doc di Giovanni, con nove questioni aperte: quante fonti per «verificata», l’italiano antico, i dialetti, la variante, la notazione delle ricostruzioni, la data del passaggio, la lingua delle note, chi corregge una voce verificata da altri, la licenza dei testi della redazione. Non decidere al suo posto: proponi.
+- **Le liste di lavoro:** `prime-100` (cento voci scelte per provenienza, da `db/aggiornamenti/2026-10-31-prime-100.sql`) e `catene-da-sistemare` (ricalcolata a ogni deploy).
+
+## Prossimi passi
+
+- Pubblicare le norme sul sito, accanto al Metodo, quando Giovanni le avrà approvate.
+- Ritocchi all’editor che emergeranno dalle prime 100.
+- Un nuovo filtro del dump italiano che conservi i modelli di menzione (`m`, `l`), per le etimologie scritte solo nel testo («From the verb segare»).
+- Licenza, «Chi siamo», dominio, mappa del sito, «come citare questa voce».
+- Il dataset su Zenodo con DOI.

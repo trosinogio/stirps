@@ -1,0 +1,5 @@
+Etimologie e prime attestazioni italiane di Wiktionary (en.wiktionary.org), chiuse sulle voci latine e del francese antico,
+e glosse italiane del Wikizionario (it.wiktionary.org), via Kaikki/wiktextract, dump di ottobre 2026.
+Analizzate con import/wiktionary.py e import/filtra_wikizionario.py.
+Licenza CC BY-SA 4.0: chi le riusa deve citare Wiktionary e il Wikizionario e condividere allo stesso modo.
+Le carica scripts/inizializza-db.mjs al primo deploy, se il database è vuoto.

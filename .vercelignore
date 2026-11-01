@@ -1,0 +1,5 @@
+.next
+.env*
+.agents
+import/dati
+import/esempio/tsv

@@ -1,0 +1,214 @@
+-- =====================================================================
+--  Dizionario etimologico — collaudo dell'import da Wiktionary
+--  Si esegue dopo aver caricato import/esempio/ con import/collauda.sh.
+-- =====================================================================
+\set ON_ERROR_STOP on
+\o /dev/null
+set client_min_messages = notice;
+
+create function pg_temp.verifica(p_ok boolean, p_cosa text) returns void language plpgsql as $$
+begin
+  if p_ok is true then raise notice 'OK      %', p_cosa;
+  else raise exception 'FALLITO %', p_cosa; end if;
+end $$;
+
+create function pg_temp.antenati_slug(p text) returns text[] language sql as $$
+  select array_agg(l.slug order by a.profondita, l.slug) from antenati(lx(p), '{accolta,alternativa}', true) a join lessema l on l.id = a.lessema_id
+$$;
+
+\echo '— catene'
+select pg_temp.verifica(pg_temp.antenati_slug('it/carne') @> array['la/caro', 'itc-pro/karo'],
+  'carne < caro < *karō: la catena si legge dal testo');
+select pg_temp.verifica((select forma_citata from relazione where esito_id = lx('it/carne') and etimo_id = lx('la/caro')) = 'carnem',
+  'la forma citata conserva la grafia di Wiktionary (carnem)');
+select pg_temp.verifica(pg_temp.antenati_slug('it/carne') @> array['ine-pro/sker'],
+  'la radice dichiarata (*(s)ker-) chiude la catena in cima');
+select pg_temp.verifica((select tipo from relazione where esito_id = lx('itc-pro/karo') and etimo_id = lx('ine-pro/sker')) in ('derivazione', 'generico'),
+  'dalla radice si arriva per formazione o per legame indeterminato, mai per eredità: niente falsi allotropi');
+select pg_temp.verifica(pg_temp.antenati_slug('it/abate') @> array['la/abbas', 'arc/abba']
+                        and pg_temp.antenati_slug('it/abate') && array['grc/abba', 'grc/abbas'],
+  'abate < latino tardo abbās < greco ἀββα, ἀββᾶς < aramaico: il latino tardo confluisce nel latino');
+
+\echo '— alternative e incertezza'
+select pg_temp.verifica(
+  (select h.stato = 'accolta' and h.confidenza = 2 from ipotesi h where h.esito_id = lx('it/terrazzo') and h.etichetta = 'Wiktionary'),
+  'terrazzo: «From terra, or from *terraceus» è l’unica ipotesi: accolta, ma solo possibile (certezza 2)');
+select pg_temp.verifica(
+  (select h.stato = 'accolta' and h.confidenza = 3 from ipotesi h where h.esito_id = lx('it/chiaroscuro') and h.etichetta = 'Wiktionary'),
+  'chiaroscuro: «oscuro (“dark, obscure”)» non è un dubbio, le glosse tra virgolette non contano');
+select pg_temp.verifica(
+  exists (select 1 from ipotesi h join lessema l on l.id = h.esito_id
+           where l.lingua = 'it' and l.lemma = 'curva' and h.stato = 'accolta' and h.origine = 'ignota'),
+  'curva: «Unknown» è un’ipotesi accolta di origine ignota, non un vuoto');
+select pg_temp.verifica(
+  (select array_agg(e.lemma order by r.ordine) from relazione r join lessema e on e.id = r.etimo_id
+    join ipotesi h on h.id = r.ipotesi_id and h.stato = 'accolta' where r.esito_id = lx('it/fotografia')) = array['foto-', '-grafia']
+  and exists (select 1 from relazione r join lessema e on e.id = r.etimo_id join lessema x on x.id = r.esito_id
+               where x.lingua = 'it' and x.lemma = 'foto-' and e.lingua = 'grc'),
+  'fotografia = foto- + -grafia: una formazione di soli elementi si lega agli elementi, e foto- risale al greco');
+select pg_temp.verifica(
+  (select tipo from relazione where esito_id = lx('la-vul/terraceus') and etimo_id = lx('la/terra')) = 'generico',
+  '*terraceus < terra: tra due parole diverse del latino non c’è eredità');
+select pg_temp.verifica(
+  exists (select 1 from ipotesi h where h.esito_id = lx('it/cicisbeo') and h.origine = 'onomatopea')
+  and not exists (select 1 from relazione r where r.esito_id = lx('it/cicisbeo')),
+  'cicisbeo: onomatopea, nessun etimo');
+
+\echo '— formazioni'
+select pg_temp.verifica(
+  (select tipo = 'derivazione' and affisso = '-avo' from relazione where esito_id = lx('it/centavo') and etimo_id = lx('it/cento')),
+  'centavo < cento + -avo: derivazione, l’affisso resta testo dell’arco');
+select pg_temp.verifica(
+  (select tipo = 'derivazione' and affisso = 'retro-' from relazione where esito_id = lx('it/retrovirus') and etimo_id = lx('it/virus')),
+  'retrovirus < retro- + virus');
+select pg_temp.verifica(
+  (select tipo from relazione where esito_id = lx('it/torta-2') and etimo_id = lx('it/torto')) = 'retroformazione',
+  'torta² < torto: retroformazione, e il secondo etimo di torta è un omografo');
+
+\echo '— la redazione prevale'
+select pg_temp.verifica(
+  (select stato from ipotesi where esito_id = lx('it/fegato') and etichetta = 'principale') = 'accolta'
+  and (select stato from ipotesi where esito_id = lx('it/fegato') and etichetta = 'Wiktionary') = 'alternativa',
+  'fegato: l’ipotesi di redazione resta accolta, quella di Wiktionary entra come alternativa');
+select pg_temp.verifica((select provenienza from lessema where slug = 'it/fegato') = 'redazione',
+  'il lessema di redazione non cambia provenienza');
+select pg_temp.verifica(
+  (select count(*) from lessema where lemma = 'cifra' and lingua in ('la', 'la-med')) = 1,
+  'la cifra di Wiktionary (latino) si riconosce nel lat. mediev. cifra del seme: nessun doppione');
+select pg_temp.verifica(
+  (select nota_lingua from ipotesi where esito_id = lx('it/carne') and etichetta = 'Wiktionary') = 'en',
+  'le note di Wiktionary dichiarano la loro lingua');
+
+\echo '— calcoli sui dati importati'
+select pg_temp.verifica(
+  exists (select 1 from mv_allotropi where (a_id, b_id) in ((lx('it/posare'), lx('it/pausare')), (lx('it/pausare'), lx('it/posare')))),
+  'posare e pausare: allotropi dallo stesso pauso (latino tardo e latino sono la stessa voce)');
+select pg_temp.verifica((select count(*) from v_validazione_wiktionary) = 5, 'la vista di validazione risponde');
+
+\echo '— chiusura delle catene (latino e francese antico)'
+select pg_temp.verifica(
+  exists (select 1 from ipotesi h join relazione r on r.ipotesi_id = h.id
+           where h.esito_id = lx('la/caro') and h.id_esterno = 'enwikt:la:caro#wikt' and r.etimo_id = lx('itc-pro/karo') and r.tipo = 'eredita'),
+  'caro ha la sua etimologia dalla voce latina: eredità da *karō');
+select pg_temp.verifica(
+  not exists (select 1 from antenati(lx('it/carne'), '{accolta}', true) a join lessema l on l.id = a.lessema_id
+               where l.lingua = 'ine-pro' and 'generico' = any(a.tipi))
+  and exists (select 1 from antenati(lx('it/carne'), '{accolta}', true) a join lessema l on l.id = a.lessema_id where l.lingua = 'ine-pro'),
+  'carne arriva alla radice indoeuropea senza legami indeterminati');
+select pg_temp.verifica(
+  exists (select 1 from mv_allotropi where (a_id, b_id) in ((lx('it/burro'), lx('it/butirro')), (lx('it/butirro'), lx('it/burro')))),
+  'burro e butirro sono allotropi: la voce del francese antico bure dichiara l’eredità da butyrum');
+select pg_temp.verifica(
+  (select string_agg(e.slug, ',') from relazione r join lessema e on e.id = r.etimo_id where r.esito_id = lx('it/fondare') and r.provenienza = 'wiktionary') = 'la/fundo-2'
+  and (select string_agg(e.slug, ',') from relazione r join lessema e on e.id = r.etimo_id where r.esito_id = lx('it/fondere') and r.provenienza = 'wiktionary') = 'la/fundo',
+  'omografi latini: fondare da fundō² (fundāre), fondere da fundō¹ (fundere), distinti dall’infinito citato');
+select pg_temp.verifica(
+  (select tipo from relazione where esito_id = lx('la/apertus') and etimo_id = lx('la/aperio')) = 'derivazione'
+  and not exists (select 1 from mv_allotropi where (a_id, b_id) in ((lx('it/aperto'), lx('it/aprire')), (lx('it/aprire'), lx('it/aperto')))),
+  'il participio resta una parola: aperto < apertus < aperiō per derivazione, e aperto non è allotropo di aprire');
+select pg_temp.verifica(
+  (select tipo from relazione where esito_id = lx('la/illorum') and etimo_id = lx('la/ille')) = 'generico'
+  and not exists (select 1 from mv_allotropi where (a_id, b_id) in ((lx('it/egli'), lx('it/loro')), (lx('it/loro'), lx('it/egli')))),
+  'loro < illōrum, forma di ille: legame indeterminato, e loro non è allotropo di egli');
+
+\echo '— chiusura sul greco antico'
+select pg_temp.verifica(pg_temp.antenati_slug('it/burro') @> array['grc/bouturon', 'grc/bous', 'grc/turos'],
+  'burro < butyrum < βούτυρον, composto di βοῦς «vacca» e τυρός «formaggio»: la chiusura legge le voci greche');
+select pg_temp.verifica(pg_temp.antenati_slug('it/burro') @> array['ine-pro/tuh2ros', 'ine-pro/gwows'],
+  'con più passaggi la catena prosegue dentro il greco fino al protoindoeuropeo: *gʷṓws «vacca», *tuh₂-ró-s «formaggio»');
+select pg_temp.verifica(not exists (select 1 from relazione x join ipotesi h on h.id = x.ipotesi_id
+                                     where x.esito_id = lx('grk-pro/gwous') and h.stato = 'accolta' and x.etimo_id <> lx('ine-pro/gwows')),
+  'un inciso tra parentesi («compare Mycenaean qo-o») non interrompe la catena: *gʷous < *gʷṓws');
+select pg_temp.verifica((select count(*) from lessema where lingua = 'grc' and slug ~ '[^ -~]') = 0,
+  'le parole greche citate senza traslitterazione hanno comunque un indirizzo in caratteri latini');
+select pg_temp.verifica((select count(*) from lessema where lingua = 'arc' and slug like 'arc/abba%') = 1,
+  'una sola voce aramaica per אבא: i segni vocalici non creano doppioni');
+
+\echo '— glosse italiane dal Wikizionario e prime attestazioni'
+select pg_temp.verifica(
+  (select testo from glossa where lessema_id = lx('it/carne') and lingua = 'it' and provenienza = 'wikizionario') like 'l''insieme dei tessuti muscolari%',
+  'carne ha una glossa italiana dal Wikizionario');
+select pg_temp.verifica(
+  (nodo_json(lx('it/carne'), 'it', true)->>'glossa_lingua') = 'it' and (nodo_json(lx('it/carne'), 'en', true)->>'glossa_lingua') = 'en',
+  'l’interfaccia italiana mostra la glossa italiana, quella inglese resta inglese');
+select pg_temp.verifica(
+  (select testo from glossa where lessema_id = lx('la/caro') and lingua = 'it') = 'carne',
+  'anche gli etimi hanno la glossa italiana: lat. caro «carne»');
+select pg_temp.verifica(
+  not exists (select 1 from glossa where lessema_id in (lx('it/torta'), lx('it/torta-2')) and provenienza = 'wikizionario'),
+  'due omografi con la stessa parte del discorso (torta, torta²): nessuna glossa indovinata');
+select pg_temp.verifica(
+  not exists (select 1 from glossa where lessema_id = lx('it/fegato') and provenienza = 'wikizionario'),
+  'fegato ha già la glossa italiana di redazione: il Wikizionario non la duplica');
+select pg_temp.verifica(
+  exists (select 1 from jsonb_array_elements(scheda('it/carne', true, 'it')->'strati') x where x->>'codice' = 'wikizionario'),
+  'la voce cita il Wikizionario tra le fonti quando ne mostra le glosse');
+create temp table glosse_prima as select count(*) as n from glossa where provenienza = 'wikizionario';
+select importa_glosse_wikizionario();
+select pg_temp.verifica((select count(*) from glossa where provenienza = 'wikizionario') = (select n from glosse_prima),
+  'reimport delle glosse idempotente');
+select pg_temp.verifica(
+  (select anno_da = 1590 and precisione = 'esatta' and provenienza = 'wiktionary' from attestazione where lessema_id = lx('it/pizza')),
+  'pizza: prima attestazione 1590, secondo Wiktionary');
+
+\echo '— glosse aggiuntive: Wikidata e traduzione automatica'
+-- come nel caricamento: le glosse aggiuntive vengono sempre dopo quelle del Wikizionario
+select importa_glosse_aggiuntive();
+select pg_temp.verifica((select testo || '|' || provenienza from glossa where lessema_id = lx('it/pausare') and lingua = 'it') = 'fare una pausa|wikidata',
+  'una definizione di Wikidata per una parola italiana senza glossa, con la stessa parte del discorso');
+select pg_temp.verifica(not exists (select 1 from glossa where lessema_id = lx('it/centavo') and lingua = 'it' and provenienza = 'wikidata'),
+  'Wikidata non entra se la parte del discorso non corrisponde (aggettivo per un sostantivo)');
+select pg_temp.verifica(not exists (select 1 from glossa where lessema_id = lx('it/cento') and lingua = 'it' and provenienza = 'wikidata'),
+  'una «glossa» di Wikidata che comincia con la maiuscola è un''etichetta, non una definizione: non entra');
+select pg_temp.verifica((select testo || '|' || provenienza from glossa where lessema_id = lx('la/mobilis') and lingua = 'it') = 'mobile, sciolto|traduzione-automatica',
+  'la traduzione automatica dà una glossa italiana a un etimo che non ne ha, dichiarata come tale');
+select pg_temp.verifica((select testo || '|' || provenienza from glossa where lessema_id = lx('la/caro') and lingua = 'it') = 'carne|wikizionario',
+  'la traduzione automatica non scavalca il Wikizionario');
+select pg_temp.verifica((nodo_json(lx('la/mobilis'), 'it')->>'glossa_automatica')::boolean
+                        and not (nodo_json(lx('la/caro'), 'it')->>'glossa_automatica')::boolean,
+  'le glosse tradotte automaticamente sono segnate come tali');
+select importa_glosse_wikizionario();
+select importa_glosse_aggiuntive();
+select pg_temp.verifica((select count(*) from glossa where provenienza in ('wikidata', 'traduzione-automatica')) = 2,
+  'un nuovo import delle glosse rimette le stesse glosse aggiuntive, senza doppioni');
+
+\echo '— reimport'
+create temp table prima as select count(*) as n from relazione where provenienza = 'wiktionary';
+update relazione set stato_editoriale = 'rivisto'
+ where esito_id = lx('it/carne') and etimo_id = lx('la/caro') and provenienza = 'wiktionary';
+select importa_wiktionary();
+select pg_temp.verifica((select count(*) from relazione where provenienza = 'wiktionary') = (select n from prima),
+  'reimport idempotente: stesso numero di archi');
+select pg_temp.verifica(
+  (select count(*) from relazione where esito_id = lx('it/carne') and etimo_id = lx('la/caro')) = 1
+  and (select stato_editoriale from relazione where esito_id = lx('it/carne') and etimo_id = lx('la/caro')) = 'rivisto',
+  'un arco rivisto dalla redazione sopravvive al reimport, senza doppioni');
+
+-- un'ipotesi verificata dalla redazione, i cui archi sono rimasti «importato», non perde la sua catena
+create temp table verificata as
+  select h.id, (select count(*) from relazione x where x.ipotesi_id = h.id) as archi
+    from ipotesi h where h.esito_id = lx('it/burro') and h.provenienza = 'wiktionary' and h.stato = 'accolta' limit 1;
+insert into rimando (opera_id, sv, posizione, ipotesi_id)
+  select (select id from opera where sigla = 'DELI'), 'burro', 'accoglie', id from verificata;
+update ipotesi set stato_editoriale = 'verificato' where id = (select id from verificata);
+select importa_wiktionary();
+select pg_temp.verifica(
+  (select archi from verificata) > 0
+  and (select count(*) from relazione x join verificata v on v.id = x.ipotesi_id) = (select archi from verificata),
+  'un''ipotesi verificata conserva al reimport i suoi archi importati');
+
+-- un abbinamento largo non deve fondere parole diverse: Τύρος (la città) non è τυρός (il formaggio).
+-- Come in produzione: la città c'è già quando il formaggio arriva per la prima volta
+delete from relazione where etimo_id = lx('grc/turos') or esito_id = lx('grc/turos');
+delete from lessema where id = lx('grc/turos');
+insert into lessema (lingua, lemma, omografo, ricostruito, translit, glossa, glossa_lingua, provenienza, stato_editoriale, id_esterno)
+  values ('grc', 'Τύρος', 1, false, 'Túros', 'Tyre', 'en', 'wiktionary', 'importato', 'enwikt:grc:Τύρος');
+select importa_wiktionary();
+select pg_temp.verifica(
+  (select count(*) from lessema where lingua = 'grc' and lemma = 'τυρός') = 1
+  and (select glossa from lessema where lingua = 'grc' and lemma = 'Τύρος') = 'Tyre'
+  and (select bool_or(e.lemma = 'τυρός') and not bool_or(e.lemma = 'Τύρος')
+         from relazione x join lessema e on e.id = x.etimo_id where x.esito_id = lx('grc/bouturon')),
+  'un nuovo import non fonde parole diverse per maiuscola o accento: Τύρος non è τυρός');
+
+\echo '— collaudo dell’import completato'
