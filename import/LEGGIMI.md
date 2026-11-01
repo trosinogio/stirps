@@ -57,7 +57,7 @@ Dove la glossa italiana manca, l’interfaccia mostra quella inglese e lo dichia
 
 ## I dizionari del Perseus: latino e greco completi
 
-Wiktionary ha circa 45 mila lemmi latini e 23 mila greci antichi. Perché le due lingue siano complete entrano anche i lemmi dei due dizionari di riferimento che Wiktionary non ha, dall’edizione digitale del Perseus Digital Library (Tufts University, http://www.perseus.tufts.edu/), con licenza CC BY-SA 4.0:
+Wiktionary dà circa 56 mila voci latine e 25 mila greche antiche (pacchetto del 1° novembre 2026, tutte le voci comprese, anche senza etimologia). Perché le due lingue siano complete entrano anche i lemmi dei due dizionari di riferimento che Wiktionary non ha: 22.329 latini dal Lewis & Short e 100.448 greci dall’LSJ. Il latino arriva così a 78 mila voci e il greco a 125 mila. I lemmi vengono dall’edizione digitale del Perseus Digital Library (Tufts University, http://www.perseus.tufts.edu/), con licenza CC BY-SA 4.0:
 
 - *A Latin Dictionary* di Charlton T. Lewis e Charles Short (1879): `lat.ls.perseus-eng2.xml`;
 - *A Greek-English Lexicon* di Henry George Liddell, Robert Scott e Henry Stuart Jones (9ª ed., 1940): `grc.lsj.perseus-eng1.xml` … `grc.lsj.perseus-eng27.xml`.

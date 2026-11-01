@@ -1,5 +1,13 @@
-Etimologie e prime attestazioni italiane di Wiktionary (en.wiktionary.org), chiuse sulle voci latine e del francese antico,
-e glosse italiane del Wikizionario (it.wiktionary.org), via Kaikki/wiktextract, dump di ottobre 2026.
-Analizzate con import/wiktionary.py e import/filtra_wikizionario.py.
+Etimologie e prime attestazioni italiane di Wiktionary (en.wiktionary.org), chiuse sulle voci latine, del francese
+antico e del greco antico, con tutti i lemmi latini e greci; glosse italiane del Wikizionario (it.wiktionary.org);
+via Kaikki/wiktextract, dump del 1° novembre 2026. Analizzate con import/wiktionary.py e import/filtra_wikizionario.py.
 Licenza CC BY-SA 4.0: chi le riusa deve citare Wiktionary e il Wikizionario e condividere allo stesso modo.
-Le carica scripts/inizializza-db.mjs al primo deploy, se il database è vuoto.
+
+dizionari.tsv.gz: lemmi e glosse del Lewis & Short (A Latin Dictionary, 1879) e del Liddell–Scott–Jones (A Greek-English
+Lexicon, 9ª ed., 1940) che Wiktionary non ha, dall'edizione digitale del Perseus Digital Library (Tufts University,
+http://www.perseus.tufts.edu/), file TEI di github.com/PerseusDL/lexica al commit 1c34cdf, estratti con
+import/filtra_perseus.py. Licenza CC BY-SA 4.0: chi li riusa deve citare il Perseus Digital Library.
+
+glosse_tradotte.tsv.gz: traduzioni automatiche delle glosse inglesi (import/traduci_glosse.py), segnate ≈ nel dizionario.
+
+Le carica scripts/inizializza-db.mjs al primo deploy, se il database è vuoto, e a ogni deploy in cui il pacchetto cambia.
