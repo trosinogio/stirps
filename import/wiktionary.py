@@ -329,6 +329,8 @@ NON_LEMMA = re.compile(r'[()\[\]{}<>“”"=|]')
 
 
 def lemma_valido(lingua, lemma, ricostruito=False):
+    if not (lemma or '').strip('*- '):
+        return False                    # un lemma vuoto («itc-pro:» da un termine senza parola) non è una voce
     if ricostruito:                                      # le ricostruzioni hanno la loro notazione: *(s)ker-
         return True
     if NON_LEMMA.search(lemma or ''):

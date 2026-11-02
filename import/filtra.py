@@ -77,8 +77,10 @@ def da_ety(t, lingua):
         x = termini[0]
         mod = dict(re.findall(r'<(\w+):([^<>]*)>', x))
         termine = re.sub(r'<[^<>]*>', '', x).strip()
-        m = re.match(r'^([a-z]{2,3}(?:-[a-z]{2,4})*):(.+)$', termine)
+        m = re.match(r'^([a-z]{2,3}(?:-[a-z]{2,4})*):(.*)$', termine)
         lt, termine = (m.group(1), m.group(2).strip()) if m else (lv, termine)
+        if not termine.strip('*- '):
+            continue                        # «itc-pro:» senza parola: nessun etimo
         if nome in ('bf', 'clipping', 'ellipsis'):
             return {'name': nome, 'args': {'1': lv, '2': termine if lt == lv else f'{lt}:{termine}'}, 'expansion': ''}
         args = {'1': lv, '2': lt, '3': termine}

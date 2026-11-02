@@ -32,6 +32,9 @@ assert da_ety({'args': {'1': 'la', '2': ':bor', '3': 'grc:Α', '4': ':influence'
 assert da_ety({'args': {'1': 'it', '2': ':influence', '3': 'fr:x'}}, 'it') is None
 assert da_ety({'args': {'1': 'la', '2': ':af', '3': 'ad<id:to>', '4': 'quiēscō'}}, 'la')['args']['2'] == 'ad-<id:to>', 'il preverbo è un prefisso'
 assert da_ety({'args': {'1': 'grc', '2': ':af', '3': 'κατά', '4': 'βαίνω'}}, 'grc')['args']['2'] == 'κατά-'
+assert da_ety({'args': {'1': 'la', '2': ':inh', '3': 'itc-pro:<id:x>'}}, 'la') is None, 'un termine vuoto non è un etimo'
+from wiktionary import lemma_valido
+assert not lemma_valido('itc-pro', '', True) and not lemma_valido('ine-pro', '*', True), 'un lemma vuoto non è una voce'
 from filtra import lemma_della_forma as lf
 assert lf(s('second-person plural present passive indicative/imperative of contemperō')) == ('contemperō', ['second-person', 'plural', 'present', 'passive', 'indicative', 'imperative'])
 assert lf({'senses': [{'glosses': ['g'], 'form_of': [{'word': 'nox'}], 'tags': ['genitive']}]}) == ('nox', ['genitive'])
