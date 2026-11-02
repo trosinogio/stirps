@@ -687,7 +687,7 @@ select jsonb_build_object(
       'tipo_etichetta', etichetta_in('tipo_relazione', c.tipi[c.profondita], p_lingua, 'breve'),
       'confidenza_catena', c.confidenza,
       -- la prima attestazione del nodo: le date entrano nella catena
-      'attestata', (select jsonb_build_object('anno_da', a.anno_da, 'anno_a', a.anno_a, 'precisione', a.precisione)
+      'attestata', (select jsonb_build_object('anno_da', a.anno_da, 'anno_a', a.anno_a, 'precisione', a.precisione, 'stima', a.stima)
                       from attestazione a where a.lessema_id = c.lessema_id and visibile(a.stato_editoriale, p_anteprima)
                      order by a.anno_da limit 1),
       -- la data del passaggio dal nodo all'esito, se una fonte la dà: è un'altra cosa dalla prima attestazione
@@ -711,6 +711,7 @@ select jsonb_build_object(
       'forma_attestata', a.forma_attestata, 'testo', a.testo, 'rif', a.rif, 'tipo', a.tipo,
       'banca_dati', a.banca_dati, 'url', a.url, 'anno_da', a.anno_da, 'anno_a', a.anno_a,
       'precisione', a.precisione, 'citazione', a.citazione, 'nota', a.nota, 'provenienza', a.provenienza,
+      'stima', a.stima, 'confidenza', a.confidenza,
       'rimandi', rimandi_json('attestazione', a.id))
       order by a.anno_da) from att a), '[]'::jsonb),
   'connessioni', coalesce((select jsonb_agg(nodo_json(c.altro, p_lingua, p_anteprima) || jsonb_build_object(
