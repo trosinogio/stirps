@@ -40,6 +40,21 @@ def forma_flessa(v):
                                     for s in con_glossa)
 
 
+def lemma_della_forma(v):
+    '''Il lemma di una forma flessa e le etichette della forma, per forme.tsv: da form_of, o dalla glossa quando
+    Wiktionary non marca il senso («second-person plural … of contemperō» → contemperō). None se non si trova.'''
+    for s in v.get('senses') or []:
+        for fo in (s.get('form_of') or [])[:1]:
+            if fo.get('word'):
+                return fo['word'], s.get('tags') or []
+    for s in v.get('senses') or []:
+        g = (s.get('glosses') or [''])[0]
+        m = FORMA.match(g) and re.search(r'\bof\s+([^\s(),;:]+)', g)
+        if m:
+            return m.group(1), [x for x in re.split(r'[\s/]+', g[:m.start()].lower()) if x]
+    return None
+
+
 def menzione_come_der(v):
     """Un'etimologia scritta solo nel testo, con i modelli di menzione: «From the verb {{m|it|segare}}». Se il testo
     comincia con «From» (o «Derived from», «Deverbal from», «Back-formation from») e la voce non ha modelli etimologici,
@@ -62,7 +77,7 @@ def menzione_come_der(v):
 
 
 if __name__ == '__main__':
-    n = tenuti = flesse = senza = promosse = flesse_con_etimo = flesse_dalla_glossa = 0
+    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = 0
     out = open(sys.argv[1], 'w', encoding='utf-8')
     glosse = open(sys.argv[2], 'w', encoding='utf-8')
     forme = open(os.environ['FORME'], 'w', encoding='utf-8') if os.environ.get('FORME') else None
@@ -73,22 +88,15 @@ if __name__ == '__main__':
         if v.get('lang_code') != LINGUA: continue
         tpl = v.get('etymology_templates') or []
         sensi = v.get('senses') or []
-        fl = forma_flessa(v)
-        if fl:
+        if forma_flessa(v):
             flesse += 1
             flesse_dalla_glossa += not marcata(v)
-            if forme:   # forma flessa → lemma (titoli di pagina), per le catene che citano noctem invece di nox
-                for s_ in sensi:
-                    for fo in (s_.get('form_of') or [])[:1]:
-                        if fo.get('word'):
-                            forme.write(f"{v['word']}\t{fo['word']}\t{','.join(s_.get('tags') or [])}\n")
-                            break
-                    break
-            # una forma con un'etimologia sua (minimo < minimus) passa al parser, segnata: resta solo se un'altra parola
-            # ne deriva o se la pagina ha anche un senso lessicale (wiktionary.py, togli_forme_flesse)
-            if not any(t.get('name') in UTILI for t in tpl):
-                continue
-            flesse_con_etimo += 1
+            # una forma flessa non è una voce, nemmeno con un'etimologia sua: va solo in forme.tsv, che lega al lemma la
+            # forma citata in una catena (noctem → nox; battipanni < battere, forma citata «batti»)
+            lf = lemma_della_forma(v)
+            if forme and lf:
+                forme.write(f"{v['word']}\t{lf[0]}\t{','.join(lf[1])}\n")
+            continue
         g = [s['glosses'][0] for s in sensi if s.get('glosses')][:2]
         # tutti i lemmi, con le forme che distinguono gli omografi: canonica, infinito, genitivo (fundō: fundere o fundāre)
         testa = ((v.get('head_templates') or [{}])[0].get('expansion') or '')
@@ -97,13 +105,11 @@ if __name__ == '__main__':
             et = set(f.get('tags') or [])
             if ({'infinitive', 'present', 'active'} <= et or {'genitive', 'singular'} <= et) and len(distintive) < 4:
                 distintive.append(f.get('form', ''))
-        # sesta colonna: 1 per le forme ricostruite (pagine Reconstruction:), che non sono parole attestate.
-        # Le forme flesse non hanno una riga: glosse.tsv è l'elenco dei lemmi (e dei lemmi interi di latino e greco)
-        if not fl:
-            glosse.write('\t'.join((v['word'], str(v.get('etymology_number') or 1), v.get('pos') or '',
-                                     (g[0] if g else '').replace('\t', ' ').replace('\n', ' ')[:200],
-                                     ','.join(x.replace(',', ' ') for x in distintive if x),
-                                     '1' if (v.get('original_title') or '').startswith('Reconstruction:') else '')) + '\n')
+        # sesta colonna: 1 per le forme ricostruite (pagine Reconstruction:), che non sono parole attestate
+        glosse.write('\t'.join((v['word'], str(v.get('etymology_number') or 1), v.get('pos') or '',
+                                 (g[0] if g else '').replace('\t', ' ').replace('\n', ' ')[:200],
+                                 ','.join(x.replace(',', ' ') for x in distintive if x),
+                                 '1' if (v.get('original_title') or '').startswith('Reconstruction:') else '')) + '\n')
         tpl = [{'n': t['name'], 'a': t.get('args', {}), 'e': t.get('expansion', '')} for t in tpl if t.get('name') in UTILI]
         if not tpl:
             tpl = menzione_come_der(v)
@@ -114,9 +120,8 @@ if __name__ == '__main__':
         canonica = next((f['form'] for f in (v.get('forms') or []) if 'canonical' in (f.get('tags') or [])), None) or testa.split(' (')[0].split(' ')[0] or None
         out.write(json.dumps({'w': v['word'], 'p': v.get('pos'), 'en': v.get('etymology_number'), 't': v.get('etymology_text', ''),
                               'tpl': tpl, 'g': g, 'h': heads, 'c': canonica,
-                              'rec': (v.get('original_title') or '').startswith('Reconstruction:'),
-                              **({'fl': 1} if fl else {})}, ensure_ascii=False) + '\n')
+                              'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
     print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}), forme flesse {flesse} '
-          f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}; con un\'etimologia sua, al parser: {flesse_con_etimo}), '
+          f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}', file=sys.stderr)

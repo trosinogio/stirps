@@ -24,24 +24,10 @@ assert ff(s('second-person plural present passive indicative/imperative of conte
 assert ff({'senses': [{'glosses': ['genitive singular of nox'], 'form_of': [{'word': 'nox'}]}, {'tags': ['no-gloss']}]}), 'un senso vuoto non salva una forma'
 assert not ff(s('perfect passive participle of amō', 'beloved, dear')), 'un senso lessicale e la voce resta'
 assert not ff(s('alternative form of riappressare')) and not ff(s('comparative studies')), 'varianti e falsi amici restano'
-# il parser toglie le forme con un'etimologia sua, salvo gli etimi e le pagine con un senso lessicale
-from wiktionary import Importatore
-imp = Importatore()
-k = {w: imp.lessema(l, w) for l, w in (('it', 'vicinissimo'), ('it', 'vicino'), ('it', 'ottimo'), ('la', 'optimus'),
-                                       ('it', 'minimo'), ('it', 'minimale'), ('it', 'fermissimo'), ('it', 'fermo'))}
-for w in ('vicinissimo', 'ottimo', 'minimo', 'fermissimo'):
-    imp.lessemi[k[w]]['forma'] = True
-imp.non_forme.update((k['fermissimo'], k['ottimo']))   # hanno anche un senso lessicale
-k['fatta'] = imp.lessema('it', 'fatta'); k['facta'] = imp.lessema('la', 'facta'); imp.lessemi[k['fatta']]['forma'] = True
-for esito, etimo in (('vicinissimo', 'vicino'), ('ottimo', 'optimus'), ('minimale', 'minimo'), ('fermissimo', 'fermo'), ('fatta', 'facta')):
-    h = k[esito] + '#wikt'
-    imp.ipotesi[k[esito]] = {'chiave': h, 'esito': k[esito], 'etichetta': 'Wiktionary', 'stato': 'accolta', 'confidenza': 3, 'origine': 'etimo', 'nota': None}
-    imp.relazioni.append({'chiave': h + '#0', 'ipotesi': h, 'etimo': k[etimo], 'esito': k[esito], 'tipo': 'derivazione'})
-imp.togli_forme_flesse()
-assert k['vicinissimo'] not in imp.lessemi and k['vicinissimo'] not in imp.ipotesi, 'vicinissimo esce, con la sua ipotesi'
-assert k['fatta'] not in imp.lessemi, 'fatta < facta esce: un\'etimologia propria non fa di una forma un lemma'
-assert all(k[w] in imp.lessemi for w in ('ottimo', 'minimo', 'fermissimo', 'minimale', 'vicino')), 'gli altri restano'
-assert imp.stat['forme_flesse_tolte'] == 2
+from filtra import lemma_della_forma as lf
+assert lf(s('second-person plural present passive indicative/imperative of contemperō')) == ('contemperō', ['second-person', 'plural', 'present', 'passive', 'indicative', 'imperative'])
+assert lf({'senses': [{'glosses': ['g'], 'form_of': [{'word': 'nox'}], 'tags': ['genitive']}]}) == ('nox', ['genitive'])
+assert lf(s('genitive singular uncontracted of ζεῦγος (zeûgos)'))[0] == 'ζεῦγος'
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \

@@ -74,11 +74,9 @@ I modificatori in linea dei modelli (`scorciare<t:to shorten>`) si staccano dal 
 
 Serve la glossa perché Wiktionary non marca sempre il senso: prima di questa regola erano entrate così circa 5.000 forme latine, 322 greche e 103 italiane. Basta un senso lessicale perché la voce resti un lemma (*amatus*, «beloved»). Le varianti («alternative form of», «Epic form of») non sono forme flesse.
 
-Come si trattano:
-- una forma senza etimologia propria va solo in `forme.tsv`, che lega una forma citata in una catena al suo lemma (*noctem* → *nox*);
-- una forma con un'etimologia propria arriva al parser segnata (`fl`), e `togli_forme_flesse()` la toglie con le sue ipotesi, salvo che un'altra parola ne derivi (*minimo* per *minimale*) o che la pagina abbia anche un senso lessicale (*ottimo*, «very good»). Escono *vicinissimo* (*vicino* + *-issimo*) e *fatta* (< *facta*): un'etimologia propria non fa di una forma un lemma.
+Una forma flessa non entra mai come voce, nemmeno quando ha un'etimologia sua (*vicinissimo* < *vicino* + *-issimo*, *fatta* < *facta*). Va solo in `forme.tsv`, con il suo lemma: da `form_of`, o dalla glossa quando Wiktionary non la marca («… of contemperō» → *contemperō*; `lemma_della_forma()`). Una catena che la cita si lega al lemma, con la forma citata accanto: *noctem* → *nox*, *battipanni* < *battere* («batti»). Le parole lessicalizzate restano perché hanno anche un senso lessicale: *ottimo* («very good»), *amatus* («loved one»).
 
-Il registro del filtro riporta quante forme ha riconosciuto in tutto, quante dalla sola glossa e quante con un'etimologia propria: un numero che cambia molto da un import all'altro va guardato.
+Il registro del filtro riporta quante forme ha riconosciuto in tutto e quante dalla sola glossa: un numero che cambia molto da un import all'altro va guardato.
 
 Le parole scritte nel sillabario cipriota, che Wiktionary mette sotto il greco antico, diventano voci del **greco arcadocipriota** (`grc-arp`, varietà del greco antico), con il loro indice per segni. Le parole con lettere epicoriche (ϝοῖκος) restano voci del greco, forme attestate, ma fuori dall’indice a 24 lettere, come nell’LSJ, che le cita sotto la forma comune; si trovano con la ricerca.
 
