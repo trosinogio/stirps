@@ -9,7 +9,8 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 ## Come si lavora: economia e rigore
 
 - **Economia.** Ogni sessione costa: prima un piano breve, poi i passi, con una sola verifica per passo. Niente esplorazioni ripetute, niente file riletti senza motivo, niente attese a colpi di controlli (una sola attesa in background che avvisa alla fine). Gli strumenti che servono più di una volta stanno nel repository (`import/filtra_pacchetto.py`, il registro delle traduzioni tentate), non si riscrivono.
-- **Rigore scientifico prima della quantità.** Una voce è una parola della sua lingua. Per latino e greco solo lemmi nel loro alfabeto (`lemma_valido()` in `import/wiktionary.py`): niente lettere isolate, simboli, abbreviazioni, sillabario cipriota, lettere epicoriche, frammenti di testo. Dopo ogni import si guarda un campione dei dati nuovi prima di pubblicare.
+- **Rigore scientifico prima della quantità.** Una voce è una parola della sua lingua. Per latino e greco solo lemmi nel loro alfabeto (`lemma_valido()` in `import/wiktionary.py`): niente lettere isolate, simboli, abbreviazioni, sillabario cipriota, lettere epicoriche, frammenti di testo. In ogni lingua solo lemmi, non forme flesse (*amamus*, *noctem*, *vicinissimo*): le riconosce `forma_flessa()` in `import/filtra.py`, dai segni di Wiktionary o dalla glossa, su tutti i sensi. Basta un senso lessicale perché la voce resti (*ottimo*, «very good»); una forma citata in una catena si lega al suo lemma (`forme.tsv`: *battipanni* < *battere*, forma citata «batti»); le varianti («alternative form of») restano. Dopo ogni import si guarda un campione dei dati nuovi prima di pubblicare, e i conti del filtro («forme flesse … riconosciute dalla sola glossa») nel registro del workflow Dati.
+- **Le date trovate in automatico sono stime:** un terminus ante quem («almeno dal …», `attestazione.stima`, con la fonte e la confidenza), mai la prima attestazione finché la redazione non la verifica. Fonti e strumento di datazione: `import/DATAZIONI.md`.
 - **Gli indici seguono l’alfabeto:** 23 lettere per il latino (J sotto I, U sotto V), 24 per il greco; i nomi propri in un indice a parte; pagine da 500 voci (`parole_lingua()`, colonne `chiave_indice` e `nome_proprio`).
 
 ## Prima di tutto: sicurezza dei dati
@@ -24,10 +25,11 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 - `npm run dev`: sviluppo (con un `DATABASE_URL` locale).
 - `npx tsc --noEmit`: controllo dei tipi.
-- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, gli 86 del seme (`db/04_test.sql`) e i 70 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
+- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, gli 89 del seme (`db/04_test.sql`) e gli 87 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
 - `node scripts/applica-sql.mjs file.sql`: applica un file SQL in una transazione.
 - `node scripts/esporta-redazione.mjs cartella`: copia del lavoro della redazione in JSON; ogni notte la fa `.github/workflows/copia-redazione.yml` nel ramo `copia-redazione`.
 - Import completo da Wiktionary: `import/importa.sh` (scarica i dump di Kaikki; latino e greco entrano interi, `INTERE=la,grc`, con i lemmi del Lewis & Short e dell’LSJ che Wiktionary non ha, dal Perseus: `DIZIONARI=1`); collaudo del parser: `import/collauda.sh`. Vedi `import/LEGGIMI.md`.
+- Traduzioni e definizioni di Claude: `import/definisci.py`, con il workflow Definizioni (push su un ramo `definizioni-*` che cambia `import/claude/lotti.conf`; segreto `ANTHROPIC_API_KEY`). Le voci già fatte non si rimandano. Vedi il README.
 - Pacchetto dati: si rigenera su GitHub con un push su un ramo `dati-*` (`.github/workflows/dati.yml`), che rimette `dati/*.tsv.gz` sul ramo. Da una sandbox Kaikki di solito non si raggiunge.
 - Pubblicazione: `.github/workflows/pubblica.yml`, dopo ogni collaudo riuscito su `main`, o a mano (`gh api repos/trosinogio/stirps/actions/workflows/pubblica.yml/dispatches -X POST -f ref=main`). Fa ramo di riserva su Neon, deploy su Vercel e controllo; l’esito sta nelle annotazioni del job. Il deploy passa da `scripts/pubblica-vercel-api.sh` (API REST): `VERCEL_TOKEN` è un token di progetto, e la CLI di Vercel con lui non funziona. Vercel non è collegato a GitHub, e da una sandbox Neon e Vercel di solito non si raggiungono: si pubblica da qui.
 
@@ -43,7 +45,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 ## Il database
 
-Tabelle principali: `lessema` (le voci, con `slug` generato), `ipotesi` (una sola `accolta` per voce), `relazione` (i passaggi), `attestazione`, `glossa`, `rimando` (le fonti, con posizione), `opera`, `strato` (provenienze e licenze), `frequenza`, `lista_lavoro`, `storico` (firmato), `meta`. Viste materializzate: `mv_famiglia`, `mv_allotropi`, `mv_storie`. Funzioni principali: `scheda()`, `nodo_json()`, `storie()`, `indovinello()`, `importa_wiktionary()`, `pulisci_wiktionary()`, `importa_dizionari()`, `importa_glosse_wikizionario()`, `importa_glosse_aggiuntive()`.
+Tabelle principali: `lessema` (le voci, con `slug` generato), `ipotesi` (una sola `accolta` per voce), `relazione` (i passaggi), `attestazione`, `glossa`, `definizione` (della redazione o di Claude), `rimando` (le fonti, con posizione), `opera`, `strato` (provenienze e licenze), `frequenza`, `lista_lavoro`, `storico` (firmato), `meta`. Viste materializzate: `mv_famiglia`, `mv_allotropi`, `mv_storie`. Funzioni principali: `scheda()`, `nodo_json()`, `storie()`, `indovinello()`, `importa_wiktionary()`, `pulisci_wiktionary()`, `importa_dizionari()`, `importa_glosse_wikizionario()`, `importa_glosse_aggiuntive()`, `importa_definizioni()`, `importa_stime()`.
 
 Come cambia il database:
 
@@ -58,7 +60,7 @@ Come cambia il database:
 - **L’import tocca solo ciò che non è stato toccato:** record con `provenienza` `'wiktionary'` o `'perseus'` e `stato_editoriale = 'importato'`. Un’ipotesi rivista o verificata resta congelata con tutti i suoi passaggi; `pulisci_wiktionary()` e `importa_dizionari()` tolgono solo ciò che nessuno ha toccato (`voce_intatta()`).
 - **Tra voci importate l’abbinamento è esatto.** La forma normalizzata abbina solo voci della redazione, mai di Wiktionary o del Perseus (Τύρος, la città, non è τυρός, il formaggio). Una voce del Perseus intatta cede il posto a Wiktionary quando Wiktionary ha la stessa parola.
 - **Ogni azione della redazione** passa da `richiediRedattore()` e da `transazione(email, …)`, che firma lo storico. Se cambia un’ipotesi accolta, dopo la risposta si ricalcolano `mv_famiglia`, `mv_allotropi` e `mv_storie` (`after()`).
-- **Le glosse italiane hanno un ordine di rango:** redazione, poi Wikizionario, poi Wikidata, poi traduzione automatica. Le tradotte portano il segno ≈ (`glossa_automatica`); salvarle nell’editor le rende «riviste».
+- **Le glosse italiane hanno un ordine di rango:** redazione, poi Wikizionario, poi Wikidata, poi traduzione automatica (Claude, poi OPUS-MT). Le tradotte portano il segno ≈ (`glossa_automatica`); salvarle nell’editor le rende «riviste».
 - **Un’ipotesi verificata ha almeno un’opera della bibliografia che la propone o la accoglie,** e due se la certezza è 4; Wiktionary, Wikizionario, Etymonline e Logeion (opere `in_rete`) non contano. Lo impone `controlla_ipotesi_verificata()` al commit, anche quando cambiano la certezza o le fonti di un’ipotesi già verificata; l’editor lo dice con gli esiti `servono-fonti` e `servono-due-fonti`.
 - **Le storie usano solo passaggi con certezza 3 o 4,** e mai archi «sospetti» (una forma ricostruita che discende da un’altra famiglia linguistica).
 - **Gli indirizzi li calcola solo `slug_di()`.** Cambiarla, o cambiare `norm()`, cambia gli URL: dopo il lancio pubblico serve una migrazione con i reindirizzamenti.
@@ -82,6 +84,7 @@ Come cambia il database:
 - **Wiktionary scrive l’incertezza nel testo** («possibly», «uncertain»): il parser la legge senza le glosse tra virgolette, perché «obscure» in una glossa non è un dubbio.
 - **Il Postgres locale della sandbox si ferma spesso:** se una query dice «connection refused», riavvialo.
 - **Lo spazio su Neon (0,5 GB nel piano gratuito):** l’import scrive solo ciò che cambia, perché ogni riga riscritta lascia una copia morta fino al vacuum; un test controlla lo `xmin` delle righe. Prima di un import grande misura in locale (`[db] spazio occupato` nel registro della build).
+- **Una sottoquery correlata per riga su un import grande** (`importa_stime()`, 108 mila stime) costava dieci minuti: join con tabelle temporanee piccole e indicizzate, e `analyze`. I secondi di ogni passo sono nel registro della build.
 - **Un confronto per forma normalizzata su molte righe** (`lemma_norm = norm(x)`) usa l’indice a trigrammi una riga alla volta e diventa lentissimo: confronta con un insieme piccolo e precalcolato (vedi `importa_dizionari()`).
 
 ## Lavoro editoriale

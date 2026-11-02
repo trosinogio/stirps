@@ -68,6 +68,16 @@ Restano fuori:
 
 I modificatori in linea dei modelli (`scorciare<t:to shorten>`) si staccano dal termine in `lessema()`.
 
+**Le forme flesse non sono voci, in nessuna lingua** (novembre 2026). Una voce è una forma flessa se ogni suo senso con una glossa lo è (`forma_flessa()` in `filtra.py`):
+- lo dice Wiktionary: il modello `nonlemma`, oppure `form_of` o il tag `form-of`;
+- oppure lo dice la glossa: «second-person plural present passive indicative/imperative of contemperō», «genitive singular of nox», «superlative degree of piccolo», «past participle of fare».
+
+Serve la glossa perché Wiktionary non marca sempre il senso: prima di questa regola erano entrate così circa 5.000 forme latine, 322 greche e 103 italiane. Basta un senso lessicale perché la voce resti un lemma (*amatus*, «beloved»). Le varianti («alternative form of», «Epic form of») non sono forme flesse.
+
+Una forma flessa non entra mai come voce, nemmeno quando ha un'etimologia sua (*vicinissimo* < *vicino* + *-issimo*, *fatta* < *facta*). Va solo in `forme.tsv`, con il suo lemma: da `form_of`, o dalla glossa quando Wiktionary non la marca («… of contemperō» → *contemperō*; `lemma_della_forma()`). Una catena che la cita si lega al lemma, con la forma citata accanto: *noctem* → *nox*, *battipanni* < *battere* («batti»). Le parole lessicalizzate restano perché hanno anche un senso lessicale: *ottimo* («very good»), *amatus* («loved one»).
+
+Il registro del filtro riporta quante forme ha riconosciuto in tutto e quante dalla sola glossa: un numero che cambia molto da un import all'altro va guardato.
+
 Le parole scritte nel sillabario cipriota, che Wiktionary mette sotto il greco antico, diventano voci del **greco arcadocipriota** (`grc-arp`, varietà del greco antico), con il loro indice per segni. Le parole con lettere epicoriche (ϝοῖκος) restano voci del greco, forme attestate, ma fuori dall’indice a 24 lettere, come nell’LSJ, che le cita sotto la forma comune; si trovano con la ricerca.
 
 **Etimologie scritte solo nel testo.** Una voce senza modelli etimologici, ma con un testo che comincia con «From», «Derived from», «Deverbal from» o «Back-formation from» e un modello di menzione («From the verb {{m|it|segare}}»), non si scarta più. La prima menzione diventa un `der` (`menzione_come_der()` in `filtra.py`), cioè un legame indeterminato o una derivazione, mai un’eredità.
@@ -214,6 +224,7 @@ Risultati sui dati di ottobre 2026: le parole italiane che arrivano al protoindo
 - `filtra_wikidata.py` filtra il dump dei lessemi di Wikidata e ne tiene i lessemi italiani con una definizione in italiano: 21.377 su 65.130. Nel pacchetto dati entrano quelli i cui lemmi sono nel dizionario, ed entrano nel database solo con la stessa parte del discorso: 1.194 parole.
 - `traduci_glosse.py` traduce le glosse inglesi degli etimi stranieri senza glossa italiana. Ne tiene 5.657 su 13.486, verificate per ritorno e con il dizionario rovesciato; sono segnate con ≈ nell'interfaccia. Comandi e controlli sono descritti nel README dell'app.
 - `stg_glossa_wikidata` e `stg_glossa_tradotta` sono le tabelle di appoggio; `importa_glosse_aggiuntive()` va chiamata dopo `importa_glosse_wikizionario()`.
+- Le traduzioni e le definizioni di Claude (`definisci.py`, novembre 2026) sono descritte nel README dell'app: tabella d'appoggio `stg_definizione`, `importa_definizioni()` dopo `importa_glosse_aggiuntive()`.
 
 ## Catene ricostruite meglio (31 ottobre 2026)
 

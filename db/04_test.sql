@@ -422,4 +422,18 @@ begin
   end;
 end $$;
 
+-- ---------------------------------------------------------------------
+\echo '— prime attestazioni: stime'
+-- ---------------------------------------------------------------------
+select pg_temp.attendi_errore(array[
+  $$insert into attestazione (lessema_id, testo, tipo, anno_da, rif, stima, stato_editoriale)
+    values (lx('it/fegato'), 'Google Books', 'lessicografica', 1525, 'Google Books Ngram', true, 'verificato')$$],
+  'una stima (terminus ante quem automatico) non può essere «verificata»', '23514');
+select pg_temp.prova_e_annulla(array[
+  $$insert into attestazione (lessema_id, testo, tipo, anno_da, precisione, banca_dati, stima, confidenza, provenienza, stato_editoriale)
+    values (lx('it/fegato'), 'Google Books', 'lessicografica', 1525, 'esatta', 'Google Books Ngram', true, 2, 'redazione', 'importato')$$,
+  $$select pg_temp.verifica(exists (select 1 from jsonb_array_elements(scheda('it/fegato', true, 'it')->'attestazioni') x
+                                     where (x->>'stima')::boolean and (x->>'confidenza')::int = 2), 'la scheda dice che è una stima, con la confidenza')$$],
+  'una stima entra con la sua confidenza e la scheda la presenta come tale');
+
 \echo '— collaudo completato'

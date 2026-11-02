@@ -26,7 +26,8 @@ const APPOGGIO = [
   ['stg_relazione', 'relazioni'], ['stg_doppione', 'doppioni'], ['stg_radice', 'radici'],
   ['stg_attestazione', 'attestazioni'], ['stg_wikizionario', 'glosse_it'],
   ['stg_glossa_wikidata', 'glosse_wikidata'], ['stg_glossa_tradotta', 'glosse_tradotte'],
-  ['stg_dizionario', 'dizionari'],
+  ['stg_dizionario', 'dizionari'], ['stg_autore', 'autori'], ['stg_stima', 'stime'],
+  ['stg_definizione', 'definizioni'],
 ];
 const BLOCCO = 5000;
 // impronta del pacchetto dati: se cambia, al deploy si rifà l'import
@@ -54,24 +55,32 @@ async function importa(client, pulisci) {
     }
     await client.query(`analyze ${APPOGGIO.map(([t]) => t).join(', ')}`);   // stime giuste per i piani della fusione
     const { rows: [r] } = await client.query('select importa_wiktionary() as r');
-    console.log('[db] fusione:', JSON.stringify(r.r));
+    console.log('[db] fusione:', JSON.stringify(r.r), `(${secondi()} s)`);
     if (pulisci) {
       const { rows: [p] } = await client.query('select pulisci_wiktionary() as p');
-      console.log('[db] pulizia:', JSON.stringify(p.p));
+      console.log('[db] pulizia:', JSON.stringify(p.p), `(${secondi()} s)`);
     }
     const { rows: [d] } = await client.query('select importa_dizionari() as d');
-    console.log('[db] dizionari:', JSON.stringify(d.d));
+    console.log('[db] dizionari:', JSON.stringify(d.d), `(${secondi()} s)`);
+    const { rows: [stm] } = await client.query('select importa_stime() as s');
+    console.log('[db] stime:', JSON.stringify(stm.s), `(${secondi()} s)`);
     const { rows: [g] } = await client.query('select importa_glosse_wikizionario() as g');
-    console.log('[db] glosse italiane:', JSON.stringify(g.g));
+    console.log('[db] glosse italiane:', JSON.stringify(g.g), `(${secondi()} s)`);
     const { rows: [ga] } = await client.query('select importa_glosse_aggiuntive() as g');
-    console.log('[db] glosse aggiuntive:', JSON.stringify(ga.g));
+    console.log('[db] glosse aggiuntive:', JSON.stringify(ga.g), `(${secondi()} s)`);
+    const { rows: [df] } = await client.query('select importa_definizioni() as d');
+    console.log('[db] definizioni:', JSON.stringify(df.d), `(${secondi()} s)`);
     await client.query('refresh materialized view mv_allotropi');
+    console.log(`[db] mv_allotropi (${secondi()} s)`);
     await client.query('refresh materialized view mv_famiglia');
+    console.log(`[db] mv_famiglia (${secondi()} s)`);
     const { rows: [st] } = await client.query(`select to_regclass('public.mv_storie') is not null as c`);
     if (st.c) await client.query('refresh materialized view mv_storie');    // le storie seguono famiglie e allotropi
+    console.log(`[db] mv_storie (${secondi()} s)`);
     await client.query(`insert into meta (chiave, valore) values ('versione_dati', $1)
                         on conflict (chiave) do update set valore = excluded.valore, aggiornato_il = now()`, [impronta]);
     await client.query('commit');
+    console.log(`[db] commit (${secondi()} s)`);
   } catch (e) {
     await client.query('rollback').catch(() => {});
     throw e;
@@ -79,7 +88,7 @@ async function importa(client, pulisci) {
   await client.query(`truncate ${APPOGGIO.map(([t]) => t).join(', ')}`);
   await client.query('vacuum (analyze)');
   const { rows: [dim] } = await client.query('select pg_size_pretty(pg_database_size(current_database())) as d');
-  console.log(`[db] spazio occupato: ${dim.d}`);
+  console.log(`[db] spazio occupato: ${dim.d} (vacuum fatto, ${secondi()} s)`);
 }
 
 async function connetti() {
@@ -105,7 +114,7 @@ const campo = (x) => (x === '\\N' ? null : x.replace(/\\\\/g, '\\'));
 
 async function carica(client, tabella, file) {
   // i dizionari possono mancare in un pacchetto vecchio: la tabella resta vuota e importa_dizionari() non fa nulla
-  if (file === 'dizionari' && !existsSync(`dati/${file}.tsv.gz`)) return 0;
+  if (['dizionari', 'autori', 'stime', 'definizioni'].includes(file) && !existsSync(`dati/${file}.tsv.gz`)) return 0;
   const { rows: colonne } = await client.query(
     `select attname as nome, format_type(atttypid, atttypmod) as tipo from pg_attribute
       where attrelid = $1::regclass and attnum > 0 and not attisdropped order by attnum`, [tabella]);

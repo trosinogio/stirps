@@ -6,6 +6,53 @@ UTILI = {'inh', 'inh+', 'bor', 'bor+', 'lbor', 'slbor', 'ubor', 'obor', 'der', '
          'named-after', 'onom', 'onomatopoeic', 'unk', 'unc', 'root', 'doublet', 'dbt', 'it-deverbal', 'etydate'}
 MENZIONI = {'m', 'l', 'm+', 'mention', 'link', 'l-self'}
 DA_TESTO = re.compile(r'^\s*(from|derived from|deverbal from|back-formation from)\b', re.I)
+# Le glosse che descrivono una forma flessa: «second-person plural present passive indicative/imperative of contemperō»,
+# «genitive singular of nox», «superlative degree of piccolo», «past participle of fare». Servono quando Wiktionary non
+# marca il senso come forma (form_of, tag form-of): succede a qualche migliaio di voci latine e greche. Le varianti
+# («alternative form of», «Epic form of») non sono forme flesse e non corrispondono.
+FORMA = re.compile(r'^(?:\([^)]*\)\s*)*(?:'
+                   r'(?:first|second|third)-person\b'
+                   r'|(?:nominative|genitive|dative|accusative|ablative|vocative|locative|instrumental|masculine|feminine|neuter)\b'
+                   r'(?:[ /-][a-z]+)*?\s+(?:singular|plural|dual)\b'
+                   r'|(?:plural|singular|dual|inflection|gerund|supine)\s+of\b'
+                   r'|(?:(?:present|perfect|future|past|aorist|imperfect)\s+)?(?:(?:active|passive|middle|mediopassive)\s+)?'
+                   r'(?:infinitive|participle)\s+of\b'
+                   r'|(?:comparative|superlative)(?:\s+degree)?\s+of\b)', re.I)
+
+
+def marcata(v):
+    '''Forma flessa marcata da Wiktionary: il modello nonlemma, o tutti i sensi con form_of o il tag form-of.'''
+    if any(t.get('name') == 'nonlemma' for t in v.get('etymology_templates') or []):
+        return True
+    sensi = v.get('senses') or []
+    return bool(sensi) and all(s.get('form_of') or 'form-of' in (s.get('tags') or []) for s in sensi)
+
+
+def forma_flessa(v):
+    '''Una voce che è soltanto una forma flessa di un altro lemma (amamus, noctem, vicinissimo) non è una voce del
+    dizionario. Lo è se ogni senso con una glossa è una forma: marcato da Wiktionary (form_of, tag form-of) o
+    riconoscibile dalla glossa (FORMA). Basta un senso che non sia una forma perché la voce resti un lemma.'''
+    if marcata(v):
+        return True
+    sensi = v.get('senses') or []
+    con_glossa = [s for s in sensi if s.get('glosses')]
+    return bool(con_glossa) and all(s.get('form_of') or 'form-of' in (s.get('tags') or []) or FORMA.match(s['glosses'][0])
+                                    for s in con_glossa)
+
+
+def lemma_della_forma(v):
+    '''Il lemma di una forma flessa e le etichette della forma, per forme.tsv: da form_of, o dalla glossa quando
+    Wiktionary non marca il senso («second-person plural … of contemperō» → contemperō). None se non si trova.'''
+    for s in v.get('senses') or []:
+        for fo in (s.get('form_of') or [])[:1]:
+            if fo.get('word'):
+                return fo['word'], s.get('tags') or []
+    for s in v.get('senses') or []:
+        g = (s.get('glosses') or [''])[0]
+        m = FORMA.match(g) and re.search(r'\bof\s+([^\s(),;:]+)', g)
+        if m:
+            return m.group(1), [x for x in re.split(r'[\s/]+', g[:m.start()].lower()) if x]
+    return None
 
 
 def menzione_come_der(v):
@@ -30,7 +77,7 @@ def menzione_come_der(v):
 
 
 if __name__ == '__main__':
-    n = tenuti = flesse = senza = promosse = 0
+    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = 0
     out = open(sys.argv[1], 'w', encoding='utf-8')
     glosse = open(sys.argv[2], 'w', encoding='utf-8')
     forme = open(os.environ['FORME'], 'w', encoding='utf-8') if os.environ.get('FORME') else None
@@ -41,15 +88,14 @@ if __name__ == '__main__':
         if v.get('lang_code') != LINGUA: continue
         tpl = v.get('etymology_templates') or []
         sensi = v.get('senses') or []
-        if any(t.get('name') == 'nonlemma' for t in tpl) or (sensi and all(s.get('form_of') or 'form-of' in (s.get('tags') or []) for s in sensi)):
+        if forma_flessa(v):
             flesse += 1
-            if forme:   # forma flessa → lemma (titoli di pagina), per le catene che citano noctem invece di nox
-                for s_ in sensi:
-                    for fo in (s_.get('form_of') or [])[:1]:
-                        if fo.get('word'):
-                            forme.write(f"{v['word']}\t{fo['word']}\t{','.join(s_.get('tags') or [])}\n")
-                            break
-                    break
+            flesse_dalla_glossa += not marcata(v)
+            # una forma flessa non è una voce, nemmeno con un'etimologia sua: va solo in forme.tsv, che lega al lemma la
+            # forma citata in una catena (noctem → nox; battipanni < battere, forma citata «batti»)
+            lf = lemma_della_forma(v)
+            if forme and lf:
+                forme.write(f"{v['word']}\t{lf[0]}\t{','.join(lf[1])}\n")
             continue
         g = [s['glosses'][0] for s in sensi if s.get('glosses')][:2]
         # tutti i lemmi, con le forme che distinguono gli omografi: canonica, infinito, genitivo (fundō: fundere o fundāre)
@@ -76,5 +122,6 @@ if __name__ == '__main__':
                               'tpl': tpl, 'g': g, 'h': heads, 'c': canonica,
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
-    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}), forme flesse {flesse}, '
+    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}), forme flesse {flesse} '
+          f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}', file=sys.stderr)

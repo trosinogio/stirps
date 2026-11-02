@@ -62,6 +62,9 @@ if [ "$DIZIONARI" = 1 ]; then
     cat "$DATI/rapporto_perseus.txt" >&2; exit 1
   fi
   cat "$DATI/rapporto_perseus.txt"
+  # stime della prima attestazione: l'autore datato più antico citato nella voce (DATAZIONI.md, passo 1)
+  python3 datatore_dizionari.py autori "$DATI/tsv/autori.tsv"
+  python3 datatore_dizionari.py stime "$DATI/tsv/autori.tsv" "$DATI/tsv/stime.tsv" "${locali[@]}"
 fi
 if [ "$SOLO_ANALISI" = 1 ]; then
   echo "     analisi finita: le tabelle sono in $DATI/tsv"
@@ -85,12 +88,14 @@ if [ -f ../glosse_it.tsv ]; then
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "\\copy stg_wikizionario from '../glosse_it.tsv'"
 fi
 if [ "$DIZIONARI" = 1 ] && [ -f dizionari.tsv ]; then
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "\\copy stg_dizionario from 'dizionari.tsv'"
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "\\copy stg_dizionario from 'dizionari.tsv'" \
+    -c "truncate stg_autore, stg_stima" -c "\\copy stg_autore from 'autori.tsv'" -c "\\copy stg_stima from 'stime.tsv'"
 fi
 
 echo "4/4  fondo nel dizionario e ricalcolo allotropi e famiglie"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -At -c "select jsonb_pretty(importa_wiktionary())"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -At -c "select jsonb_pretty(importa_dizionari())"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -At -c "select jsonb_pretty(importa_stime())"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -At -c "select jsonb_pretty(importa_glosse_wikizionario())"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "refresh materialized view mv_allotropi" -c "refresh materialized view mv_famiglia" -c "analyze"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "select * from v_validazione_wiktionary"

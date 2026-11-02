@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { isLang, TESTI, type Lang } from '@/lib/i18n';
+import Automatica from '@/components/Automatica';
+import Definizione from '@/components/Definizione';
 import { lingueGeo, scheda } from '@/lib/dati';
 import { classeRamo, contaRami, fmt, G, nodiUnici, ORDINE_LINGUE, ORDINE_RAMI, ramoDi } from '@/lib/forme';
 import { nodiFamiglia } from '@/lib/albero';
@@ -104,7 +106,8 @@ export default async function Radice({ params }: { params: Promise<{ lang: strin
       <header className="testa-voce">
         <h1 className={`voce-titolo ${classeRamo(L.ramo)}`}><span className="lemma">{fmt(L)}</span><span className="sigla">{L.lingua_nome}</span></h1>
         {L.translit && <p className="translit">{L.translit}</p>}
-        {L.glossa && <p className="glossa-g" lang={L.glossa_lingua && L.glossa_lingua !== lang ? L.glossa_lingua : undefined}>{G(L.glossa, lang)}</p>}
+        {L.glossa && <p className="glossa-g" lang={L.glossa_lingua && L.glossa_lingua !== lang ? L.glossa_lingua : undefined}>{L.glossa_automatica && <Automatica lang={lang} />}{G(L.glossa, lang)}</p>}
+        <Definizione L={L} lang={lang} />
         <Origine sc={sc} lang={lang} />
         {discendenti.length > 0 && (
           <div className="statistiche">

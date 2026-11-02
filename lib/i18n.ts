@@ -93,6 +93,8 @@ export interface Testi {
   legame: (tipo: string) => string;
   tipiConnessione: Record<string, string>;
   inLingua: (nome: string) => string;
+  automaticaGlossa: string;
+  automaticaDefinizione: (modello: string) => string;
   nomiLingue: Record<string, string>;
   aC: string;
   tempo: { dC: string; oggi: string; aria: (parole: string) => string; legenda: string; senzaData: string; scorri: string };
@@ -123,6 +125,7 @@ export interface Testi {
   fonteStrato: (nome: string, licenza: string) => string;
   glosseAltrove: (lingua: string) => string;
   secondo: (fonte: string) => string;
+  almenoDal: (data: string) => string; stimaNota: string;
   homeIntro: string;
   prova: string;
   storie: string;
@@ -254,6 +257,8 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     legame: (t) => `legame ${t} con`,
     tipiConnessione: { culturale: 'culturale', semantica: 'semantico', omonimia: 'di omonimia', paronimia: 'di paronimia', falso_amico: 'di falso amico', altro: '' },
     inLingua: (n) => `in ${n}`,
+    automaticaGlossa: 'Traduzione automatica della glossa inglese, da verificare',
+    automaticaDefinizione: (m) => `Definizione scritta da ${m} (Anthropic), non ancora rivista dalla redazione`,
     nomiLingue: { it: 'italiano', en: 'inglese' },
     aC: 'a.C.',
     tempo: {
@@ -296,6 +301,8 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     fonteStrato: (n, l) => `Fonte: ${n} (${l})`,
     glosseAltrove: (l) => `Le glosse senza traduzione restano ${l ? 'in ' + l : 'nella lingua d’origine'}, come le ha fornite la fonte.`,
     secondo: (f) => `secondo ${f}`,
+    almenoDal: (d) => `almeno dal ${d}`,
+    stimaNota: 'Stima automatica: la parola è attestata almeno da questa data. La prima attestazione può essere più antica, ed è da verificare sulle fonti.',
     homeIntro: 'Ogni parola viene da altre parole. Qui ogni voce mostra da dove viene, per quali lingue è passata e con quale certezza lo sappiamo, fino alla radice.',
     prova: 'Prova con',
     storie: 'Storie di parole',
@@ -437,6 +444,8 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     legame: (t) => `${t} link with`,
     tipiConnessione: { culturale: 'cultural', semantica: 'semantic', omonimia: 'homonymy', paronimia: 'paronymy', falso_amico: 'false-friend', altro: '' },
     inLingua: (n) => `in ${n}`,
+    automaticaGlossa: 'Machine translation of the English gloss, to be checked',
+    automaticaDefinizione: (m) => `Definition written by ${m} (Anthropic), not yet reviewed by the editors`,
     nomiLingue: { it: 'Italian', en: 'English' },
     aC: 'BC',
     tempo: {
@@ -476,6 +485,8 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     fonteStrato: (n, l) => `Source: ${n} (${l})`,
     glosseAltrove: (l) => `Glosses without a translation stay ${l ? 'in ' + l : 'in the original language'}, as the source provided them.`,
     secondo: (f) => `according to ${f}`,
+    almenoDal: (d) => `by ${d}`,
+    stimaNota: 'Automatic estimate: the word is attested at least from this date. The first attestation may be earlier and is to be checked against the sources.',
     homeIntro: 'Every word comes from other words. Each entry here shows where a word comes from, which languages it passed through and how sure we are of it, all the way back to the root.',
     prova: 'Try',
     storie: 'Word stories',

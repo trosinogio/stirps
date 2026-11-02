@@ -327,4 +327,85 @@ select pg_temp.verifica(
   and (select glossa from lessema where slug = 'la/abactus-2') = 'a driving away, robbing',
   'una voce del dizionario che il pacchetto non ha più si toglie, se nessuno l''ha toccata; le altre restano dove sono');
 
+\echo '— stime della prima attestazione dai dizionari'
+select pg_temp.verifica(
+  (select a.stima and a.anno_da = -184 and a.testo = 'Plauto' and a.banca_dati = 'Lewis & Short' and a.confidenza = 3
+          and a.url like 'https://scaife.perseus.org/library/urn:cts:latinLit:phi0119%'
+     from attestazione a where a.lessema_id = lx('la/carus') and a.id_esterno like 'stima:%')
+  and exists (select 1 from autore where lingua = 'la' and sigla = 'phi0119' and nome = 'Plauto'),
+  'carus: almeno dal 184 a.C., Plauto secondo il Lewis & Short, con il link all''opera; l''autore è nella tabella autore');
+select pg_temp.verifica(
+  (select a.precisione = 'secolo' and a.anno_da = -701 and a.confidenza = 2
+     from attestazione a where a.lessema_id = lx('grc/akris-2') and a.stima),
+  'una voce del dizionario riceve la sua stima (ἄκρις: Omero, VIII sec. a.C., confidenza 2 per la data per secolo)');
+select pg_temp.verifica(not exists (select 1 from attestazione a where a.lessema_id = lx('la/caro') and a.stima),
+  'un lemma con più voci nel dizionario (caro) non riceve stime: non si sa a quale voce vadano');
+create temp table stime_xmin as select id, xmin::text as x from attestazione where stima;
+select importa_stime();
+select pg_temp.verifica(
+  (select count(*) from stime_xmin p join attestazione a on a.id = p.id and a.xmin::text = p.x) = (select count(*) from stime_xmin)
+  and (select count(*) from attestazione where stima) = (select count(*) from stime_xmin),
+  'un nuovo import delle stime con gli stessi dati non riscrive niente');
+delete from stg_stima where lemma = 'carus';
+select importa_stime();
+select pg_temp.verifica(not exists (select 1 from attestazione a where a.lessema_id = lx('la/carus') and a.stima),
+  'una stima che il pacchetto non ha più si toglie');
+
+\echo '— traduzioni e definizioni di Claude'
+truncate stg_definizione;
+insert into stg_definizione
+select l.id_esterno, coalesce(l.glossa, ''), v.t, v.d, 'claude-opus-5-5'
+  from lessema l
+  join (values ('la/mobilis', 'mobile, movibile', 'Che si può muovere o spostare; in senso figurato, mutevole.'),
+               ('la/caro', 'carne', 'La carne, come sostanza del corpo e come cibo.'),
+               ('it/pausare', 'sostare', 'Fare una pausa, interrompere per breve tempo un’attività.'),
+               ('it/centavo', 'centavo', 'Moneta divisionale di vari paesi dell’America Latina.')) v(s, t, d) on l.slug = v.s;
+insert into stg_definizione
+select id_esterno, 'una glossa che non c''è più', 'caro', 'Definizione nata da un''altra glossa.', 'claude-opus-5-5'
+  from lessema where slug = 'la/carus';
+select importa_glosse_aggiuntive();
+select importa_definizioni();
+select pg_temp.verifica((select testo || '|' || provenienza from glossa where lessema_id = lx('la/mobilis') and lingua = 'it') = 'mobile, movibile|claude'
+                        and (nodo_json(lx('la/mobilis'), 'it')->>'glossa_automatica')::boolean,
+  'la traduzione di Claude prende il posto di quella di OPUS-MT, ed è segnata come automatica');
+select pg_temp.verifica((select testo || '|' || provenienza from glossa where lessema_id = lx('la/caro') and lingua = 'it') = 'carne|wikizionario'
+                        and exists (select 1 from definizione where lessema_id = lx('la/caro') and provenienza = 'claude'),
+  'Claude non scavalca la glossa del Wikizionario, ma la definizione entra');
+select pg_temp.verifica((select testo || '|' || provenienza from glossa where lessema_id = lx('it/pausare') and lingua = 'it') = 'fare una pausa|wikidata',
+  'per una parola italiana la definizione breve di Wikidata viene prima della traduzione di Claude');
+select pg_temp.verifica(not exists (select 1 from glossa where lessema_id = lx('it/centavo') and provenienza = 'claude')
+                        and exists (select 1 from definizione where lessema_id = lx('it/centavo')),
+  'per una parola italiana una «traduzione» uguale al lemma non diventa glossa; la definizione sì');
+select pg_temp.verifica(not exists (select 1 from definizione where lessema_id = lx('la/carus'))
+                        and not exists (select 1 from glossa where lessema_id = lx('la/carus') and provenienza = 'claude'),
+  'una definizione nata da un''altra glossa non entra: aspetta quella nuova');
+select pg_temp.verifica(
+  (select l->>'definizione' = 'Che si può muovere o spostare; in senso figurato, mutevole.' and (l->>'definizione_automatica')::boolean
+          and l->>'definizione_modello' = 'claude-opus-5-5' and l->>'definizione_lingua' = 'it'
+     from (select scheda('la/mobilis')->'lessema' as l) x)
+  and exists (select 1 from jsonb_array_elements(scheda('la/mobilis')->'strati') e where e->>'codice' = 'claude'),
+  'la scheda porta la definizione, automatica, con il modello; lo strato di Claude è tra le fonti della pagina');
+select pg_temp.verifica((scheda('la/mobilis', false, 'en')->'lessema'->>'definizione_lingua') = 'it',
+  'sul sito inglese la definizione resta in italiano, dichiarata come tale');
+create temp table definizioni_xmin as select id, xmin::text as x from definizione;
+create temp table glosse_claude_xmin as select id, xmin::text as x from glossa where provenienza = 'claude';
+select importa_glosse_aggiuntive();
+select importa_definizioni();
+select pg_temp.verifica(
+  (select count(*) from definizione d join definizioni_xmin x on x.id = d.id and x.x = d.xmin::text) = (select count(*) from definizioni_xmin)
+  and (select count(*) from definizione) = (select count(*) from definizioni_xmin)
+  and (select count(*) from glossa g join glosse_claude_xmin x on x.id = g.id and x.x = g.xmin::text) = (select count(*) from glosse_claude_xmin),
+  'un nuovo import delle definizioni con gli stessi dati non riscrive niente');
+update definizione set testo = 'Che si muove; mutevole, incostante.', stato_editoriale = 'rivisto' where lessema_id = lx('la/mobilis');
+truncate stg_definizione;
+select importa_glosse_aggiuntive();
+select importa_definizioni();
+select pg_temp.verifica(
+  (select testo = 'Che si muove; mutevole, incostante.' and provenienza = 'claude' from definizione where lessema_id = lx('la/mobilis'))
+  and not (scheda('la/mobilis')->'lessema'->>'definizione_automatica')::boolean
+  and not exists (select 1 from definizione where lessema_id = lx('la/caro')),
+  'una definizione rivista dalla redazione resta, senza il segno ≈; quelle che il pacchetto non ha più si tolgono');
+select pg_temp.verifica((select testo || '|' || provenienza from glossa where lessema_id = lx('la/mobilis') and lingua = 'it') = 'mobile, sciolto|traduzione-automatica',
+  'senza la traduzione di Claude torna quella di OPUS-MT');
+
 \echo '— collaudo dell’import completato'

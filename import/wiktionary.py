@@ -781,6 +781,11 @@ class Importatore:
         """Le voci che non sono parole (lemma_valido) escono, con gli archi che le toccano; un'ipotesi che resta senza
         archi esce anch'essa: meglio nessuna etimologia che una catena attraverso un frammento di testo."""
         via = {k for k, l in self.lessemi.items() if not lemma_valido(l['lingua'], l['lemma'], l['ricostruito'])}
+        self.togli(via, 'ipotesi_tolte_non_valide')
+        self.stat['voci_non_valide'] = len(via)
+
+    def togli(self, via, conto):
+        """Toglie le voci in via, gli archi che le toccano e le ipotesi rimaste senza archi."""
         for k in via:
             del self.lessemi[k]
         prima = Counter(r['ipotesi'] for r in self.relazioni)
@@ -793,8 +798,7 @@ class Importatore:
         self.radici = {x for x in self.radici if x[0] not in via and x[1] not in via}
         self.doppioni = {x for x in self.doppioni if x[0] not in via and x[1] not in via}
         self.attestazioni = {k: v for k, v in self.attestazioni.items() if k not in via}
-        self.stat['voci_non_valide'] = len(via)
-        self.stat['ipotesi_tolte_non_valide'] = len(tolte)
+        self.stat[conto] += len(tolte)
 
     def aggiungi_lemmi_interi(self):
         """Nelle lingue intere entrano anche i lemmi senza etimologia, con glossa e parte del discorso: la lingua è

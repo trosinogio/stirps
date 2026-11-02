@@ -7,6 +7,7 @@ import { classeRamo, datazione, fmt, G, nodiUnici, perLingua, tx } from '@/lib/f
 import { Fiducia, intercala, VoceLink } from '@/components/comuni';
 import Mappa from '@/components/Mappa';
 import Automatica from '@/components/Automatica';
+import Definizione from '@/components/Definizione';
 import LineaTempo, { type NodoTempo } from '@/components/LineaTempo';
 import type { Attestazione, NodoCatena, Relazione, Rimando, Scheda } from '@/lib/tipi';
 
@@ -103,7 +104,7 @@ function Origine({ sc, t, lang }: { sc: Scheda; t: Testi; lang: Lang }) {
                 <span className="lt" aria-hidden="true">&lt;</span>
                 <div>
                   {/* due date diverse: quella del passaggio accanto al tipo, la prima attestazione accanto alla parola */}
-                  <div className="passo-1"><VoceLink n={c} lang={lang} /><span className="tp">{c.tipo_etichetta ?? c.tipo}{c.passaggio_data && <>, <span title={t.dataPassaggio}>{datazione(c.passaggio_data as Attestazione, t)}</span></>}</span>{c.attestata && <span className="data-catena" title={t.primaAttestazione}>{datazione(c.attestata as Attestazione, t)}</span>}</div>
+                  <div className="passo-1"><VoceLink n={c} lang={lang} /><span className="tp">{c.tipo_etichetta ?? c.tipo}{c.passaggio_data && <>, <span title={t.dataPassaggio}>{datazione(c.passaggio_data as Attestazione, t)}</span></>}</span>{c.attestata && <span className="data-catena" title={(c.attestata as Attestazione).stima ? t.stimaNota : t.primaAttestazione}>{(c.attestata as Attestazione).stima ? t.almenoDal(datazione(c.attestata as Attestazione, t)) : datazione(c.attestata as Attestazione, t)}</span>}</div>
                   {c.glossa && <div className="gl">{c.glossa_automatica && <Automatica lang={lang} />}{G(c.glossa, lang)}</div>}
                 </div>
               </div>
@@ -198,6 +199,7 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
             {glossaAltrove && <span className="marca-lingua">({t.inLingua(t.nomiLingue[L.glossa_lingua!] ?? L.glossa_lingua!)})</span>}
           </p>
         )}
+        <Definizione L={L} lang={lang} />
         {L.nota && <p className="origine"><Nota testo={L.nota} sc={sc} t={t} /></p>}
       </header>
 
@@ -308,9 +310,12 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
           <ul className="attestazioni">
             {sc.attestazioni.map((a, i) => (
               <li key={i}>
-                <span className="data">{datazione(a, t)}</span>
+                {/* una stima è un terminus ante quem: «almeno dal 1525», con la spiegazione al passaggio del mouse */}
+                <span className="data" title={a.stima ? t.stimaNota : undefined}>{a.stima ? t.almenoDal(datazione(a, t)) : datazione(a, t)}</span>
                 <span>
-                  <span>{a.provenienza && a.provenienza !== 'redazione' ? t.secondo(a.testo) : a.testo}{a.rif ? `, ${a.rif}` : ''}</span>
+                  <span>{a.stima && a.banca_dati
+                    ? <>{a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer">{a.testo}</a> : a.testo}, {t.secondo(a.banca_dati)}</>
+                    : a.provenienza && a.provenienza !== 'redazione' ? t.secondo(a.testo) : a.testo}{a.rif ? `, ${a.rif}` : ''}</span>
                   {a.forma_attestata && <> <span className="gl">{t.forma}</span> <i>{a.forma_attestata}</i></>}
                   {a.citazione && <>: <span className="cit">{G(a.citazione, lang)}</span></>}
                   {a.nota && <span className="nota"><Nota testo={a.nota} sc={sc} t={t} /></span>}

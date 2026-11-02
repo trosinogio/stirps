@@ -305,17 +305,38 @@ create table attestazione (
   periodo           int4range generated always as (int4range(anno_da, coalesce(anno_a, anno_da), '[]')) stored,
   citazione         text,
   nota              text,
+  stima             boolean not null default false,
+  confidenza        smallint check (confidenza between 1 and 4),
   provenienza       text not null default 'redazione' references strato,
   stato_editoriale  stato_editoriale not null default 'bozza',
   creato_il         timestamptz not null default now(),
   aggiornato_il     timestamptz not null default now(),
   foreign key (accezione_id, lessema_id) references accezione (id, lessema_id),
   check (anno_a is null or anno_a >= anno_da),
-  check (stato_editoriale <> 'verificato' or rif is not null)
+  check (stato_editoriale <> 'verificato' or rif is not null),
+  constraint attestazione_stima_non_verificata check (not (stima and stato_editoriale = 'verificato'))
 );
 comment on column attestazione.anno_da   is 'Anni interi, negativi per l''età a.C.; «sec. XIII» = 1201–1300 con precisione «secolo».';
 comment on column attestazione.citazione is 'Solo testi in pubblico dominio e solo brevi.';
 comment on column attestazione.banca_dati is 'EDR, EDH, EDCS per l''epigrafia; OVI, TLIO per l''italiano antico.';
+comment on column attestazione.stima is 'Terminus ante quem trovato in automatico (corpus, citazioni di un dizionario): la parola è attestata almeno da allora. Non è la prima attestazione finché la redazione non la verifica sulla fonte, e una stima non può essere «verificata».';
+comment on column attestazione.confidenza is 'Per le stime: 4 sicura · 3 probabile · 2 possibile · 1 dubbia (per esempio un anno isolato in un corpus OCR).';
+
+-- Gli autori citati dai dizionari (Lewis & Short, LSJ) con la loro datazione: dall'autore più antico citato in una voce
+-- si ricava una stima della prima attestazione. La sigla è quella del dizionario, per lingua (Plaut., Hom.).
+create table autore (
+  lingua      text not null references lingua,
+  sigla       text not null,
+  nome        text not null,
+  anno_da     int,
+  anno_a      int,
+  precisione  precisione_data not null default 'circa',
+  wikidata    text,
+  fonte       text,
+  primary key (lingua, sigla),
+  check (anno_a is null or anno_da is null or anno_a >= anno_da)
+);
+comment on table autore is 'Autori citati dai dizionari, con la datazione (anni interi, negativi a.C.) e la sua fonte.';
 
 -- ---------------------------------------------------------------------
 --  Bibliografia e rimandi, con la posizione della fonte
@@ -418,6 +439,23 @@ create table glossa (
 );
 create unique index glossa_lessema_lingua   on glossa (lessema_id, lingua)   where accezione_id is null;
 create unique index glossa_accezione_lingua on glossa (accezione_id, lingua) where accezione_id is not null;
+
+-- La definizione della voce, più ampia della glossa: una per lingua. La scrive la redazione, oppure un modello
+-- (provenienza «claude», con il nome del modello): finché nessuno la rivede è automatica, e la pagina la segna con ≈.
+create table definizione (
+  id                bigint generated always as identity primary key,
+  lessema_id        bigint not null references lessema on delete cascade,
+  lingua            text not null references lingua,
+  testo             text not null,
+  provenienza       text not null default 'redazione' references strato,
+  modello           text,
+  stato_editoriale  stato_editoriale not null default 'bozza',
+  creato_il         timestamptz not null default now(),
+  aggiornato_il     timestamptz not null default now(),
+  unique (lessema_id, lingua),
+  check (testo = btrim(testo) and testo <> '')
+);
+comment on column definizione.modello is 'Il modello che l''ha scritta (claude-opus-5-5…), per le definizioni automatiche.';
 comment on table glossa is
   'Glosse in lingue diverse da quella di base, ciascuna con provenienza e stato: le glosse inglesi di Wiktionary entrano qui come strato importato.';
 
