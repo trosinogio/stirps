@@ -24,6 +24,31 @@ ETY_CHIAVI = {'inh': 'inh', 'bor': 'bor', 'ubor': 'ubor', 'obor': 'obor', 'lbor'
               'com': 'af', 'univ': 'af', 'univerbation': 'af', 'blend': 'blend'}
 
 
+# I preverbi latini e greci: in {{ety|la|:af|ad<id:to>|quiēscō}} il preverbo è scritto come parola, ma il composto
+# va con il verbo (acquiēscō < quiēscō), come nel modello classico {{af|la|ad-|quiēscō}}
+PREVERBI = {'la': {'a', 'ab', 'abs', 'ad', 'ante', 'circum', 'com', 'con', 'cum', 'contra', 'de', 'di', 'dis', 'e', 'ex',
+                   'extra', 'in', 'inter', 'intro', 'ob', 'per', 'post', 'prae', 'praeter', 'pro', 're', 'red', 'retro',
+                   'se', 'sub', 'subter', 'super', 'supra', 'trans'},
+            'grc': {'αμφι', 'ανα', 'αντι', 'απο', 'δια', 'εισ', 'εκ', 'εξ', 'εν', 'επι', 'κατα', 'μετα', 'παρα', 'περι',
+                    'προ', 'προσ', 'συν', 'συμ', 'ξυν', 'υπερ', 'υπο'}}
+
+
+def _piano(s):
+    import unicodedata
+    return ''.join(c for c in unicodedata.normalize('NFD', s) if not unicodedata.combining(c)).lower().replace('ς', 'σ')
+
+
+def preverbo(termine, lingua):
+    '''«ad<id:to>» in un composto latino → «ad-»: un preverbo davanti al verbo è un prefisso.'''
+    base = re.sub(r'<[^<>]*>', '', termine).strip()
+    m = re.match(r'^([a-z]{2,3}(?:-[a-z]{2,4})*):(.+)$', base)
+    lt, parola = (m.group(1), m.group(2)) if m else (lingua, base)
+    lt = 'la' if lt.startswith('la') else 'grc' if lt.startswith('grc') else lt
+    if parola.endswith('-') or _piano(parola) not in PREVERBI.get(lt, ()):
+        return termine
+    return termine.replace(parola, parola + '-', 1)
+
+
 def da_ety(t, lingua):
     '''Un {{ety}}/{{etymon}} come modello classico: {{ety|la|:af|fābula<id:discourse>|-lus<alt:-la>}} → {{af|la|…}},
     {{ety|it|:inh|la:aquila}} → {{inh|it|la|aquila}}. :influence, :cog e le chiavi che non danno un etimo non contano.
@@ -47,6 +72,7 @@ def da_ety(t, lingua):
         if not nome:
             continue
         if nome in ('af', 'blend'):
+            termini = [preverbo(x, lv) if i < len(termini) - 1 else x for i, x in enumerate(termini)]
             return {'name': nome, 'args': {'1': lv, **{str(i): x for i, x in enumerate(termini, 2)}}, 'expansion': ''}
         x = termini[0]
         mod = dict(re.findall(r'<(\w+):([^<>]*)>', x))
@@ -143,6 +169,8 @@ if __name__ == '__main__':
     # DIAGNOSI_MODELLI=ety,etymon: alcuni esempi grezzi di quei modelli nel registro, per imparare a leggerli
     diagnosi = set(filter(None, os.environ.get('DIAGNOSI_MODELLI', '').split(',')))
     esempi_diagnosi = Counter()
+    # DIAGNOSI_PAROLE=audientia,acquiesco: i modelli grezzi di quelle parole, per capire perché non si leggono
+    parole_diagnosi = set(filter(None, os.environ.get('DIAGNOSI_PAROLE', '').split(',')))
     for riga in sys.stdin:
         n += 1
         try: v = json.loads(riga)
@@ -150,6 +178,11 @@ if __name__ == '__main__':
         if v.get('lang_code') != LINGUA: continue
         tpl = v.get('etymology_templates') or []
         sensi = v.get('senses') or []
+        if v.get('word') in parole_diagnosi:
+            print('  parola ' + json.dumps({'parola': v.get('word'), 'pos': v.get('pos'), 'modelli': tpl,
+                                             'testo': (v.get('etymology_text') or '')[:300],
+                                             'sensi': [(s.get('glosses') or [''])[0][:60] for s in sensi][:3]}, ensure_ascii=False)[:1500],
+                  file=sys.stderr)
         for t in tpl:
             if t.get('name') in diagnosi and esempi_diagnosi[t['name']] < 10:
                 esempi_diagnosi[t['name']] += 1

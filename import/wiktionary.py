@@ -1040,6 +1040,11 @@ class Importatore:
                 continue
             voti[cima][radice] += 1
         for cima, conta in voti.items():
+            # *leǵ- e *leǵ-@gather sono la stessa radice: la forma generica conta per l'unica variante precisa
+            for r in [r for r in conta if '@' in r]:
+                generica = r.split('@', 1)[0]
+                if generica in conta and sum(1 for x in conta if x.startswith(generica + '@')) == 1:
+                    conta[r] += conta.pop(generica)
             # una maggioranza chiara, o niente: audience dichiara *h₂ew- e *dʰeh₁- (audiō = «mettere nell'orecchio»),
             # e scegliere a caso tra le due ha dato ad audientia la radice di «porre»
             (radice, n1), *resto = conta.most_common()
