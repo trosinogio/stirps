@@ -186,11 +186,17 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
         time.sleep(60)
     uso = {'input': 0, 'cache_w': 0, 'cache_r': 0, 'output': 0}
     esiti = {'ok': 0, 'vuote': 0, 'senza_risposta': 0, 'errori': 0}
+    motivi = {}                                        # gli errori, per tipo e messaggio
     nuove = {}
     for r in client.messages.batches.results(batch_id):
         g = gruppi[int(r.custom_id[1:])]
         if r.result.type != 'succeeded':
-            esiti['errori'] += len(g); continue
+            esiti['errori'] += len(g)
+            e = getattr(r.result, 'error', None)
+            e = getattr(e, 'error', e)
+            motivo = f"{r.result.type}: {getattr(e, 'type', '')} {getattr(e, 'message', '')}"[:300]
+            motivi[motivo] = motivi.get(motivo, 0) + 1
+            continue
         m = r.result.message
         u = m.usage
         uso['input'] += u.input_tokens; uso['output'] += u.output_tokens
@@ -209,6 +215,8 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
                 tr = ''                                        # c'è già una glossa italiana di rango più alto
             esiti['ok' if de or tr else 'vuote'] += 1
             nuove[v['chiave']] = (v['originale'], tr, de, modello)
+    if motivi:
+        print(f'::warning title=Errori {modello}::{motivi}', flush=True)
     pi, po, pc = PREZZI.get(modello, (0, 0, 0))
     costo = (uso['input'] * pi + uso['cache_w'] * pi * 2 + uso['cache_r'] * pc + uso['output'] * po) / 1e6 / 2
     print(f'::notice title=Esito {modello}::{esiti}; token {uso}; costo ${costo:.2f} '
