@@ -60,13 +60,16 @@ def autori(uscita):
             scarti += 1; continue
         ident = ('phi' if lingua == 'la' else 'tlg') + cifre.group().zfill(4)
         # il terminus ante quem: morte, fine dell'attività, floruit; la nascita più sessant'anni, in mancanza d'altro
+        a = None
         for chiave, prec, scarto in (('morte', 'pm', 0), ('fine', 'pf', 0), ('fl', 'pfl', 0), ('nascita', 'pn', 60)):
             if v.get(chiave):
+                if int(v.get(prec, 9)) < 7:      # millennio o meno: «−1000» per un poeta del VI secolo, troppo vago
+                    break
                 a = anno(v[chiave]) + scarto
                 precisione = 'secolo' if int(v.get(prec, 9)) <= 7 else 'circa' if int(v.get(prec, 9)) == 8 or scarto else 'esatta'
                 break
-        else:
-            continue
+        if a is None:
+            scarti += 1; continue
         if not -1500 <= a <= 1500:      # un autore del TLG o del PHI non è morto dopo il 1500: la data è sbagliata
             scarti += 1; continue
         nome = v.get('nome') or v['item'].rsplit('/', 1)[-1]
