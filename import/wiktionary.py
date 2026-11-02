@@ -784,16 +784,13 @@ class Importatore:
 
     def togli_forme_flesse(self):
         """Una voce che Wiktionary dà solo come forma flessa (filtra.forma_flessa) non è un lemma ed esce, con le sue
-        ipotesi, salvo che: un'altra parola ne derivi (è un etimo in una catena: minimo per minimale); la sua etimologia
-        venga da un'altra lingua (ottimo < optimus: una forma lessicalizzata, che i dizionari registrano); la pagina abbia
-        anche un senso che non è una forma (una riga in glosse.tsv). Vicinissimo (vicino + -issimo) esce."""
+        ipotesi, salvo che un'altra parola ne derivi (è un etimo in una catena: minimo per minimale) o che la pagina
+        abbia anche un senso che non è una forma (una riga in glosse.tsv: ottimo, «very good»). Escono vicinissimo
+        (vicino + -issimo) e fatta (< facta): un'etimologia propria non fa di una forma un lemma."""
         tolte = 0
         while True:
             etimi = {r['etimo'] for r in self.relazioni}
-            lingua = {k: base_lingua(l['lingua']) for k, l in self.lessemi.items()}
-            da_fuori = {r['esito'] for r in self.relazioni if lingua.get(r['etimo']) != lingua.get(r['esito'])}
-            via = {k for k, l in self.lessemi.items()
-                   if l.get('forma') and k not in etimi and k not in da_fuori and k not in self.non_forme}
+            via = {k for k, l in self.lessemi.items() if l.get('forma') and k not in etimi and k not in self.non_forme}
             if not via:
                 break
             tolte += len(via)

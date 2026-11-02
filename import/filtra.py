@@ -84,8 +84,8 @@ if __name__ == '__main__':
                             forme.write(f"{v['word']}\t{fo['word']}\t{','.join(s_.get('tags') or [])}\n")
                             break
                     break
-            # una forma con un'etimologia sua (ottimo < optimus) passa al parser, segnata: resta solo se un'altra parola
-            # ne deriva o se l'etimologia viene da un'altra lingua (wiktionary.py, togli_forme_flesse)
+            # una forma con un'etimologia sua (minimo < minimus) passa al parser, segnata: resta solo se un'altra parola
+            # ne deriva o se la pagina ha anche un senso lessicale (wiktionary.py, togli_forme_flesse)
             if not any(t.get('name') in UTILI for t in tpl):
                 continue
             flesse_con_etimo += 1

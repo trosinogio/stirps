@@ -76,7 +76,7 @@ Serve la glossa perché Wiktionary non marca sempre il senso: prima di questa re
 
 Come si trattano:
 - una forma senza etimologia propria va solo in `forme.tsv`, che lega una forma citata in una catena al suo lemma (*noctem* → *nox*);
-- una forma con un'etimologia propria arriva al parser segnata (`fl`), e `togli_forme_flesse()` la toglie con le sue ipotesi, salvo che un'altra parola ne derivi (*minimo* per *minimale*), che la sua etimologia venga da un'altra lingua (*ottimo* < *optimus*, una forma lessicalizzata) o che la pagina abbia anche un senso lessicale. *Vicinissimo* (*vicino* + *-issimo*) esce.
+- una forma con un'etimologia propria arriva al parser segnata (`fl`), e `togli_forme_flesse()` la toglie con le sue ipotesi, salvo che un'altra parola ne derivi (*minimo* per *minimale*) o che la pagina abbia anche un senso lessicale (*ottimo*, «very good»). Escono *vicinissimo* (*vicino* + *-issimo*) e *fatta* (< *facta*): un'etimologia propria non fa di una forma un lemma.
 
 Il registro del filtro riporta quante forme ha riconosciuto in tutto, quante dalla sola glossa e quante con un'etimologia propria: un numero che cambia molto da un import all'altro va guardato.
 
