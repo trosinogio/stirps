@@ -204,7 +204,7 @@ Il codice vive in un repository GitHub privato. Vercel non è collegato a GitHub
   - Traduce solo le glosse delle voci nuove e compone `dati/*.tsv.gz` con `gzip -9 -n`.
   - Rimette il pacchetto sullo stesso ramo, con un commit.
   - Da una sandbox Kaikki di solito non si raggiunge: si passa da qui. Con il merge su `main` la pubblicazione rifà l'import, dopo il ramo di riserva.
-- **Collaudo** (`.github/workflows/collaudo.yml`): a ogni push controlla i tipi TypeScript e fa girare `scripts/collauda.sh` su un Postgres di prova, cioè gli 89 test del seme e i 72 dell'import. In locale: `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`.
+- **Collaudo** (`.github/workflows/collaudo.yml`): a ogni push controlla i tipi TypeScript e fa girare `scripts/collauda.sh` su un Postgres di prova, cioè gli 89 test del seme e i 77 dell'import. In locale: `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`.
 - **Copia della redazione** (`.github/workflows/copia-redazione.yml`): ogni notte `scripts/esporta-redazione.mjs` esporta tutto ciò che la redazione ha scritto o toccato (voci, ipotesi, passaggi, date, glosse, fonti, storico). Le righe sono JSON, ciascuna con gli indirizzi delle voci collegate. La copia va nel ramo `copia-redazione`, e ogni notte con dei cambiamenti diventa un commit. Il workflow richiede il segreto `DATABASE_URL_UNPOOLED` del repository, e si può lanciare a mano dalla scheda Actions.
 - **Ripristino:** la prima via è un ramo di Neon (`neon branches restore`); la seconda è la copia, leggibile e indipendente dagli identificativi del database.
 

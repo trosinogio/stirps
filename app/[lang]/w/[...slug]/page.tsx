@@ -311,7 +311,9 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
                 {/* una stima è un terminus ante quem: «almeno dal 1525», con la spiegazione al passaggio del mouse */}
                 <span className="data" title={a.stima ? t.stimaNota : undefined}>{a.stima ? t.almenoDal(datazione(a, t)) : datazione(a, t)}</span>
                 <span>
-                  <span>{a.provenienza && a.provenienza !== 'redazione' ? t.secondo(a.testo) : a.testo}{a.rif ? `, ${a.rif}` : ''}</span>
+                  <span>{a.stima && a.banca_dati
+                    ? <>{a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer">{a.testo}</a> : a.testo}, {t.secondo(a.banca_dati)}</>
+                    : a.provenienza && a.provenienza !== 'redazione' ? t.secondo(a.testo) : a.testo}{a.rif ? `, ${a.rif}` : ''}</span>
                   {a.forma_attestata && <> <span className="gl">{t.forma}</span> <i>{a.forma_attestata}</i></>}
                   {a.citazione && <>: <span className="cit">{G(a.citazione, lang)}</span></>}
                   {a.nota && <span className="nota"><Nota testo={a.nota} sc={sc} t={t} /></span>}

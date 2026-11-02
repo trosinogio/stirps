@@ -327,4 +327,28 @@ select pg_temp.verifica(
   and (select glossa from lessema where slug = 'la/abactus-2') = 'a driving away, robbing',
   'una voce del dizionario che il pacchetto non ha più si toglie, se nessuno l''ha toccata; le altre restano dove sono');
 
+\echo '— stime della prima attestazione dai dizionari'
+select pg_temp.verifica(
+  (select a.stima and a.anno_da = -184 and a.testo = 'Plauto' and a.banca_dati = 'Lewis & Short' and a.confidenza = 3
+          and a.url like 'https://scaife.perseus.org/library/urn:cts:latinLit:phi0119%'
+     from attestazione a where a.lessema_id = lx('la/carus') and a.id_esterno like 'stima:%')
+  and exists (select 1 from autore where lingua = 'la' and sigla = 'phi0119' and nome = 'Plauto'),
+  'carus: almeno dal 184 a.C., Plauto secondo il Lewis & Short, con il link all''opera; l''autore è nella tabella autore');
+select pg_temp.verifica(
+  (select a.precisione = 'secolo' and a.anno_da = -701 and a.confidenza = 2
+     from attestazione a where a.lessema_id = lx('grc/akris-2') and a.stima),
+  'una voce del dizionario riceve la sua stima (ἄκρις: Omero, VIII sec. a.C., confidenza 2 per la data per secolo)');
+select pg_temp.verifica(not exists (select 1 from attestazione a where a.lessema_id = lx('la/caro') and a.stima),
+  'un lemma con più voci nel dizionario (caro) non riceve stime: non si sa a quale voce vadano');
+create temp table stime_xmin as select id, xmin::text as x from attestazione where stima;
+select importa_stime();
+select pg_temp.verifica(
+  (select count(*) from stime_xmin p join attestazione a on a.id = p.id and a.xmin::text = p.x) = (select count(*) from stime_xmin)
+  and (select count(*) from attestazione where stima) = (select count(*) from stime_xmin),
+  'un nuovo import delle stime con gli stessi dati non riscrive niente');
+delete from stg_stima where lemma = 'carus';
+select importa_stime();
+select pg_temp.verifica(not exists (select 1 from attestazione a where a.lessema_id = lx('la/carus') and a.stima),
+  'una stima che il pacchetto non ha più si toglie');
+
 \echo '— collaudo dell’import completato'

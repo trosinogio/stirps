@@ -1,6 +1,6 @@
 # Prime attestazioni: fonti e strumento di datazione
 
-Progetto del 2 novembre 2026. La fase 0 è fatta: la tabella `attestazione` distingue le **stime** (`stima`, `confidenza`) dalle attestazioni verificate, e c'è la tabella `autore` per datare le citazioni dei dizionari. Il resto è da fare.
+Progetto del 2 novembre 2026. Fatti la fase 0 e il passo 1 (`datatore_dizionari.py`, `importa_stime()`). La fase 0: la tabella `attestazione` distingue le **stime** (`stima`, `confidenza`) dalle attestazioni verificate, e c'è la tabella `autore` per datare le citazioni dei dizionari. Il resto è da fare.
 
 ## Il principio
 
@@ -41,7 +41,9 @@ Un programma in `import/` che produce un file del pacchetto (`dati/stime.tsv.gz`
 - Precisione: «circa».
 - Confidenza: 3 con dieci o più volumi nella finestra, 2 da tre a nove, 1 sotto. Prima del 1600 resta al più 1, salvo un sostegno forte.
 
-**3. Le citazioni dei dizionari (latino e greco).**
+**3. Le citazioni dei dizionari (latino e greco), fatto.** `datatore_dizionari.py autori` interroga Wikidata (P1055 per PHI, P1041 per TLG) e data ogni autore con la morte, o la fine dell'attività, o il floruit, o la nascita più sessant'anni, con la precisione di Wikidata. `datatore_dizionari.py stime` dà a ogni voce l'autore datato più antico tra le citazioni con l'identificativo dell'opera. `importa_stime()` le assegna solo dove la voce è certa: la voce del dizionario stessa, o un lemma con una sola voce nel dizionario e una sola nella lingua (*caro*, con tre voci nel Lewis & Short, resta senza). La voce mostra «almeno dal 184 a.C. — Plauto, secondo il Lewis & Short», con il link all'opera su Scaife.
+
+In origine:
 - Fonti: le voci del Lewis & Short e dell'LSJ nei file TEI del Perseus citano gli autori, spesso con l'identificativo dell'opera (`urn:cts:latinLit:phi0119…`, `Perseus:abo:tlg,0012,001`).
 - Datazione degli autori: si passa dagli identificativi PHI e TLG a Wikidata, e il risultato va nella tabella `autore`.
 - Data: l'autore più antico citato nella voce, per esempio «almeno da Plauto (III–II sec. a.C.)».
@@ -61,7 +63,7 @@ Un programma in `import/` che produce un file del pacchetto (`dati/stime.tsv.gz`
 | passo | che cosa | lavoro (sessioni) | altro |
 |---|---|---|---|
 | fase 0 | colonne `stima` e `confidenza`, tabella `autore`, la voce mostra «almeno dal …» | fatto | – |
-| 1 | citazioni del Lewis & Short e dell'LSJ, autori datati con Wikidata | 2–3 | revisione dei ~300 autori più citati (10–15 h di redazione) |
+| 1 | citazioni del Lewis & Short e dell'LSJ, autori datati con Wikidata (`datatore_dizionari.py`, `importa_stime()`) | fatto | revisione dei ~300 autori più citati (10–15 h di redazione) |
 | 2 | Wikisource: italiano antico e moderno | 2 | ~1 h di workflow |
 | 3 | Google Books Ngram: italiano dal Cinquecento | 2 | ~1–2 h di workflow per lo scarico |
 | 4 | taratura e pubblicazione | 1 | 4–6 h di redazione |

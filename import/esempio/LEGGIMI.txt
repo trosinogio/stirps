@@ -7,3 +7,6 @@ italiana raggiunge, e la forma ricostruita *baba, che nessuna catena cita.
 dizionari.tsv: dieci righe dell'uscita di filtra_perseus.py, dai file TEI del Perseus Digital Library (Lewis & Short
 e Liddell–Scott–Jones, github.com/PerseusDL/lexica, CC BY-SA 4.0, http://www.perseus.tufts.edu/): lemmi nuovi
 (Carus, abactus¹ e abactus², ἄκρις e ἀκρίς, βαβαί) e lemmi che Wiktionary ha già (carus, levir, δαήρ, τυρός).
+stime.tsv: righe vere dell'uscita di datatore_dizionari.py stime per carus, caro (due voci del Lewis & Short) e ἄκρις,
+ἀκρίς; autori.tsv: quattro autori con la datazione scritta a mano per la prova (Plauto 184 a.C., Cicerone 43 a.C.,
+Omero VIII sec. a.C., Platone 347 a.C.), nel formato di datatore_dizionari.py autori.

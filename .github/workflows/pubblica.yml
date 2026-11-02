@@ -52,9 +52,9 @@ jobs:
           padre=$(jq -r --arg n "$RAMO_NEON" '.branches[] | select(.name == $n) | .id' <<< "$rami")
           if [ -z "$padre" ]; then echo "::error title=Pubblica::il ramo $RAMO_NEON non c'è su Neon"; exit 1; fi
           # il piano gratuito di Neon ha 10 rami: restano i due rami di riserva più recenti, più quello nuovo.
-          # Si tolgono solo i rami che si chiamano backup-*, mai production né altri
+          # Si tolgono solo i rami che si chiamano backup-*, mai production né altri, e mai quelli con rami figli
           echo "- Rami su Neon: $(jq -r '[.branches[] | "\(.name) (\(.created_at[0:10])\(if .protected then ", protetto" else "" end)\(if .default then ", predefinito" else "" end))"] | join("; ")' <<< "$rami")" >> "$GITHUB_STEP_SUMMARY"
-          for vecchio in $(jq -r '[.branches[] | select(.name | startswith("backup-"))] | sort_by(.created_at) | reverse | .[2:][] | .id + ":" + .name' <<< "$rami"); do
+          for vecchio in $(jq -r '[.branches[].parent_id] as $padri | [.branches[] | select((.name | startswith("backup-")) and ([.id] | inside($padri) | not))] | sort_by(.created_at) | reverse | .[2:][] | .id + ":" + .name' <<< "$rami"); do
             r=$(curl -sS -w '\n%{http_code}' -X DELETE -H "$aut" "$api/${vecchio%%:*}")
             c=${r##*$'\n'}
             if [ "$c" -lt 300 ]; then
