@@ -49,6 +49,20 @@ def preverbo(termine, lingua):
     return termine.replace(parola, parola + '-', 1)
 
 
+def porta_etimo(t):
+    '''Un modello classico che dà davvero un etimo: {{suffix|la|-ia}} senza la base (audientia, fabella) non lo dà, e
+    allora vale {{ety}}, se c'è.'''
+    n, a = t.get('name'), t.get('args') or {}
+    if n not in CON_ETIMO:
+        return False
+    parti = [re.sub(r'<[^<>]*>', '', v).strip() for k, v in sorted(a.items()) if k.isdigit() and int(k) >= 2 and v and v.strip()]
+    if n in ('af', 'affix', 'suffix', 'prefix', 'confix', 'compound', 'blend'):
+        return len(parti) >= 2 or any(p and not p.startswith('-') and not p.endswith('-') for p in parti)
+    if n in ('bf', 'back-form', 'clipping', 'ellipsis', 'it-deverbal'):
+        return bool(parti)
+    return bool(re.sub(r'<[^<>]*>', '', a.get('3') or '').strip('*- '))
+
+
 def da_ety(t, lingua):
     '''Un {{ety}}/{{etymon}} come modello classico: {{ety|la|:af|fābula<id:discourse>|-lus<alt:-la>}} → {{af|la|…}},
     {{ety|it|:inh|la:aquila}} → {{inh|it|la|aquila}}. :influence, :cog e le chiavi che non danno un etimo non contano.
@@ -214,7 +228,7 @@ if __name__ == '__main__':
                                  '1' if (v.get('original_title') or '').startswith('Reconstruction:') else '')) + '\n')
         tpl = [{**t, 'name': ALIAS.get(t.get('name'), t.get('name'))} for t in tpl]
         classici = [t for t in tpl if t.get('name') in UTILI]
-        if not any(t['name'] in CON_ETIMO for t in classici):
+        if not any(porta_etimo(t) for t in classici):
             # solo per le voci che non hanno già un etimo nei modelli classici: quelle che leggiamo bene non cambiano
             conv = next((c for c in (da_ety(t, LINGUA) for t in tpl if t.get('name') in ('ety', 'etymon')) if c), None)
             if conv:

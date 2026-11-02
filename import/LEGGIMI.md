@@ -253,3 +253,16 @@ Le regole (`arco_impossibile()`, `precisa_omografe()`, `chiudi_su_radici()`), co
 
 Dopo: 86% giuste, 0 radici sotto un loro derivato, 0,4% su un nodo generico. Il resto è soprattutto incompletezza: composti con due radici, catene che si fermano a una parola di una lingua che non leggiamo (inglese), voci latine con l'etimologia nel nuovo modello `{{ety}}`, che il filtro non legge ancora (21.527).
 
+## Il sistema nuovo di Wiktionary: {{ety}} e {{etymon}} (novembre 2026)
+
+Nel dump latino 21.527 voci scrivono l'etimologia con `{{ety}}` o `{{etymon}}`, che il filtro non leggeva: restavano senza catena. Il modello ha come argomento 1 la lingua della voce, poi parole chiave con i due punti seguite dai loro termini: `{{ety|la|:af|fābula<id:discourse>|-lus<alt:-la>}}`, `{{ety|it|:inh|la:aquila}}`. Un termine senza prefisso è della stessa lingua; senza parola chiave vale `:from`. Dice solo il primo livello: gli etimi hanno le loro voci.
+
+- `da_ety()` converte il primo etimo nel modello classico equivalente: `:inh` → `inh`, `:bor`/`:lbor`/`:ubor` → i prestiti, `:der`/`:from` → `der`, `:af` → `af`. `:influence` e le parole chiave che non danno un etimo non contano.
+- **I preverbi.** Nei composti latini e greci un preverbo scritto come parola (`ad`, `κατά`), quando non è l'ultimo elemento, diventa un prefisso: *acquiēscō* va con *quiēscō*, non con *ad*.
+- **Quando vale.** Solo se nessun modello classico dà già un etimo (`porta_etimo()`). `{{suffix|la|-ia}}` senza la base non lo dà, e allora vale `{{ety}}`: così *fabella* va con *fābula*. Un termine vuoto (`itc-pro:`) non è un etimo, e `lemma_valido()` non accetta lemmi vuoti.
+- **Le abbreviazioni.** Quelle dei modelli classici (`suf`, `pre`, `com`, `con`, `univerbation`, `back-formation`…) diventano il modello pieno.
+- **Il risultato.** Le voci latine con etimologia passano da 10.060 a 32.545, e le ipotesi del pacchetto da 97.847 a circa 120.300; le catene giuste nel controllo delle radici restano all'86%.
+- **La diagnosi.** `SENZA=…` scrive le cause dei lemmi senza etimologia (nessuna, solo testo, modelli non letti), `DIAGNOSI_MODELLI=…` e `DIAGNOSI_PAROLE=…` stampano esempi grezzi nel registro.
+
+*Audientia* resta senza catena: la sua pagina ha `{{suffix|la|-ia}}` e scrive la base *audiēns* solo nel testo. Servirà la lettura della prosa.
+

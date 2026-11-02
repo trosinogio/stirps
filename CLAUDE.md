@@ -79,6 +79,7 @@ Come cambia il database:
 
 ## Trappole già incontrate
 
+- **Wiktionary cambia i modelli etimologici:** dal 2026 molte voci (22 mila latine) usano `{{ety}}`/`{{etymon}}` (`:inh|la:aquila`, `:af|fābula|-lus`). `filtra.py` li converte nel modello classico (`da_ety()`), solo dove un modello classico non dà già un etimo (`porta_etimo()`). Il registro del filtro conta le voci lette «da {{ety}}» e le cause dei lemmi senza etimologia, con i «modelli non letti più frequenti»: se ne compare uno nuovo, si guardano esempi grezzi con `DIAGNOSI_MODELLI=nome` o `DIAGNOSI_PAROLE=parola` nel workflow Dati.
 - **Il lessico di frequenza conta forme, non lemmi,** e viene dai sottotitoli: *stia*, *sulla*, *era* sono forme di altre parole, e ci sono molte volgarità. Filtrare prima di usarlo per scegliere parole.
 - **Ricorsioni sul grafo:** si visitano le parole, non i percorsi (`union`, non `union all` con l’array del cammino). I composti dotti (*-logia*, *-grafia*) creano migliaia di percorsi convergenti, e contarli bloccava `mv_famiglia`.
 - **Da una sandbox la porta 5432 di Neon può essere chiusa:** gli script ricadono sul driver WebSocket `@neondatabase/serverless`.

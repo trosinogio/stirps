@@ -33,6 +33,9 @@ assert da_ety({'args': {'1': 'it', '2': ':influence', '3': 'fr:x'}}, 'it') is No
 assert da_ety({'args': {'1': 'la', '2': ':af', '3': 'ad<id:to>', '4': 'quiēscō'}}, 'la')['args']['2'] == 'ad-<id:to>', 'il preverbo è un prefisso'
 assert da_ety({'args': {'1': 'grc', '2': ':af', '3': 'κατά', '4': 'βαίνω'}}, 'grc')['args']['2'] == 'κατά-'
 assert da_ety({'args': {'1': 'la', '2': ':inh', '3': 'itc-pro:<id:x>'}}, 'la') is None, 'un termine vuoto non è un etimo'
+from filtra import porta_etimo
+assert not porta_etimo({'name': 'suffix', 'args': {'1': 'la', '2': '-ia'}}), '{{suffix|la|-ia}} senza base non dà un etimo: vale {{ety}}'
+assert porta_etimo({'name': 'suffix', 'args': {'1': 'la', '2': 'audiēns', '3': 'ia'}}) and porta_etimo({'name': 'inh', 'args': {'1': 'it', '2': 'la', '3': 'aquila'}})
 from wiktionary import lemma_valido
 assert not lemma_valido('itc-pro', '', True) and not lemma_valido('ine-pro', '*', True), 'un lemma vuoto non è una voce'
 from filtra import lemma_della_forma as lf
