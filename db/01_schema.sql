@@ -43,12 +43,14 @@ comment on function norm(text) is
 -- trattino (ine-pro/sek). È la sola fonte della regola: la usano la colonna slug e i controlli dell'import.
 -- La chiave dell'indice di una lingua: le prime due lettere della forma normalizzata, secondo l'alfabeto della lingua
 -- (23 lettere latine, con J sotto I e U sotto V; 24 greche). «A-» raccoglie le parole di una lettera e quelle come
--- «a priori»; null per le parole che cominciano fuori dall'alfabeto (W latina, Ϝ greca), che restano fuori dall'indice.
+-- «a priori»; null per le parole che cominciano fuori dall'alfabeto (W latina, ϝοῖκος con la lettera epicorica), che
+-- restano voci ma fuori dall'indice.
 -- È nella colonna generata lessema.chiave_indice: se cambia, la colonna va ricalcolata (update lessema set lemma = lemma).
 create or replace function indice_iniziali(p_lingua text, p_forma text) returns text
 language sql immutable parallel safe
 return (with a as (select case when p_lingua ~ '^la(-|$)' then 'ABCDEFGHIKLMNOPQRSTVXYZ'
-                               when p_lingua ~ '^grc(-|$)' then 'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ' end as lettere,
+                               -- il greco arcadocipriota ha il sillabario: si indicizza per segni
+                               when p_lingua ~ '^grc(-|$)' and p_lingua <> 'grc-arp' then 'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ' end as lettere,
                           case when p_lingua ~ '^la(-|$)' then translate(upper(p_forma), 'JU', 'IV') else upper(p_forma) end as f)
         select case when f is null or f = '' then null
                     when lettere is not null and strpos(lettere, left(f, 1)) = 0 then null

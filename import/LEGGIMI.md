@@ -68,6 +68,12 @@ Restano fuori:
 
 I modificatori in linea dei modelli (`scorciare<t:to shorten>`) si staccano dal termine in `lessema()`.
 
+Le parole scritte nel sillabario cipriota, che Wiktionary mette sotto il greco antico, diventano voci del **greco arcadocipriota** (`grc-arp`, varietà del greco antico), con il loro indice per segni. Le parole con lettere epicoriche (ϝοῖκος) restano voci del greco, forme attestate, ma fuori dall’indice a 24 lettere, come nell’LSJ, che le cita sotto la forma comune; si trovano con la ricerca.
+
+**Etimologie scritte solo nel testo.** Una voce senza modelli etimologici, ma con un testo che comincia con «From», «Derived from», «Deverbal from» o «Back-formation from» e un modello di menzione («From the verb {{m|it|segare}}»), non si scarta più. La prima menzione diventa un `der` (`menzione_come_der()` in `filtra.py`), cioè un legame indeterminato o una derivazione, mai un’eredità.
+
+Le traduzioni automatiche valgono solo per la glossa inglese che è stata tradotta: se la glossa cambia, la traduzione aspetta il pacchetto successivo.
+
 Per riapplicare le regole a un pacchetto già fatto, senza riscaricare i dump: `python3 filtra_pacchetto.py ../dati`.
 
 Le traduzioni automatiche tentate restano nel pacchetto anche quando la verifica le scarta (terza colonna vuota): un nuovo pacchetto traduce solo le voci nuove o con la glossa cambiata.
@@ -88,7 +94,8 @@ python3 filtra_perseus.py dati/it/tsv/dizionari.tsv --escludi dati/it/tsv/lessem
 `filtra_perseus.py` usa solo la libreria standard e scrive le stesse colonne di `lessemi.tsv`:
 
 - **Il lemma come il titolo di Wiktionary.** Senza quantità, e per il latino *i* al posto di *j* (*iam*, non *jam*). Il greco dell’LSJ è in Beta Code (`*)/abrwn` → Ἄβρων) e diventa Unicode.
-- **La glossa è la prima traduzione.** Nel Lewis & Short è il primo corsivo che sia una definizione, saltando le note grammaticali («doub. dim.», «P. a. fin.») e i pezzi di parola (POSIER*unt*). Nell’LSJ è la prima traduzione del primo senso che ne ha, saltando i titoli citati («Aus Lydien»). Le glosse lunghe si fermano al primo punto e virgola.
+- **La glossa è la prima traduzione che dice qualcosa.** Nel Lewis & Short è il primo dei primi tre corsivi che sia una definizione, saltando le note grammaticali («doub. dim.», «P. a. fin.») e i pezzi di parola (POSIER*unt*). Nell’LSJ è la prima delle prime tre traduzioni del primo senso che ne ha, saltando i titoli citati («Aus Lydien»). Una glossa senza parole piene («of …», «to be») non basta, e una tronca cede a una completa. Le glosse lunghe si fermano al primo punto e virgola.
+- **Misurata su Wiktionary.** Sui lemmi che hanno entrambi, il senso principale concorda con la glossa di Wiktionary nel 68% dei casi per il Lewis & Short e nel 76% per l’LSJ; quasi tutti i disaccordi sono sinonimi («an ascending» e «ascent»).
 - **La traslitterazione del greco** segue lo schema di Wiktionary e dà l’indirizzo: ἀκρίς → `grc/akris`.
 - **Gli omografi** si numerano nell’ordine del dizionario: *abactus*¹, *abactus*².
 - **Restano fuori** le voci spurie del Lewis & Short, le voci dell’LSJ che non sono in greco (142) e, con `--escludi`, i lemmi che Wiktionary ha già, con la stessa forma.

@@ -548,6 +548,8 @@ begin
     select distinct on (l.id) l.id, btrim(t.testo) as testo
       from stg_glossa_tradotta t join lessema l on l.id_esterno = t.chiave
      where l.lingua <> 'it' and coalesce(l.glossa_lingua, '') <> 'it' and btrim(coalesce(t.testo, '')) <> ''
+       -- la traduzione vale solo per la glossa inglese che è stata tradotta: se la glossa cambia, aspetta la nuova
+       and (coalesce(t.originale, '') = '' or t.originale = l.glossa)
      order by l.id, btrim(t.testo);
   create index on cand_tr (id);
   delete from glossa g

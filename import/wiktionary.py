@@ -51,6 +51,8 @@ CURATE = {
     'la-pre': ('latino preclassico', 'lat. precl.', 'Old Latin', 'OL', 'indoeuropea', 'italica', None, 'la', None, None),
     'roa-oit': ('italiano antico', 'it. ant.', 'Old Italian', 'OIt.', 'indoeuropea', 'italica', None, 'it', None, None),
     'grc-koi': ('greco della koinè', 'gr. koinè', 'Koine Greek', 'Koine', 'indoeuropea', 'ellenica', None, 'grc', None, None),
+    # le parole scritte nel sillabario cipriota (Wiktionary le mette sotto il greco antico): una varietà a sé
+    'grc-arp': ('greco arcadocipriota', 'gr. arcadocipr.', 'Arcadocypriot Greek', 'Arcadocypr.', 'indoeuropea', 'ellenica', None, 'grc', 35.0, 33.0),
     'gkm': ('greco bizantino', 'gr. biz.', 'Byzantine Greek', 'ByzGk.', 'indoeuropea', 'ellenica', 'grc', None, 41.01, 28.98),
     'el': ('greco moderno', 'gr. mod.', 'Greek', 'ModGk.', 'indoeuropea', 'ellenica', 'gkm', None, 37.98, 23.73),
     'grk-pro': ('protoellenico', 'protoellen.', 'Proto-Hellenic', 'PHel.', 'indoeuropea', 'ellenica', 'ine-pro', None, None, None),
@@ -317,8 +319,12 @@ GRECO = re.compile('[\u0370-\u03ff\u1f00-\u1fff]')
 # latine, più j, u, w delle grafie moderne e medievali; 24 greche), spazi, trattini e apostrofi interni. Fuori le lettere
 # isolate (A, Ϝ), i simboli (☉), le abbreviazioni (A., ꝑ), i numeri (6tus), il sillabario cipriota, le lettere
 # epicoriche (ϝοῖκος, ͷοῖκος) e i frammenti di testo che una citazione può trascinare («βάλλω (bállo, “to strike”)>»).
+# Le lettere epicoriche (ϝ, ϙ, ϻ, ͷ, ͱ, ͳ, ϳ) sono ammesse nelle parole (ϝοῖκος, forma attestata), che però restano fuori
+# dall'indice a 24 lettere; da sole no. Il sillabario cipriota è la scrittura del greco arcadocipriota (grc-arp).
+CIPRIOTA = {chr(c) for c in range(0x10800, 0x10840)}
 LETTERE = {'la': set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZæœÆŒ'),
-           'grc': set('αβγδεζηθικλμνξοπρσςτυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ')}
+           'grc': set('αβγδεζηθικλμνξοπρσςτυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩϝϜϙϘϻϺͷͶͱͰͳͲϳͿ'),
+           'grc-arp': CIPRIOTA}
 NON_LEMMA = re.compile(r'[()\[\]{}<>“”"=|]')
 
 
@@ -327,7 +333,7 @@ def lemma_valido(lingua, lemma, ricostruito=False):
         return True
     if NON_LEMMA.search(lemma or ''):
         return False
-    lettere = LETTERE.get(base_lingua(lingua))
+    lettere = LETTERE.get(lingua) or LETTERE.get(base_lingua(lingua))
     if lettere is None:
         return True
     corpo = lemma.strip('-')
@@ -398,6 +404,8 @@ class Importatore:
         if not ric and lingua in VARIETA_ATTESTATE:
             lingua = VARIETA_ATTESTATE[lingua]
         lemma = termine[1:] if ric else termine
+        if not ric and base_lingua(lingua) == 'grc' and lemma and all(c in CIPRIOTA for c in lemma):
+            lingua = 'grc-arp'          # sillabario cipriota: greco arcadocipriota, con il suo indice
         k = chiave(lingua, termine.lstrip('*') if not ric else termine, omografo)
         if ident and ric:
             k += '@' + ident            # radici omografe: *(s)ker-@cut e *(s)ker-@turn sono due nodi
