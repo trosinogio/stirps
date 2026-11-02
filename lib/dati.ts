@@ -75,3 +75,22 @@ export async function periodiLingue(codici: string[]): Promise<Map<string, { ann
     `select codice, anno_da, anno_a, ricostruita from lingua where codice = any($1)`, [codici]);
   return new Map(r.map((x) => [x.codice, x]));
 }
+
+// La mappa del sito: voci, famiglie e lingue visibili, a blocchi
+export async function contaVociMappa(): Promise<number> {
+  const r = await query<{ n: number }>('select count(*)::int as n from lessema where visibile(stato_editoriale, $1)', [ANTEPRIMA]);
+  return r[0].n;
+}
+export async function vociMappa(blocco: number, quante: number): Promise<{ slug: string; agg: string }[]> {
+  return query<{ slug: string; agg: string }>(
+    `select slug, aggiornato_il::date::text as agg from lessema where visibile(stato_editoriale, $1)
+      order by id limit $2 offset $3`, [ANTEPRIMA, quante, blocco * quante]);
+}
+export async function radiciELingueMappa(): Promise<{ radici: string[]; lingue: string[] }> {
+  const [r, l] = await Promise.all([
+    query<{ slug: string }>(`select l.slug from (select capo from mv_famiglia group by capo having count(*) > 1) f
+                               join lessema l on l.id = f.capo where visibile(l.stato_editoriale, $1) order by l.slug`, [ANTEPRIMA]),
+    query<{ codice: string }>(`select distinct lingua as codice from lessema where visibile(stato_editoriale, $1) order by 1`, [ANTEPRIMA]),
+  ]);
+  return { radici: r.map((x) => x.slug), lingue: l.map((x) => x.codice) };
+}

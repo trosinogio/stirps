@@ -141,9 +141,13 @@ select pg_temp.verifica(not exists (select 1 from lessema where slug in ('la/bab
 select pg_temp.verifica((select glossa from lessema where slug = 'la/caros') = 'heavy sleep, stupor, torpor'
                         and not exists (select 1 from ipotesi where esito_id = lx('la/caros')),
   'un lemma latino senza etimologia entra lo stesso, con la sua glossa e senza catena: la lingua è completa (cāros)');
-select pg_temp.verifica(not exists (select 1 from lessema where lemma in ('A', '☉', 'Ϝ', 'ϝοῖκος', '𐠀𐠙'))
-                        and lx('la/carus') is not null,
-  'non sono parole e restano fuori: lettere (A, Ϝ), simboli (☉), lettere epicoriche (ϝοῖκος), sillabario cipriota');
+select pg_temp.verifica(not exists (select 1 from lessema where lemma in ('A', '☉', 'Ϝ')) and lx('la/carus') is not null,
+  'non sono parole e restano fuori: lettere isolate (A, Ϝ) e simboli (☉)');
+select pg_temp.verifica(
+  (select chiave_indice is null from lessema where lingua = 'grc' and lemma = 'ϝοῖκος')
+  and exists (select 1 from lessema l join lingua g on g.codice = l.lingua
+               where l.lemma = '𐠀𐠙' and l.lingua = 'grc-arp' and g.varieta_di = 'grc' and l.chiave_indice is not null),
+  'ϝοῖκος resta una voce del greco, fuori dall''indice a 24 lettere; il sillabario cipriota è greco arcadocipriota, con il suo indice');
 
 \echo '— glosse italiane dal Wikizionario e prime attestazioni'
 select pg_temp.verifica(
@@ -284,7 +288,8 @@ select pg_temp.verifica(
                                                     and p.glossa is not distinct from l.glossa) = (select count(*) from d_prima)
   and (select count(*) from lessema where provenienza = 'perseus') = (select count(*) from d_prima),
   'un nuovo import dei dizionari non cambia niente: stesse voci, stessi indirizzi');
-insert into stg_glossa_tradotta values ('perseus:lsj:n3486', 'grasshopper, locust, cricket', 'cavalletta, locusta, grillo');
+insert into stg_glossa_tradotta values ('perseus:lsj:n3486', 'grasshopper, locust, cricket', 'cavalletta, locusta, grillo'),
+                                       ('perseus:lsj:n3485', 'hill-top', 'cima');   -- tradotta da una glossa che non c'è più
 select importa_glosse_wikizionario();
 select importa_glosse_aggiuntive();
 select pg_temp.verifica(
@@ -292,6 +297,8 @@ select pg_temp.verifica(
     = 'cavalletta, locusta, grillo'
   and (nodo_json(lx('grc/akris'), 'it')->>'glossa_automatica')::boolean,
   'anche le voci dei dizionari ricevono la glossa tradotta, segnata ≈');
+select pg_temp.verifica(not exists (select 1 from glossa where lessema_id = lx('grc/akris-2') and lingua = 'it'),
+  'una traduzione fatta da una glossa inglese diversa da quella di oggi non si usa (ἄκρις: «hill-top», non «hill-top, mountain peak»)');
 -- Wiktionary arriva a una parola che c'era solo nel dizionario
 insert into stg_lessema (chiave, lingua, lemma, omografo, ricostruito, translit, pos, glossa)
   values ('enwikt:grc:βαβαί', 'grc', 'βαβαί', 1, false, 'babaí', 'inter.', 'bless me!');

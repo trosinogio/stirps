@@ -14,7 +14,7 @@ Solo libreria standard.
 
     python3 filtra_perseus.py uscita.tsv [--escludi lessemi.tsv] lat.ls.perseus-eng2.xml grc.lsj.perseus-eng1.xml …
 """
-import re, sys, unicodedata, xml.etree.ElementTree as ET
+import itertools, re, sys, unicodedata, xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from wiktionary import nome_pagina, translit_grc, base_lingua, lemma_valido   # stessi titoli, traslitterazione, regole
 
@@ -102,8 +102,19 @@ def abbreviazioni(g):
     return all(p.endswith('.') and len(p) <= 10 for p in parole)
 
 
-def glossa_ls(voce):
-    """Il primo corsivo che sia una definizione: in bene il primo è una «e» nella nota sull'etimo, poi viene «well».
+VUOTE = set('the a an of to in on at by for from with and or as be is am are one who which that this its his her their '
+            'something someone any some'.split())
+
+
+def scegli(candidati):
+    """Tra i candidati, nell'ordine del dizionario, il primo che dice qualcosa: almeno una parola piena e non tronco;
+    poi il primo con una parola piena, anche tronco (con i puntini: «to add to …»). «of …» o «to be» non bastano."""
+    pieni = [g for g in candidati if any(w not in VUOTE for w in re.findall(r'[a-z]{3,}', g.lower()))]
+    return next((g for g in pieni if not g.endswith('…')), pieni[0] if pieni else '')
+
+
+def candidati_ls(voce):
+    """I corsivi che possono essere definizioni: in bene il primo è una «e» nella nota sull'etimo, poi viene «well».
     Un corsivo attaccato alla parola che lo precede è un pezzo di parola (POSIER<hi>unt</hi> in pono), non una glossa."""
     genitori = {figlio: padre for padre in voce.iter() for figlio in padre}
     for hi in voce.iter('hi'):
@@ -120,8 +131,12 @@ def glossa_ls(voce):
         g = testo(hi).strip(' ;,:')
         if len(g) < 3 or ABBREVIAZIONE.match(g) or GRAMMATICA.match(g) or abbreviazioni(g):
             continue
-        return breve(g)
-    return ''
+        yield breve(g)
+
+
+def glossa_ls(voce):
+    """La prima definizione che dice qualcosa, tra i primi tre corsivi utili."""
+    return scegli(list(itertools.islice(candidati_ls(voce), 3)))
 
 
 def titolo(t):
@@ -131,13 +146,14 @@ def titolo(t):
 
 
 def glossa_lsj(voce):
-    """La prima traduzione del primo senso che ne ha, saltando i titoli citati («God» per θεός, non «against his will»
-    di un senso successivo). Senza sensi tradotti, la prima traduzione della voce."""
+    """La prima traduzione che dice qualcosa nel primo senso che ne ha, saltando i titoli citati («God» per θεός, non
+    «against his will» di un senso successivo); se in quel senso nessuna basta, i sensi successivi."""
     for senso in [s for s in voce.iter('sense')] + [voce]:
         tr = [testo(t).strip(' ;,:') for t in senso.iter('tr')]
-        tr = [t for t in tr if t]
-        if tr:
-            return breve(next((t for t in tr if not titolo(t)), tr[0]))
+        tr = [breve(t) for t in tr if t and not titolo(t)]
+        g = scegli(tr[:3])
+        if g:
+            return g
     return ''
 
 
