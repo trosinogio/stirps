@@ -10,4 +10,7 @@ import/filtra_perseus.py. Licenza CC BY-SA 4.0: chi li riusa deve citare il Pers
 
 glosse_tradotte.tsv.gz: traduzioni automatiche delle glosse inglesi (import/traduci_glosse.py), segnate ≈ nel dizionario.
 
+definizioni.tsv.gz: traduzioni e definizioni italiane scritte da Claude (Anthropic) con import/definisci.py: chiave della
+voce, glossa d'origine, traduzione, definizione, modello. Automatiche, segnate ≈ nel dizionario; CC BY-SA 4.0 come le fonti.
+
 Le carica scripts/inizializza-db.mjs al primo deploy, se il database è vuoto, e a ogni deploy in cui il pacchetto cambia.

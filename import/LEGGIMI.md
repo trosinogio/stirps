@@ -214,6 +214,7 @@ Risultati sui dati di ottobre 2026: le parole italiane che arrivano al protoindo
 - `filtra_wikidata.py` filtra il dump dei lessemi di Wikidata e ne tiene i lessemi italiani con una definizione in italiano: 21.377 su 65.130. Nel pacchetto dati entrano quelli i cui lemmi sono nel dizionario, ed entrano nel database solo con la stessa parte del discorso: 1.194 parole.
 - `traduci_glosse.py` traduce le glosse inglesi degli etimi stranieri senza glossa italiana. Ne tiene 5.657 su 13.486, verificate per ritorno e con il dizionario rovesciato; sono segnate con ≈ nell'interfaccia. Comandi e controlli sono descritti nel README dell'app.
 - `stg_glossa_wikidata` e `stg_glossa_tradotta` sono le tabelle di appoggio; `importa_glosse_aggiuntive()` va chiamata dopo `importa_glosse_wikizionario()`.
+- Le traduzioni e le definizioni di Claude (`definisci.py`, novembre 2026) sono descritte nel README dell'app: tabella d'appoggio `stg_definizione`, `importa_definizioni()` dopo `importa_glosse_aggiuntive()`.
 
 ## Catene ricostruite meglio (31 ottobre 2026)
 

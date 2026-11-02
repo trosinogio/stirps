@@ -43,7 +43,8 @@ export interface Attestazione {
 }
 export interface Strato { codice: string; nome: string; licenza: string; share_alike: boolean; attribuzione?: string | null }
 export interface Lessema extends Nodo {
-  wiktionary_lingua?: string; pos?: string | null; obsoleto: boolean; nota?: string | null; stato_editoriale: string; provenienza: string }
+  wiktionary_lingua?: string; pos?: string | null; obsoleto: boolean; nota?: string | null; stato_editoriale: string; provenienza: string;
+  definizione?: string | null; definizione_lingua?: string | null; definizione_automatica?: boolean | null; definizione_modello?: string | null }
 export interface Consultabile { sigla: string; titolo: string; autore?: string | null; anno?: number | null; modello: string; tipo: string }
 export interface Opera {
   sigla: string; autore: string | null; titolo: string; edizione: string | null; anno: number | null; editore: string | null;

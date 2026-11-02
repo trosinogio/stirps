@@ -7,6 +7,7 @@ import { classeRamo, datazione, fmt, G, nodiUnici, perLingua, tx } from '@/lib/f
 import { Fiducia, intercala, VoceLink } from '@/components/comuni';
 import Mappa from '@/components/Mappa';
 import Automatica from '@/components/Automatica';
+import Definizione from '@/components/Definizione';
 import LineaTempo, { type NodoTempo } from '@/components/LineaTempo';
 import type { Attestazione, NodoCatena, Relazione, Rimando, Scheda } from '@/lib/tipi';
 
@@ -198,6 +199,7 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
             {glossaAltrove && <span className="marca-lingua">({t.inLingua(t.nomiLingue[L.glossa_lingua!] ?? L.glossa_lingua!)})</span>}
           </p>
         )}
+        <Definizione L={L} lang={lang} />
         {L.nota && <p className="origine"><Nota testo={L.nota} sc={sc} t={t} /></p>}
       </header>
 

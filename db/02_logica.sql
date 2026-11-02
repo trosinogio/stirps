@@ -38,10 +38,10 @@ end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['lessema', 'accezione', 'ipotesi', 'relazione', 'attestazione', 'connessione', 'glossa'] loop
+  foreach t in array array['lessema', 'accezione', 'ipotesi', 'relazione', 'attestazione', 'connessione', 'glossa', 'definizione'] loop
     execute format('create trigger %1$s_tocca before update on %1$s for each row execute function tocca()', t);
   end loop;
-  foreach t in array array['lessema', 'accezione', 'ipotesi', 'relazione', 'attestazione', 'connessione', 'rimando', 'glossa'] loop
+  foreach t in array array['lessema', 'accezione', 'ipotesi', 'relazione', 'attestazione', 'connessione', 'rimando', 'glossa', 'definizione'] loop
     execute format('create trigger %1$s_storico after insert or update or delete on %1$s for each row execute function registra_storico()', t);
   end loop;
 end $$;
@@ -176,7 +176,7 @@ language sql stable as $$
            'ramo', g.ramo, 'lemma', x.lemma, 'ricostruito', x.ricostruito, 'translit', x.translit,
            'glossa', coalesce(t.testo, x.glossa),
            'glossa_lingua', case when t.testo is not null then t.lingua else x.glossa_lingua end,
-           'glossa_automatica', coalesce(t.provenienza = 'traduzione-automatica' and t.stato_editoriale = 'importato', false))
+           'glossa_automatica', coalesce(t.provenienza in ('traduzione-automatica', 'claude') and t.stato_editoriale = 'importato', false))
   from lessema x
   join lingua g on g.codice = x.lingua
   left join glossa t on t.lessema_id = x.id and t.accezione_id is null and t.lingua = p_lingua
@@ -563,7 +563,7 @@ select jsonb_build_object(
                           'lingua_nome', g.nome, 'lingua_sigla', g.sigla, 'ramo', g.ramo, 'lemma', x.lemma,
                           'ricostruito', x.ricostruito, 'translit', x.translit, 'glossa', coalesce(t.testo, x.glossa),
                           'glossa_lingua', case when t.testo is not null then t.lingua else x.glossa_lingua end,
-                          'glossa_automatica', coalesce(t.provenienza = 'traduzione-automatica' and t.stato_editoriale = 'importato', false))
+                          'glossa_automatica', coalesce(t.provenienza in ('traduzione-automatica', 'claude') and t.stato_editoriale = 'importato', false))
                         order by x.rn)
                         from gruppo x
                         cross join (select coalesce(etichetta_in('lingua', codice, p_lingua), nome) as nome,
@@ -600,6 +600,9 @@ with
 l   as (select * from lessema where slug = p_slug and visibile(stato_editoriale, p_anteprima)),
 gl  as (select t.* from glossa t join l on t.lessema_id = l.id
         where t.accezione_id is null and t.lingua = p_lingua and visibile(t.stato_editoriale, p_anteprima)),
+df  as (select d.* from definizione d join l on d.lessema_id = l.id
+        where d.lingua in (p_lingua, 'it') and visibile(d.stato_editoriale, p_anteprima)
+        order by d.lingua = p_lingua desc limit 1),
 ip  as (select h.* from ipotesi h join l on h.esito_id = l.id
         where visibile(h.stato_editoriale, p_anteprima)),
 rel as (select r.*, t.etichetta as tipo_etichetta, t.categoria
@@ -629,7 +632,7 @@ miti as (select h.*, x.slug as esito_slug
 prov as (
   select provenienza from l   union select provenienza from ip  union select provenienza from rel
   union select provenienza from acc union select provenienza from att union select provenienza from con
-  union select provenienza from gl
+  union select provenienza from gl union select provenienza from df
   union select x.provenienza from lessema x
         where x.id in (select lessema_id from cat union select lessema_id from cog
                        union select altro from allo union select altro from con)
@@ -649,7 +652,11 @@ select jsonb_build_object(
       'lemma', l.lemma, 'ricostruito', l.ricostruito, 'translit', l.translit, 'pos', l.pos,
       'glossa', coalesce((select testo from gl), l.glossa),
       'glossa_lingua', case when exists (select 1 from gl) then p_lingua else l.glossa_lingua end,
-      'glossa_automatica', exists (select 1 from gl where gl.provenienza = 'traduzione-automatica' and gl.stato_editoriale = 'importato'),
+      'glossa_automatica', exists (select 1 from gl where gl.provenienza in ('traduzione-automatica', 'claude') and gl.stato_editoriale = 'importato'),
+      -- la definizione nella lingua della pagina, o in italiano (le definizioni automatiche si scrivono solo in italiano)
+      'definizione', (select d.testo from df d), 'definizione_lingua', (select d.lingua from df d),
+      'definizione_automatica', (select d.provenienza = 'claude' and d.stato_editoriale = 'importato' from df d),
+      'definizione_modello', (select d.modello from df d where d.provenienza = 'claude'),
       'obsoleto', l.obsoleto, 'nota', l.nota,
       'stato_editoriale', l.stato_editoriale, 'provenienza', l.provenienza,
       -- per il collegamento a Wiktionary: il nome inglese della lingua (le varietà stanno nella voce della lingua madre)

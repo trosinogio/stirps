@@ -118,6 +118,7 @@ h2{font-family:var(--serif);font-weight:700;font-size:22px;line-height:1.25;marg
 .etichetta{font:12.5px var(--sans);border:1px solid var(--filo-2);border-radius:4px;padding:1px 7px;color:var(--ink-2)}
 .glossa-g{font-size:22px;margin:10px 0 0}
 .origine{font-size:16.5px;color:var(--ink-2);margin:10px 0 0;max-width:68ch}
+.definizione{font-size:16.5px;line-height:1.55;color:var(--ink-2);margin:8px 0 0;max-width:68ch}
 .statistiche{display:grid;gap:8px;margin:14px 0 0;max-width:520px}
 .statistiche .conti{font:14px var(--sans);color:var(--ink-2)}
 .statistiche .barra{grid-column:auto;margin:0}

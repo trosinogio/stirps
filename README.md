@@ -85,7 +85,7 @@ Ogni parola ha al più una glossa italiana. Le fonti, in ordine di rango:
 1. la redazione;
 2. il Wikizionario (CC BY-SA 4.0);
 3. le definizioni dei lessemi di Wikidata (CC0), per le parole italiane senza voce nel Wikizionario: solo con la stessa parte del discorso, senza omografi e senza «etichette» con la maiuscola;
-4. la traduzione automatica delle glosse inglesi di Wiktionary e dei dizionari del Perseus, per gli etimi stranieri.
+4. la traduzione automatica delle glosse inglesi di Wiktionary e dei dizionari del Perseus: prima quella di Claude, poi quella di OPUS-MT.
 
 Una fonte di rango più basso non scavalca mai una più alta. Una glossa importata di Wikidata o della traduzione lascia il posto a quella del Wikizionario quando arriva; `importa_glosse_aggiuntive()` toglie quelle che non valgono più e aggiunge le nuove, lasciando dove sono le altre. Quelle riviste dalla redazione restano.
 
@@ -111,6 +111,15 @@ python3 import/traduci_glosse.py lessemi.tsv en_it glosse_tradotte.tsv --chiavi 
 ```
 
 `chiavi.txt` elenca le voci straniere senza glossa italiana. Con `--parte 1/3` il lavoro si divide; un processore traduce circa trenta glosse al secondo.
+
+## Traduzioni e definizioni di Claude
+
+Oltre alla glossa, una voce può avere una **definizione** (tabella `definizione`, una per lingua): della redazione, o scritta da Claude (strato `claude`, con il nome del modello in `modello`). Le scrive `import/definisci.py` con la Batch API di Anthropic e l'output strutturato: per ogni voce una traduzione breve (la glossa, che prende il posto di quella di OPUS-MT) e una definizione, vuote se il modello non conosce la parola con sicurezza. Il modello non scrive etimologie, date né autori: il dizionario li ha già, con le fonti.
+
+- **Le radici** (le 4.662 della pagina «Radici») si definiscono con Opus 5.5, a partire dalla glossa della radice e dalle glosse dei discendenti più vicini, così il significato si ancora alla famiglia. Le altre voci aspettano il confronto tra Haiku, Sonnet e Opus su un campione di 300 (`import/claude/campione.jsonl.gz`).
+- **Il workflow Definizioni** (`.github/workflows/definizioni.yml`) parte con un push su un ramo `definizioni-*` che cambia `import/claude/lotti.conf`, e serve il segreto `ANTHROPIC_API_KEY`. Manda solo le voci che non hanno ancora un risultato e salva l'id di ogni batch con le chiavi delle sue richieste: un'esecuzione interrotta lo riprende senza ripagare. I risultati per il dizionario vanno in `dati/definizioni.tsv.gz`, quelli dei confronti in `import/claude/esiti/`.
+- **Nel database** `importa_definizioni()`, dopo `importa_glosse_aggiuntive()`, porta le definizioni per differenza. Valgono solo per la glossa da cui sono nate (colonna `originale`); una definizione della redazione o rivista non si tocca. La pagina della voce e quella della famiglia le mostrano sotto la glossa, con il segno ≈ e il nome del modello finché nessuno le rivede; sul sito inglese restano in italiano, dichiarate come tali.
+- **Per rifare i lotti** da una copia locale del database: `python3 import/definisci.py estrai postgres://…/stirps radici import/claude/radici.jsonl.gz`.
 
 ## Liste di lavoro: le prime 100
 

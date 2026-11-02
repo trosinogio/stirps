@@ -93,6 +93,8 @@ export interface Testi {
   legame: (tipo: string) => string;
   tipiConnessione: Record<string, string>;
   inLingua: (nome: string) => string;
+  automaticaGlossa: string;
+  automaticaDefinizione: (modello: string) => string;
   nomiLingue: Record<string, string>;
   aC: string;
   tempo: { dC: string; oggi: string; aria: (parole: string) => string; legenda: string; senzaData: string; scorri: string };
@@ -255,6 +257,8 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     legame: (t) => `legame ${t} con`,
     tipiConnessione: { culturale: 'culturale', semantica: 'semantico', omonimia: 'di omonimia', paronimia: 'di paronimia', falso_amico: 'di falso amico', altro: '' },
     inLingua: (n) => `in ${n}`,
+    automaticaGlossa: 'Traduzione automatica della glossa inglese, da verificare',
+    automaticaDefinizione: (m) => `Definizione scritta da ${m} (Anthropic), non ancora rivista dalla redazione`,
     nomiLingue: { it: 'italiano', en: 'inglese' },
     aC: 'a.C.',
     tempo: {
@@ -440,6 +444,8 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     legame: (t) => `${t} link with`,
     tipiConnessione: { culturale: 'cultural', semantica: 'semantic', omonimia: 'homonymy', paronimia: 'paronymy', falso_amico: 'false-friend', altro: '' },
     inLingua: (n) => `in ${n}`,
+    automaticaGlossa: 'Machine translation of the English gloss, to be checked',
+    automaticaDefinizione: (m) => `Definition written by ${m} (Anthropic), not yet reviewed by the editors`,
     nomiLingue: { it: 'Italian', en: 'English' },
     aC: 'BC',
     tempo: {

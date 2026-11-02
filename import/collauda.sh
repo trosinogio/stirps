@@ -25,7 +25,7 @@ LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.t
 cd esempio/tsv
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
 truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_radice, stg_attestazione, stg_wikizionario,
-         stg_glossa_wikidata, stg_glossa_tradotta, stg_dizionario, stg_autore, stg_stima;
+         stg_glossa_wikidata, stg_glossa_tradotta, stg_dizionario, stg_autore, stg_stima, stg_definizione;
 \copy stg_lingua from 'lingue.tsv'
 \copy stg_lessema from 'lessemi.tsv'
 \copy stg_ipotesi from 'ipotesi.tsv'
@@ -44,6 +44,7 @@ select importa_dizionari();
 select importa_stime();
 select importa_glosse_wikizionario();
 select importa_glosse_aggiuntive();
+select importa_definizioni();
 refresh materialized view mv_allotropi;
 refresh materialized view mv_famiglia;
 SQL

@@ -503,6 +503,9 @@ on conflict (codice) do nothing;
 
 create table if not exists stg_glossa_wikidata (lid text, lemma text, categoria text, glossa text, sensi int);
 create table if not exists stg_glossa_tradotta (chiave text, originale text, testo text);
+-- traduzioni e definizioni di Claude (import/definisci.py, dati/definizioni.tsv.gz): chiave della voce, glossa
+-- d'origine, traduzione breve, definizione, modello; i campi vuoti dicono che il modello non conosceva la parola
+create table if not exists stg_definizione (chiave text, originale text, traduzione text, definizione text, modello text);
 
 -- Dopo il Wikizionario: definizioni di Wikidata per le parole italiane che non ne hanno (stessa parte del discorso,
 -- niente omografi), poi traduzioni automatiche per gli etimi che non hanno una glossa italiana. Per differenza: le
@@ -521,7 +524,7 @@ begin
      where l.lingua = 'it' and l.stato_editoriale <> 'superato' and coalesce(l.glossa_lingua, '') <> 'it'
        and w.glossa ~ '^[[:lower:]]' and length(w.glossa) >= 6
        and not exists (select 1 from glossa g where g.lessema_id = l.id and g.lingua = 'it' and g.accezione_id is null
-                        and not (g.provenienza = 'wikidata' and g.stato_editoriale = 'importato'))
+                        and not (g.provenienza in ('wikidata', 'traduzione-automatica', 'claude') and g.stato_editoriale = 'importato'))
        and (case w.categoria
               when 'Q1084' then l.pos like 's.%' or l.pos = 's.'
               when 'Q34698' then l.pos = 'agg.'
@@ -535,34 +538,45 @@ begin
        and (select count(*) from lessema o where o.lingua = 'it' and o.lemma = l.lemma) = 1
      order by l.id, w.sensi desc, w.lid;
   create index on cand_wd (id);
+  -- le traduzioni automatiche, dove non c'è altro: quella di Claude prima di quella di OPUS-MT; per le parole italiane
+  -- (solo Claude) Wikidata viene prima. Valgono solo per la glossa inglese da cui sono nate: se cambia, aspettano
+  create temp table cand_tr on commit drop as
+    select distinct on (c.id) c.id, c.testo, c.provenienza
+      from (select l.id, btrim(d.traduzione) as testo, 'claude' as provenienza, 1 as rango
+              from stg_definizione d join lessema l on l.id_esterno = d.chiave
+             where coalesce(l.glossa_lingua, '') <> 'it' and btrim(coalesce(d.traduzione, '')) <> ''
+               and coalesce(d.originale, '') = coalesce(l.glossa, '') and l.stato_editoriale <> 'superato'
+            union all
+            select l.id, btrim(t.testo), 'traduzione-automatica', 2
+              from stg_glossa_tradotta t join lessema l on l.id_esterno = t.chiave
+             where l.lingua <> 'it' and coalesce(l.glossa_lingua, '') <> 'it' and btrim(coalesce(t.testo, '')) <> ''
+               and (coalesce(t.originale, '') = '' or t.originale = l.glossa)) c
+     where not exists (select 1 from cand_wd w where w.id = c.id)
+     order by c.id, c.rango, c.testo;
+  create index on cand_tr (id);
+  -- prima si tolgono le glosse aggiuntive superate, poi si mettono le nuove: così una glossa di rango più alto
+  -- (Wikidata) prende il posto di una traduzione automatica dello stesso lessema
   delete from glossa g
    where g.provenienza = 'wikidata' and g.stato_editoriale = 'importato'
      and not exists (select 1 from cand_wd c where c.id = g.lessema_id and c.glossa = g.testo);
+  delete from glossa g
+   where g.provenienza in ('traduzione-automatica', 'claude') and g.stato_editoriale = 'importato'
+     and not exists (select 1 from cand_tr c where c.id = g.lessema_id and c.testo = g.testo and c.provenienza = g.provenienza);
   insert into glossa (lessema_id, lingua, testo, provenienza, stato_editoriale)
   select id, 'it', glossa, 'wikidata', 'importato' from cand_wd
   on conflict (lessema_id, lingua) where accezione_id is null do nothing;
   select count(*) into n from glossa where provenienza = 'wikidata';
   r := r || jsonb_build_object('wikidata', n);
-
-  create temp table cand_tr on commit drop as
-    select distinct on (l.id) l.id, btrim(t.testo) as testo
-      from stg_glossa_tradotta t join lessema l on l.id_esterno = t.chiave
-     where l.lingua <> 'it' and coalesce(l.glossa_lingua, '') <> 'it' and btrim(coalesce(t.testo, '')) <> ''
-       -- la traduzione vale solo per la glossa inglese che è stata tradotta: se la glossa cambia, aspetta la nuova
-       and (coalesce(t.originale, '') = '' or t.originale = l.glossa)
-     order by l.id, btrim(t.testo);
-  create index on cand_tr (id);
-  delete from glossa g
-   where g.provenienza = 'traduzione-automatica' and g.stato_editoriale = 'importato'
-     and not exists (select 1 from cand_tr c where c.id = g.lessema_id and c.testo = g.testo);
   insert into glossa (lessema_id, lingua, testo, provenienza, stato_editoriale)
-  select id, 'it', testo, 'traduzione-automatica', 'importato' from cand_tr
+  select id, 'it', testo, provenienza, 'importato' from cand_tr
   on conflict (lessema_id, lingua) where accezione_id is null do nothing;
   select count(*) into n from glossa where provenienza = 'traduzione-automatica';
   r := r || jsonb_build_object('traduzione_automatica', n);
+  select count(*) into n from glossa where provenienza = 'claude';
+  r := r || jsonb_build_object('claude', n);
   return r;
 end $$;
-comment on function importa_glosse_aggiuntive() is 'Glosse italiane di rango più basso: definizioni di Wikidata e traduzioni automatiche, solo dove mancano.';
+comment on function importa_glosse_aggiuntive() is 'Glosse italiane di rango più basso: definizioni di Wikidata e traduzioni automatiche (Claude, poi OPUS-MT), solo dove mancano.';
 
 -- ===== Dizionari del Perseus: Lewis & Short e Liddell–Scott–Jones (novembre 2026) =====
 -- Lemmi e glosse inglesi dei due dizionari, per le parole latine e greche che Wiktionary non ha. Le voci entrano come
@@ -725,3 +739,47 @@ begin
   return r;
 end $$;
 comment on function importa_stime() is 'Stime della prima attestazione dai dizionari del Perseus: l''autore datato più antico citato nella voce, solo dove la voce è certa.';
+
+-- ===== Traduzioni e definizioni di Claude (novembre 2026) =====
+insert into strato (codice, nome, licenza, share_alike, attribuzione, url) values
+('claude', 'Claude (Anthropic), traduzioni e definizioni automatiche', 'CC BY-SA 4.0', true,
+ 'Traduzioni e definizioni italiane scritte da Claude, il modello di Anthropic, a partire dalle glosse di Wiktionary e dei dizionari del Perseus e, per le radici, dai loro discendenti; automatiche, finché la redazione non le rivede. Restano con la licenza CC BY-SA 4.0 delle fonti.',
+ 'https://www.anthropic.com/claude')
+on conflict (codice) do update set nome = excluded.nome, licenza = excluded.licenza, share_alike = excluded.share_alike,
+                                   attribuzione = excluded.attribuzione, url = excluded.url;
+insert into etichetta_lingua (vocabolario, codice, lingua, etichetta, breve, descrizione) values
+('strato', 'claude', 'en', 'Claude (Anthropic), machine translations and definitions', 'CC BY-SA 4.0',
+ 'Italian translations and definitions written by Claude, Anthropic’s model, from the glosses of Wiktionary and of the Perseus dictionaries and, for roots, from their descendants; automatic until the editors review them. They keep the CC BY-SA 4.0 licence of their sources.')
+on conflict (vocabolario, codice, lingua) do update set etichetta = excluded.etichetta, breve = excluded.breve,
+                                                       descrizione = excluded.descrizione;
+
+-- Dopo importa_glosse_aggiuntive(): le definizioni di Claude per le voci importate, per differenza. Valgono solo per
+-- la glossa da cui sono nate; una definizione della redazione, o una rivista, non si tocca.
+create or replace function importa_definizioni() returns jsonb
+language plpgsql as $$
+declare
+  n int;
+  tolte int;
+  nuove int;
+begin
+  perform set_config('app.import', 'on', true);
+  create temp table cand_def on commit drop as
+    select distinct on (l.id) l.id, btrim(d.definizione) as testo, nullif(d.modello, '') as modello
+      from stg_definizione d join lessema l on l.id_esterno = d.chiave
+     where btrim(coalesce(d.definizione, '')) <> '' and coalesce(d.originale, '') = coalesce(l.glossa, '')
+       and l.stato_editoriale <> 'superato'
+     order by l.id, d.modello;
+  create index on cand_def (id);
+  delete from definizione f
+   where f.provenienza = 'claude' and f.stato_editoriale = 'importato'
+     and not exists (select 1 from cand_def c where c.id = f.lessema_id and c.testo = f.testo
+                                                and c.modello is not distinct from f.modello);
+  get diagnostics tolte = row_count;
+  insert into definizione (lessema_id, lingua, testo, provenienza, modello, stato_editoriale)
+  select id, 'it', testo, 'claude', modello, 'importato' from cand_def
+  on conflict (lessema_id, lingua) do nothing;
+  get diagnostics nuove = row_count;
+  select count(*) into n from definizione where provenienza = 'claude';
+  return jsonb_build_object('claude', n, 'nuove', nuove, 'tolte', tolte);
+end $$;
+comment on function importa_definizioni() is 'Definizioni italiane scritte da Claude, per differenza: solo per la glossa da cui sono nate, e mai sopra quelle della redazione o rivedute.';

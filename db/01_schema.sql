@@ -439,6 +439,23 @@ create table glossa (
 );
 create unique index glossa_lessema_lingua   on glossa (lessema_id, lingua)   where accezione_id is null;
 create unique index glossa_accezione_lingua on glossa (accezione_id, lingua) where accezione_id is not null;
+
+-- La definizione della voce, più ampia della glossa: una per lingua. La scrive la redazione, oppure un modello
+-- (provenienza «claude», con il nome del modello): finché nessuno la rivede è automatica, e la pagina la segna con ≈.
+create table definizione (
+  id                bigint generated always as identity primary key,
+  lessema_id        bigint not null references lessema on delete cascade,
+  lingua            text not null references lingua,
+  testo             text not null,
+  provenienza       text not null default 'redazione' references strato,
+  modello           text,
+  stato_editoriale  stato_editoriale not null default 'bozza',
+  creato_il         timestamptz not null default now(),
+  aggiornato_il     timestamptz not null default now(),
+  unique (lessema_id, lingua),
+  check (testo = btrim(testo) and testo <> '')
+);
+comment on column definizione.modello is 'Il modello che l''ha scritta (claude-opus-5-5…), per le definizioni automatiche.';
 comment on table glossa is
   'Glosse in lingue diverse da quella di base, ciascuna con provenienza e stato: le glosse inglesi di Wiktionary entrano qui come strato importato.';
 
