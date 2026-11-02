@@ -47,6 +47,15 @@ export interface Testi {
   legenda: { eredita: string; prestito: string; dotto: string; formazione: string; indeterminata: string; ricostruita: string };
   stemmaSuggerimento: string;
   stemmaDi: (lemma: string) => string;
+  nomiPropriMostra: (n: number) => string;
+  nomiPropriNascondi: string;
+  altreParole: (n: number) => string;
+  eNomiPropri: (n: number) => string;
+  altreDa: (n: number, lemma: string) => string;
+  filtraParole: string;
+  chiudi: string;
+  nessunaParola: string;
+  apriStemmaDi: (lemma: string) => string;
   mappaPochi: string;
   mappaNota: string;
   mappaProto: string;
@@ -210,6 +219,15 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     legenda: { eredita: 'eredità', prestito: 'prestito', dotto: 'prestito dotto', formazione: 'derivazione o composizione', indeterminata: 'legame indeterminato', ricostruita: 'forma ricostruita' },
     stemmaSuggerimento: 'Passa sopra una parola per seguirne il percorso dalla radice. Fai clic per aprire la voce.',
     stemmaDi: (l) => `Stemma della famiglia di ${l}`,
+    nomiPropriMostra: (n) => `Mostra i nomi propri (${n.toLocaleString('it-IT')})`,
+    nomiPropriNascondi: 'Nascondi i nomi propri',
+    altreParole: (n) => `+ ${n.toLocaleString('it-IT')} ${n === 1 ? 'parola' : 'parole'}`,
+    eNomiPropri: (n) => `e ${n.toLocaleString('it-IT')} ${n === 1 ? 'nome proprio' : 'nomi propri'}`,
+    altreDa: (n, l) => `${n === 1 ? 'Un’altra parola' : `Altre ${n.toLocaleString('it-IT')} parole`} da ${l}`,
+    filtraParole: 'Filtra le parole',
+    chiudi: 'Chiudi',
+    nessunaParola: 'Nessuna parola corrisponde.',
+    apriStemmaDi: (l) => `Apri lo stemma di ${l}`,
     mappaPochi: 'Servono almeno due lingue con un luogo per disegnare una mappa. Le protolingue non hanno una collocazione.',
     mappaNota: 'Luoghi indicativi, un punto per lingua; le frecce vanno dalla forma più antica alla più recente.',
     mappaProto: ' Le protolingue non hanno una collocazione e non compaiono.',
@@ -397,6 +415,15 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     legenda: { eredita: 'inheritance', prestito: 'borrowing', dotto: 'learned borrowing', formazione: 'derivation or compound', indeterminata: 'indeterminate link', ricostruita: 'reconstructed form' },
     stemmaSuggerimento: 'Hover over a word to follow its path from the root. Click to open the entry.',
     stemmaDi: (l) => `Stemma of the family of ${l}`,
+    nomiPropriMostra: (n) => `Show proper names (${n.toLocaleString('en-GB')})`,
+    nomiPropriNascondi: 'Hide proper names',
+    altreParole: (n) => `+ ${n.toLocaleString('en-GB')} ${n === 1 ? 'word' : 'words'}`,
+    eNomiPropri: (n) => `and ${n.toLocaleString('en-GB')} ${n === 1 ? 'proper name' : 'proper names'}`,
+    altreDa: (n, l) => `${n === 1 ? 'One more word' : `${n.toLocaleString('en-GB')} more words`} from ${l}`,
+    filtraParole: 'Filter the words',
+    chiudi: 'Close',
+    nessunaParola: 'No word matches.',
+    apriStemmaDi: (l) => `Open the stemma of ${l}`,
     mappaPochi: 'A map needs at least two languages with a location. Proto-languages have no location.',
     mappaNota: 'Approximate locations, one point per language; arrows run from the older form to the newer one.',
     mappaProto: ' Proto-languages have no location and are not shown.',

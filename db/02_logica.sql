@@ -174,6 +174,7 @@ language sql stable as $$
            'lingua_nome', coalesce(etichetta_in('lingua', x.lingua, p_lingua), g.nome),
            'lingua_sigla', coalesce(etichetta_in('lingua', x.lingua, p_lingua, 'breve'), g.sigla),
            'ramo', g.ramo, 'lemma', x.lemma, 'ricostruito', x.ricostruito, 'translit', x.translit,
+           'nome_proprio', x.nome_proprio,      -- lo stemma nasconde i nomi propri, se non si chiede di vederli
            'glossa', coalesce(t.testo, x.glossa),
            'glossa_lingua', case when t.testo is not null then t.lingua else x.glossa_lingua end,
            'glossa_automatica', coalesce(t.provenienza in ('traduzione-automatica', 'claude') and t.stato_editoriale = 'importato', false))

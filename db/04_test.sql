@@ -436,4 +436,8 @@ select pg_temp.prova_e_annulla(array[
                                      where (x->>'stima')::boolean and (x->>'confidenza')::int = 2), 'la scheda dice che è una stima, con la confidenza')$$],
   'una stima entra con la sua confidenza e la scheda la presenta come tale');
 
+select pg_temp.verifica(
+  (select bool_and((nodo_json(id)->>'nome_proprio')::boolean is not distinct from nome_proprio) from lessema),
+  'nodo_json dice se una voce è un nome proprio: lo stemma li nasconde finché non si chiede di vederli');
+
 \echo '— collaudo completato'
