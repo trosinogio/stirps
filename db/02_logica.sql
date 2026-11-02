@@ -517,12 +517,19 @@ $$;
 create function parole_lingua(p_codice text, p_lingua text default 'it', p_anteprima boolean default false, p_iniziale text default null)
 returns jsonb language sql stable as $$
 with
-lf as (select l.*, coalesce(nullif(l.lemma_norm, ''), l.lemma) as f
+-- l'indice segue l'alfabeto della lingua: 23 lettere per il latino (J sotto I, U sotto V, come nella grafia classica),
+-- 24 per il greco; le parole che cominciano con altro restano voci, ma fuori dall'indice
+al as (select case when p_codice ~ '^la(-|$)' then 'ABCDEFGHIKLMNOPQRSTVXYZ'
+                   when p_codice ~ '^grc(-|$)' then 'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ' end as lettere),
+lf as (select l.*, case when p_codice ~ '^la(-|$)' then translate(upper(coalesce(nullif(l.lemma_norm, ''), l.lemma)), 'JU', 'IV')
+                        else upper(coalesce(nullif(l.lemma_norm, ''), l.lemma)) end as f
        from lessema l where l.lingua = p_codice and visibile(l.stato_editoriale, p_anteprima)),
 -- le prime due lettere: le parole di una lettera sola e quelle come «a priori» o «a-» stanno nel gruppo «A-»
-lx as (select l.*, upper(left(l.f, 1)) as ini,
-              case when substr(l.f, 2, 1) ~ '^[[:alpha:]]$' then upper(left(l.f, 2)) else upper(left(l.f, 1)) || '-' end as ini2
-       from lf l),
+lx as (select l.*, left(l.f, 1) as ini,
+              case when substr(l.f, 2, 1) ~ '^[[:alpha:]]$' and (al.lettere is null or strpos(al.lettere, substr(l.f, 2, 1)) > 0)
+                   then left(l.f, 2) else left(l.f, 1) || '-' end as ini2
+       from lf l, al
+      where al.lettere is null or strpos(al.lettere, left(l.f, 1)) > 0),
 ini as (select ini, count(*) as n, (ini !~ '^[[:alpha:]]') as simbolo from lx group by ini),
 scelta as (select coalesce(upper(left(p_iniziale, 1)), case when (select count(*) from lx) <= 400 then null
                                          -- si apre sulla prima iniziale vera: non su una I con una sola parola greca
@@ -534,7 +541,7 @@ scelta2 as (select case when (select sum(n) from sotto) > 2000
                         then coalesce((select ini2 from sotto where ini2 = upper(p_iniziale)),
                                       (select ini2 from sotto order by ini2 like '_-', ini2 limit 1)) end as v)
 select jsonb_build_object(
-  'totale', (select count(*) from lx),
+  'totale', (select count(*) from lf),
   'iniziale', (select v from scelta),
   'iniziali', coalesce((select jsonb_agg(jsonb_build_object('iniziale', ini, 'n', n) order by simbolo, ini) from ini), '[]'::jsonb),
   'sottoiniziale', (select v from scelta2),

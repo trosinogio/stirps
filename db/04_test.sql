@@ -390,5 +390,26 @@ end $$;
 select pg_temp.verifica(
   (select p->>'sottoiniziale' is null and jsonb_array_length(p->'sottoiniziali') = 0 from parole_lingua('la', 'it', true, 'C') p),
   'un''iniziale con poche parole resta una pagina sola');
+-- l'indice segue l'alfabeto: 23 lettere latine (J sotto I, U sotto V), 24 greche; il resto resta fuori dall'indice
+do $$
+declare la jsonb; gr jsonb;
+begin
+  begin
+    insert into lessema (lingua, lemma, glossa_lingua, stato_editoriale) values
+      ('la', 'uxorprova', 'it', 'bozza'), ('la', 'Iuliusprova', 'it', 'bozza'), ('la', 'Jacobusprova', 'it', 'bozza'),
+      ('la', 'Wilhelmusprova', 'it', 'bozza'), ('grc', 'ϝοῖκοςπροβα', 'it', 'bozza'), ('grc', 'οἶκοςπροβα', 'it', 'bozza');
+    la := parole_lingua('la', 'it', true, null);
+    gr := parole_lingua('grc', 'it', true, null);
+    perform pg_temp.verifica(
+      (select bool_and(x->>'iniziale' = any (regexp_split_to_array('ABCDEFGHIKLMNOPQRSTVXYZ', ''))) from jsonb_array_elements(la->'iniziali') x)
+      and (select bool_and(x->>'iniziale' = any (regexp_split_to_array('ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ', ''))) from jsonb_array_elements(gr->'iniziali') x)
+      and exists (select 1 from jsonb_array_elements(parole_lingua('la', 'it', true, 'V')->'parole') x where x->>'lemma' = 'uxorprova')
+      and (select count(*) from jsonb_array_elements(parole_lingua('la', 'it', true, 'I')->'parole') x
+            where x->>'lemma' in ('Iuliusprova', 'Jacobusprova')) = 2,
+      'l''indice segue l''alfabeto: 23 lettere latine (uxor sotto V, Iacobus e Jacobus sotto I, niente W), 24 greche (niente Ϝ)');
+    raise exception using errcode = 'P0098', message = 'annulla';
+  exception when sqlstate 'P0098' then null;
+  end;
+end $$;
 
 \echo '— collaudo completato'

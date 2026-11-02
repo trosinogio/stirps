@@ -55,6 +55,23 @@ Risultato, ottobre 2026:
 
 Dove la glossa italiana manca, l’interfaccia mostra quella inglese e lo dichiara.
 
+## Le voci sono parole
+
+Prima di scrivere le tabelle il parser toglie le voci che non sono parole (`lemma_valido()`), con gli archi che le toccano e le ipotesi rimaste senza archi.
+- **In ogni lingua:** niente frammenti di testo, cioè parentesi, uncini o virgolette.
+- **Per latino e greco**, salvo le forme ricostruite, solo lettere dell’alfabeto con i loro diacritici, più spazi, trattini e apostrofi interni.
+
+Restano fuori:
+- le lettere isolate (A, α, Ϝ), salvo le parole di una lettera con i loro segni (ὁ, ὦ; latino ā, ē, ō);
+- i simboli (☉), le abbreviazioni (A., ꝑ) e i numeri (6tus);
+- il sillabario cipriota e le lettere epicoriche (ϝοῖκος, ͷοῖκος).
+
+I modificatori in linea dei modelli (`scorciare<t:to shorten>`) si staccano dal termine in `lessema()`.
+
+Per riapplicare le regole a un pacchetto già fatto, senza riscaricare i dump: `python3 filtra_pacchetto.py ../dati`.
+
+Le traduzioni automatiche tentate restano nel pacchetto anche quando la verifica le scarta (terza colonna vuota): un nuovo pacchetto traduce solo le voci nuove o con la glossa cambiata.
+
 ## I dizionari del Perseus: latino e greco completi
 
 Wiktionary dà circa 56 mila voci latine e 25 mila greche antiche (pacchetto del 1° novembre 2026, tutte le voci comprese, anche senza etimologia). Perché le due lingue siano complete entrano anche i lemmi dei due dizionari di riferimento che Wiktionary non ha: 22.329 latini dal Lewis & Short e 100.448 greci dall’LSJ. Il latino arriva così a 78 mila voci e il greco a 125 mila. I lemmi vengono dall’edizione digitale del Perseus Digital Library (Tufts University, http://www.perseus.tufts.edu/), con licenza CC BY-SA 4.0:

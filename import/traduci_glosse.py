@@ -198,6 +198,8 @@ def main():
             if buoni and it_di.get(ss[0]) == buoni[0] if buoni else False:
                 f.write(f'{chiave}\t{originale}\t{", ".join(buoni)}\n')
                 scritte += 1
+            else:
+                f.write(f'{chiave}\t{originale}\t\n')   # scartata: registrata, così un nuovo pacchetto non la ritraduce
     print(f'glosse {len(righe)}, sensi unici {len(uniche)}, tradotte e confermate {scritte}, tempo {time.time() - t0:.1f} s', file=sys.stderr)
 
 if __name__ == '__main__':

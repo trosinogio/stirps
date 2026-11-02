@@ -224,6 +224,17 @@ def pulisci_parte(p):
     return p.strip(), lingua
 
 
+def senza_modificatori(t):
+    """Il termine senza i modificatori in linea dei modelli di Wiktionary, anche annidati:
+    'scorciare<t:to shorten>' → 'scorciare', 'pisciare<ref:<<name:garz>>>' → 'pisciare', 'Giappone>>' → 'Giappone'."""
+    t = t or ''
+    while True:
+        u = re.sub(r'<[^<>]*>', '', t)
+        if u == t:
+            return u.replace('<', '').replace('>', '').strip()
+        t = u
+
+
 def codice_lingua(c):
     c = (c or '').split(',')[0].strip()
     return ALIAS.get(c, c)
@@ -302,6 +313,32 @@ def translit_grc(parola):
 
 GRECO = re.compile('[\u0370-\u03ff\u1f00-\u1fff]')
 
+# Le voci del dizionario sono parole. Per latino e greco: solo lettere del loro alfabeto, con i diacritici (23 lettere
+# latine, più j, u, w delle grafie moderne e medievali; 24 greche), spazi, trattini e apostrofi interni. Fuori le lettere
+# isolate (A, Ϝ), i simboli (☉), le abbreviazioni (A., ꝑ), i numeri (6tus), il sillabario cipriota, le lettere
+# epicoriche (ϝοῖκος, ͷοῖκος) e i frammenti di testo che una citazione può trascinare («βάλλω (bállo, “to strike”)>»).
+LETTERE = {'la': set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZæœÆŒ'),
+           'grc': set('αβγδεζηθικλμνξοπρσςτυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ')}
+NON_LEMMA = re.compile(r'[()\[\]{}<>“”"=|]')
+
+
+def lemma_valido(lingua, lemma, ricostruito=False):
+    if ricostruito:                                      # le ricostruzioni hanno la loro notazione: *(s)ker-
+        return True
+    if NON_LEMMA.search(lemma or ''):
+        return False
+    lettere = LETTERE.get(base_lingua(lingua))
+    if lettere is None:
+        return True
+    corpo = lemma.strip('-')
+    basi = [c for c in unicodedata.normalize('NFD', corpo) if not unicodedata.combining(c)]
+    if not basi or basi[0] not in lettere or basi[-1] not in lettere or any(c not in lettere and c not in " -'’" for c in basi):
+        return False
+    if sum(c in lettere for c in basi) == 1 and corpo == lemma:
+        # una lettera sola è una parola solo con i suoi segni (ὁ, ὦ) o, in latino, minuscola (ā, ē, ō): A, α, Ϝ no
+        return len(unicodedata.normalize('NFD', corpo)) > 1 if base_lingua(lingua) == 'grc' else basi[0].islower()
+    return True
+
 
 def norm(t):
     t = t.lower()
@@ -356,7 +393,7 @@ class Importatore:
     # ---- lessemi ----
     def lessema(self, lingua, termine, glossa=None, translit=None, pos=None, omografo=1, ident=None):
         lingua = codice_lingua(lingua)
-        termine = nome_pagina(lingua, termine)
+        termine = nome_pagina(lingua, senza_modificatori(termine))
         ric = termine.startswith('*')
         if not ric and lingua in VARIETA_ATTESTATE:
             lingua = VARIETA_ATTESTATE[lingua]
@@ -732,6 +769,25 @@ class Importatore:
                 break
 
 
+    def togli_non_validi(self):
+        """Le voci che non sono parole (lemma_valido) escono, con gli archi che le toccano; un'ipotesi che resta senza
+        archi esce anch'essa: meglio nessuna etimologia che una catena attraverso un frammento di testo."""
+        via = {k for k, l in self.lessemi.items() if not lemma_valido(l['lingua'], l['lemma'], l['ricostruito'])}
+        for k in via:
+            del self.lessemi[k]
+        prima = Counter(r['ipotesi'] for r in self.relazioni)
+        self.relazioni = [r for r in self.relazioni if r['etimo'] not in via and r['esito'] not in via]
+        dopo = Counter(r['ipotesi'] for r in self.relazioni)
+        tolte = {h['chiave'] for h in self.ipotesi.values()
+                 if h['esito'] in via or (prima[h['chiave']] and not dopo[h['chiave']])}
+        self.ipotesi = {k: h for k, h in self.ipotesi.items() if h['chiave'] not in tolte}
+        self.relazioni = [r for r in self.relazioni if r['ipotesi'] not in tolte]
+        self.radici = {x for x in self.radici if x[0] not in via and x[1] not in via}
+        self.doppioni = {x for x in self.doppioni if x[0] not in via and x[1] not in via}
+        self.attestazioni = {k: v for k, v in self.attestazioni.items() if k not in via}
+        self.stat['voci_non_valide'] = len(via)
+        self.stat['ipotesi_tolte_non_valide'] = len(tolte)
+
     def aggiungi_lemmi_interi(self):
         """Nelle lingue intere entrano anche i lemmi senza etimologia, con glossa e parte del discorso: la lingua è
         completa, non solo le sue famiglie. Le forme ricostruite (sesta colonna di glosse.tsv) restano fuori."""
@@ -1014,5 +1070,6 @@ if __name__ == '__main__':
     imp.chiudi_su_radici()
     imp.togli_cicli()
     imp.aggiungi_lemmi_interi()
+    imp.togli_non_validi()
     st = imp.scrivi(args[1])
     print(json.dumps(dict(st), indent=1))

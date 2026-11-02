@@ -6,6 +6,12 @@ Tutto il progetto è in italiano: identificatori, commenti, messaggi di commit, 
 
 Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi, deploy) e `import/LEGGIMI.md` (parser e import da Wiktionary). Leggili prima di toccare le parti che descrivono.
 
+## Come si lavora: economia e rigore
+
+- **Economia.** Ogni sessione costa: prima un piano breve, poi i passi, con una sola verifica per passo. Niente esplorazioni ripetute, niente file riletti senza motivo, niente attese a colpi di controlli (una sola attesa in background che avvisa alla fine). Gli strumenti che servono più di una volta stanno nel repository (`import/filtra_pacchetto.py`, il registro delle traduzioni tentate), non si riscrivono.
+- **Rigore scientifico prima della quantità.** Una voce è una parola della sua lingua. Per latino e greco solo lemmi nel loro alfabeto (`lemma_valido()` in `import/wiktionary.py`): niente lettere isolate, simboli, abbreviazioni, sillabario cipriota, lettere epicoriche, frammenti di testo. Dopo ogni import si guarda un campione dei dati nuovi prima di pubblicare.
+- **Gli indici seguono l’alfabeto:** 23 lettere per il latino (J sotto I, U sotto V), 24 per il greco (`parole_lingua()`).
+
 ## Prima di tutto: sicurezza dei dati
 
 - **`.env.local` punta al database di produzione.** `npm run build` esegue prima `scripts/inizializza-db.mjs`, che scrive nel database: per prove in locale passa sempre `DATABASE_URL` e `DATABASE_URL_UNPOOLED` espliciti verso un Postgres locale.
@@ -18,7 +24,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 - `npm run dev`: sviluppo (con un `DATABASE_URL` locale).
 - `npx tsc --noEmit`: controllo dei tipi.
-- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, gli 84 del seme (`db/04_test.sql`) e i 69 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
+- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, gli 85 del seme (`db/04_test.sql`) e i 70 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
 - `node scripts/applica-sql.mjs file.sql`: applica un file SQL in una transazione.
 - `node scripts/esporta-redazione.mjs cartella`: copia del lavoro della redazione in JSON; ogni notte la fa `.github/workflows/copia-redazione.yml` nel ramo `copia-redazione`.
 - Import completo da Wiktionary: `import/importa.sh` (scarica i dump di Kaikki; latino e greco entrano interi, `INTERE=la,grc`, con i lemmi del Lewis & Short e dell’LSJ che Wiktionary non ha, dal Perseus: `DIZIONARI=1`); collaudo del parser: `import/collauda.sh`. Vedi `import/LEGGIMI.md`.
