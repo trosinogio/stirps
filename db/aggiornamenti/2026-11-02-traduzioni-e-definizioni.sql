@@ -72,6 +72,8 @@ begin
               from stg_definizione d join lessema l on l.id_esterno = d.chiave
              where coalesce(l.glossa_lingua, '') <> 'it' and btrim(coalesce(d.traduzione, '')) <> ''
                and coalesce(d.originale, '') = coalesce(l.glossa, '') and l.stato_editoriale <> 'superato'
+               -- per una parola italiana una «traduzione» uguale al lemma non dice nulla (limnofilo → «limnofilo»)
+               and not (l.lingua = 'it' and norm(btrim(d.traduzione)) = norm(l.lemma))
             union all
             select l.id, btrim(t.testo), 'traduzione-automatica', 2
               from stg_glossa_tradotta t join lessema l on l.id_esterno = t.chiave

@@ -546,6 +546,8 @@ begin
               from stg_definizione d join lessema l on l.id_esterno = d.chiave
              where coalesce(l.glossa_lingua, '') <> 'it' and btrim(coalesce(d.traduzione, '')) <> ''
                and coalesce(d.originale, '') = coalesce(l.glossa, '') and l.stato_editoriale <> 'superato'
+               -- per una parola italiana una «traduzione» uguale al lemma non dice nulla (limnofilo → «limnofilo»)
+               and not (l.lingua = 'it' and norm(btrim(d.traduzione)) = norm(l.lemma))
             union all
             select l.id, btrim(t.testo), 'traduzione-automatica', 2
               from stg_glossa_tradotta t join lessema l on l.id_esterno = t.chiave
@@ -702,16 +704,23 @@ begin
   get diagnostics n = row_count;
   r := r || jsonb_build_object('autori', n);
 
+  -- il bersaglio: la voce del dizionario stessa, o l'unica voce della lingua per un lemma che ha una sola stima.
+  -- Con join e tabelle piccole precalcolate: una sottoquery correlata per riga costava dieci minuti
+  create temp table st_unica on commit drop as
+    select l.lingua, l.lemma, min(l.id) as id
+      from lessema l
+      join (select lingua, lemma from stg_stima group by 1, 2 having count(*) = 1) p
+        on p.lingua = l.lingua and p.lemma = l.lemma
+     where not l.ricostruito
+     group by 1, 2 having count(*) = 1;
+  create index on st_unica (lingua, lemma);
+  analyze st_unica;
   create temp table st_nuove on commit drop as
-  with per_lemma as (select lingua, lemma, count(*) as n from stg_stima group by 1, 2),
-       bersaglio as (
-    select s.*, coalesce(
-             (select l.id from lessema l where l.id_esterno = s.chiave),
-             (select min(l.id) from lessema l, per_lemma p
-               where p.lingua = s.lingua and p.lemma = s.lemma and p.n = 1
-                 and l.lingua = s.lingua and l.lemma = s.lemma and not l.ricostruito
-              having count(*) = 1)) as lessema_id
-      from stg_stima s)
+  with bersaglio as (
+    select s.*, coalesce(d.id, u.id) as lessema_id
+      from stg_stima s
+      left join lessema d on d.id_esterno = s.chiave
+      left join st_unica u on u.lingua = s.lingua and u.lemma = s.lemma)
   select lessema_id, 'stima:' || chiave as id_esterno, autore, anno, precisione::precisione_data as precisione, fonte,
          'https://scaife.perseus.org/library/urn:cts:' || case when lingua = 'la' then 'latinLit' else 'greekLit' end
            || ':' || opera || '/' as url,

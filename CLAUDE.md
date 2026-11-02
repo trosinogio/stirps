@@ -25,7 +25,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 - `npm run dev`: sviluppo (con un `DATABASE_URL` locale).
 - `npx tsc --noEmit`: controllo dei tipi.
-- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, gli 89 del seme (`db/04_test.sql`) e gli 86 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
+- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, gli 89 del seme (`db/04_test.sql`) e gli 87 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
 - `node scripts/applica-sql.mjs file.sql`: applica un file SQL in una transazione.
 - `node scripts/esporta-redazione.mjs cartella`: copia del lavoro della redazione in JSON; ogni notte la fa `.github/workflows/copia-redazione.yml` nel ramo `copia-redazione`.
 - Import completo da Wiktionary: `import/importa.sh` (scarica i dump di Kaikki; latino e greco entrano interi, `INTERE=la,grc`, con i lemmi del Lewis & Short e dell’LSJ che Wiktionary non ha, dal Perseus: `DIZIONARI=1`); collaudo del parser: `import/collauda.sh`. Vedi `import/LEGGIMI.md`.
@@ -84,6 +84,7 @@ Come cambia il database:
 - **Wiktionary scrive l’incertezza nel testo** («possibly», «uncertain»): il parser la legge senza le glosse tra virgolette, perché «obscure» in una glossa non è un dubbio.
 - **Il Postgres locale della sandbox si ferma spesso:** se una query dice «connection refused», riavvialo.
 - **Lo spazio su Neon (0,5 GB nel piano gratuito):** l’import scrive solo ciò che cambia, perché ogni riga riscritta lascia una copia morta fino al vacuum; un test controlla lo `xmin` delle righe. Prima di un import grande misura in locale (`[db] spazio occupato` nel registro della build).
+- **Una sottoquery correlata per riga su un import grande** (`importa_stime()`, 108 mila stime) costava dieci minuti: join con tabelle temporanee piccole e indicizzate, e `analyze`. I secondi di ogni passo sono nel registro della build.
 - **Un confronto per forma normalizzata su molte righe** (`lemma_norm = norm(x)`) usa l’indice a trigrammi una riga alla volta e diventa lentissimo: confronta con un insieme piccolo e precalcolato (vedi `importa_dizionari()`).
 
 ## Lavoro editoriale

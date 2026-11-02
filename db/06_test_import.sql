@@ -358,7 +358,8 @@ select l.id_esterno, coalesce(l.glossa, ''), v.t, v.d, 'claude-opus-5-5'
   from lessema l
   join (values ('la/mobilis', 'mobile, movibile', 'Che si può muovere o spostare; in senso figurato, mutevole.'),
                ('la/caro', 'carne', 'La carne, come sostanza del corpo e come cibo.'),
-               ('it/pausare', 'sostare', 'Fare una pausa, interrompere per breve tempo un’attività.')) v(s, t, d) on l.slug = v.s;
+               ('it/pausare', 'sostare', 'Fare una pausa, interrompere per breve tempo un’attività.'),
+               ('it/centavo', 'centavo', 'Moneta divisionale di vari paesi dell’America Latina.')) v(s, t, d) on l.slug = v.s;
 insert into stg_definizione
 select id_esterno, 'una glossa che non c''è più', 'caro', 'Definizione nata da un''altra glossa.', 'claude-opus-5-5'
   from lessema where slug = 'la/carus';
@@ -372,6 +373,9 @@ select pg_temp.verifica((select testo || '|' || provenienza from glossa where le
   'Claude non scavalca la glossa del Wikizionario, ma la definizione entra');
 select pg_temp.verifica((select testo || '|' || provenienza from glossa where lessema_id = lx('it/pausare') and lingua = 'it') = 'fare una pausa|wikidata',
   'per una parola italiana la definizione breve di Wikidata viene prima della traduzione di Claude');
+select pg_temp.verifica(not exists (select 1 from glossa where lessema_id = lx('it/centavo') and provenienza = 'claude')
+                        and exists (select 1 from definizione where lessema_id = lx('it/centavo')),
+  'per una parola italiana una «traduzione» uguale al lemma non diventa glossa; la definizione sì');
 select pg_temp.verifica(not exists (select 1 from definizione where lessema_id = lx('la/carus'))
                         and not exists (select 1 from glossa where lessema_id = lx('la/carus') and provenienza = 'claude'),
   'una definizione nata da un''altra glossa non entra: aspetta quella nuova');

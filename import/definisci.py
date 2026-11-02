@@ -213,6 +213,8 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
             tr, de = pulisci(x['traduzione'])[:150], pulisci(x['definizione'])[:1500]
             if v.get('glossa_it'):
                 tr = ''                                        # c'è già una glossa italiana di rango più alto
+            if v['lingua'] == 'italiano' and tr.lower() == v['lemma'].lower():
+                tr = ''                                        # per una parola italiana il lemma stesso non è una glossa
             esiti['ok' if de or tr else 'vuote'] += 1
             nuove[v['chiave']] = (v['originale'], tr, de, modello)
     if motivi:
