@@ -117,6 +117,11 @@ jobs:
           echo "::notice title=Voci per lingua (prima, dopo)::$(tr '\n' ';' < /tmp/confronto.txt)"
           ls -la dati/
 
+      - name: Controllo delle radici
+        run: |
+          python3 import/controlla_radici.py dati | tee /tmp/radici.txt
+          echo "::notice title=Radici::$(head -6 /tmp/radici.txt | tr '\n' ' ')"
+
       - name: Commit sul ramo
         run: |
           git config user.name "stirps-dati"

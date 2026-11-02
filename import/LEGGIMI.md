@@ -236,3 +236,20 @@ Quattro regole nuove del parser danno una catena a 3.425 parole italiane che ne 
 - **L'unica ipotesi è accolta, anche se incerta,** e conserva la sua certezza bassa (1 o 2). Il lettore vede l'etimologia con il suo dubbio, invece del vuoto; un'origine ignota diventa un'ipotesi accolta di origine ignota. Le storie del sito seguono solo i passaggi con certezza 3 o 4.
 
 Restano fuori le etimologie scritte solo nel testo, come *sega*: «From the verb segare», senza modello. Il filtro non conserva i modelli di menzione (`m`, `l`); è un lavoro per un import futuro.
+
+## Radici rigorose (novembre 2026)
+
+Il controllo `controlla_radici.py` confronta, per le 2.941 parole che dichiarano la loro radice in Wiktionary (`{{root}}`), la radice dichiarata con la cima della loro catena. Solo il 73% arrivava alla radice giusta, per tre errori del parser:
+- **anelli rovesciati.** Gli anelli intermedi incatenano in sequenza le forme citate in un'etimologia, e 211 radici avevano un falso etimo: *\*steh₂-* < *\*stnéh₂ti*, *\*dʰeh₁-* < *\*steh₂-*, *\*bʰoln-* < longobardo *\*palla*. La cima mostrata era sbagliata nel 14% dei casi;
+- **omografe mescolate.** Il nodo generico di radici omografe (*\*(s)ker-*) mescolava famiglie diverse: *carne* finiva sotto «girare»;
+- **ripiego a caso.** Il ripiego sulla radice dichiarata sceglieva a caso tra due radici (*audientia* sotto *\*dʰeh₁-* «porre»).
+
+Le regole (`arco_impossibile()`, `precisa_omografe()`, `chiudi_su_radici()`), con le loro prove in `collauda.sh`:
+- una radice (*\*meh₂-*) non ha etimi automatici;
+- un tema (*\*meh₂-tu-*) deriva solo da una radice della stessa lingua;
+- nessuna parola deriva da una lingua che discende dalla sua (`antenato_lingua()`, `discende_da()`; un prestito come *\*kaisaraz* < *Caesar* resta);
+- un arco verso il nodo generico passa alla radice precisa se tutte le parole sotto la dichiarano;
+- il ripiego collega solo con una maggioranza chiara.
+
+Dopo: 86% giuste, 0 radici sotto un loro derivato, 0,4% su un nodo generico. Il resto è soprattutto incompletezza: composti con due radici, catene che si fermano a una parola di una lingua che non leggiamo (inglese), voci latine con l'etimologia nel nuovo modello `{{ety}}`, che il filtro non legge ancora (21.527).
+

@@ -361,6 +361,65 @@ BASE = {'roa-oit': 'it', 'grc-koi': 'grc', 'grk-ita': 'grc'}
 # Le forme ricostruite del latino volgare restano a sé.
 VARIETA_ATTESTATE = {'la-lat': 'la', 'la-med': 'la', 'la-cla': 'la', 'la-new': 'la', 'la-ecc': 'la', 'la-eme': 'la',
                      'la-pre': 'la', 'la-ren': 'la', 'grc-koi': 'grc'}
+# Genealogia delle lingue indoeuropee, per i controlli di direzione: una parola non deriva da una lingua che discende
+# dalla sua (*bʰoln- < longobardo *palla, laudo < italiano lodare sono archi rovesciati). Per gruppo, l'antenato
+# immediato; le altre lingue usano l'antenato di CURATE, se c'è.
+ROMANZE = {'it', 'fr', 'es', 'pt', 'ro', 'ca', 'oc', 'fro', 'frm', 'pro', 'gl', 'an', 'ast', 'sc', 'scn', 'nap', 'vec',
+           'lmo', 'pms', 'lij', 'fur', 'rm', 'lld', 'co', 'egl', 'rgn', 'frp', 'dlm', 'ist', 'roa-opt', 'roa-oit', 'itk',
+           'osp', 'roa-ole', 'wa', 'nrf', 'mfe', 'ht'}
+GERMANICHE = {'en', 'ang', 'enm', 'sco', 'de', 'gmh', 'goh', 'gsw', 'lb', 'yi', 'nl', 'dum', 'odt', 'osx', 'nds', 'gml',
+              'fy', 'ofs', 'lng', 'frk', 'got', 'non', 'is', 'fo', 'sv', 'da', 'no', 'nb', 'nn', 'gmw-pro', 'gmq-pro', 'gme-pro'}
+CELTICHE = {'ga', 'sga', 'mga', 'gd', 'gv', 'cy', 'wlm', 'owl', 'br', 'xbm', 'obt', 'kw', 'xtg', 'xcg', 'xce', 'cel-bry-pro'}
+SLAVE = {'ru', 'orv', 'uk', 'be', 'pl', 'cs', 'sk', 'sl', 'hr', 'sr', 'sh', 'bg', 'mk', 'cu', 'dsb', 'hsb', 'zlw-pro'}
+INDOIRANICHE = {'sa', 'pi', 'pra', 'hi', 'ur', 'bn', 'inc-pro', 'fa', 'pal', 'peo', 'ae', 'xpr', 'ku', 'ps', 'os', 'ira-pro'}
+FIGLIE_PIE = {'itc-pro', 'gem-pro', 'grk-pro', 'cel-pro', 'sla-pro', 'bsl-pro', 'bat-pro', 'iir-pro', 'ine-bsl-pro',
+              'hyx-pro', 'alb-pro', 'ine-ana-pro', 'ine-toc-pro', 'hy', 'xcl', 'sq', 'hit', 'txb', 'xto', 'lt', 'lv', 'prg'}
+
+
+def antenato_lingua(c):
+    c = base_lingua(c)
+    if c in ROMANZE:
+        return 'la'
+    if c in ('la', 'osc', 'xum', 'xfa', 'itc-ola'):
+        return 'itc-pro'
+    if c in ('el', 'gkm'):
+        return 'grc'
+    if c == 'grc':
+        return 'grk-pro'
+    if c in GERMANICHE:
+        return 'gem-pro'
+    if c in CELTICHE:
+        return 'cel-pro'
+    if c in SLAVE:
+        return 'sla-pro'
+    if c in INDOIRANICHE:
+        return 'iir-pro'
+    if c in FIGLIE_PIE:
+        return 'ine-pro'
+    cur = CURATE.get(c)
+    return cur[6] if cur and cur[6] != c else None
+
+
+def forma_ricostruita(l):
+    """«radice» per una radice ricostruita (*meh₂-, *(s)ker-), «tema» per un tema con un trattino interno (*meh₂-tu-,
+    *wréǵ-ye-), None per il resto. Una radice è la cima della sua famiglia; un tema deriva dalla sua radice."""
+    if not l.get('ricostruito') or not l['lemma'].endswith('-'):
+        return None
+    return 'tema' if '-' in l['lemma'].strip('-') else 'radice'
+
+
+def discende_da(a, b):
+    """La lingua a discende (strettamente) dalla lingua b."""
+    b, visti = base_lingua(b), set()
+    a = antenato_lingua(a)
+    while a and a not in visti:
+        if a == b:
+            return True
+        visti.add(a)
+        a = antenato_lingua(a)
+    return False
+
+
 def base_lingua(c):
     if c in BASE:
         return BASE[c]
@@ -854,9 +913,30 @@ class Importatore:
         return [(p, l) for p, l in parti if p]
 
     # ---- etimi intermedi: vince la spiegazione più frequente ----
+    def arco_impossibile(self, etimo, esito):
+        """Il motivo per cui un arco etimo → esito non può stare, o None. Una radice ricostruita è la cima della sua
+        famiglia: non ha etimi automatici (*steh₂- < *stnéh₂ti mette la radice sotto un suo derivato). Una parola non
+        deriva da una lingua che discende dalla sua (*bʰoln- < longobardo *palla)."""
+        le, lx = self.lessemi.get(etimo), self.lessemi.get(esito)
+        if not le or not lx:
+            return None
+        if forma_ricostruita(lx) == 'radice':
+            return 'radice_con_un_etimo'
+        if forma_ricostruita(lx) == 'tema' and (forma_ricostruita(le) != 'radice' or base_lingua(le['lingua']) != base_lingua(lx['lingua'])):
+            return 'tema_da_una_non_radice'      # *meh₂-tu- viene da *meh₂-, non da una parola o da un altro tema
+        if discende_da(le['lingua'], lx['lingua']):
+            return 'etimo_in_una_lingua_figlia'
+        return None
+
     def risolvi_intermedi(self):
         for esito, conta in self.intermedi.items():
             if esito in self.ipotesi:     # la voce ha già una sua etimologia
+                continue
+            # gli anelli impossibili non si offrono nemmeno come alternative
+            for c in [c for c in conta if self.arco_impossibile(c[0], esito)]:
+                self.stat[f'intermedi_scartati_{self.arco_impossibile(c[0], esito)}'] += 1
+                del conta[c]
+            if not conta:
                 continue
             # tra due candidati vince il più vicino: se *rēks discende da *h₃rḗǵs, per rēx l'etimo è *rēks
             # anche quando più voci saltano il passaggio intermedio
@@ -874,6 +954,64 @@ class Importatore:
                                        'ordine': 1, 'affisso': None, 'conf': conf, 'forma': forma})
             if len(conta) > 1:
                 self.stat['intermedi_con_alternative'] += 1
+
+    # ---- radici omografe: dal nodo generico alla radice precisa ----
+    def precisa_omografe(self):
+        """carne < caro < *karō < *(s)ker-: Wiktionary cita la radice senza dire quale delle omografe (*(s)ker-
+        «tagliare», «girare»), e il nodo generico mescola famiglie diverse. Se le parole sotto un arco verso il nodo
+        generico dichiarano tutte la stessa omografa ({{root}}: *(s)ker-@cut), l'arco passa a quella; se ne dichiarano
+        di diverse, resta com'è."""
+        varianti = defaultdict(set)
+        for k in self.lessemi:
+            if '@' in k:
+                varianti[k.split('@', 1)[0]].add(k)
+        if not varianti:
+            return
+        accolte = {h['esito']: h['chiave'] for h in self.ipotesi.values() if h['stato'] == 'accolta'}
+        primo = {}
+        for r in self.relazioni:
+            if r['ordine'] == 1 and accolte.get(r['esito']) == r['ipotesi']:
+                primo.setdefault(r['esito'], r)
+        voti, archi = defaultdict(Counter), {}
+        for parola, radice in self.radici:
+            generica = radice.split('@', 1)[0]
+            if radice not in varianti.get(generica, ()):
+                continue
+            k, visti = parola, {parola}
+            while k in primo:
+                r = primo[k]
+                if r['etimo'] == generica:
+                    voti[id(r)][radice] += 1
+                    archi[id(r)] = r
+                    break
+                if r['etimo'] in visti:
+                    break
+                k = r['etimo']
+                visti.add(k)
+        for rid, conta in voti.items():
+            if len(conta) == 1:
+                archi[rid]['etimo'] = next(iter(conta))
+                self.stat['omografe_precisate'] += 1
+            else:
+                self.stat['omografe_ambigue'] += 1
+
+    def togli_archi_impossibili(self):
+        """Ultimo controllo su tutti gli archi (arco_impossibile): quelli che non possono stare escono, e con loro le
+        ipotesi rimaste senza archi; un'alternativa, se c'è, viene promossa alla scrittura."""
+        via = set()
+        for r in self.relazioni:
+            motivo = self.arco_impossibile(r['etimo'], r['esito'])
+            if motivo:
+                via.add(id(r))
+                self.stat[f'archi_tolti_{motivo}'] += 1
+        if not via:
+            return
+        prima = Counter(r['ipotesi'] for r in self.relazioni)
+        self.relazioni = [r for r in self.relazioni if id(r) not in via]
+        dopo = Counter(r['ipotesi'] for r in self.relazioni)
+        tolte = {h['chiave'] for h in self.ipotesi.values() if prima[h['chiave']] and not dopo[h['chiave']]}
+        self.ipotesi = {k: h for k, h in self.ipotesi.items() if h['chiave'] not in tolte}
+        self.stat['ipotesi_tolte_archi_impossibili'] += len(tolte)
 
     # ---- radici dichiarate: la catena si chiude in cima con un legame indeterminato ----
     def chiudi_su_radici(self):
@@ -897,12 +1035,17 @@ class Importatore:
                 continue
             if cima in accolte or any(h['esito'] == cima for h in self.ipotesi.values() if h['stato'] == 'accolta'):
                 continue
-            if self.lessemi[cima]['lemma'].endswith('-'):
+            if forma_ricostruita(self.lessemi[cima]) == 'radice':
                 self.stat['radici_dichiarate_in_conflitto'] += 1   # una radice non discende da un'altra radice
                 continue
             voti[cima][radice] += 1
         for cima, conta in voti.items():
-            radice = conta.most_common(1)[0][0]
+            # una maggioranza chiara, o niente: audience dichiara *h₂ew- e *dʰeh₁- (audiō = «mettere nell'orecchio»),
+            # e scegliere a caso tra le due ha dato ad audientia la radice di «porre»
+            (radice, n1), *resto = conta.most_common()
+            if resto and n1 < 2 * resto[0][1]:
+                self.stat['radici_dichiarate_senza_maggioranza'] += 1
+                continue
             kh = cima + '#wikt-radice'
             self.ipotesi[kh] = {'chiave': kh, 'esito': cima, 'etichetta': 'Wiktionary (radice dichiarata)', 'stato': 'accolta',
                                 'confidenza': 2, 'origine': 'etimo', 'nota': None}
@@ -1079,9 +1222,11 @@ if __name__ == '__main__':
         if p[1]:
             completa_glosse(imp, p[1], lingua)
     imp.risolvi_intermedi()
+    imp.precisa_omografe()
     imp.chiudi_su_radici()
     imp.togli_cicli()
     imp.aggiungi_lemmi_interi()
+    imp.togli_archi_impossibili()
     imp.togli_non_validi()
     st = imp.scrivi(args[1])
     print(json.dumps(dict(st), indent=1))

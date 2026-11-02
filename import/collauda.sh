@@ -28,6 +28,49 @@ from filtra import lemma_della_forma as lf
 assert lf(s('second-person plural present passive indicative/imperative of contemperō')) == ('contemperō', ['second-person', 'plural', 'present', 'passive', 'indicative', 'imperative'])
 assert lf({'senses': [{'glosses': ['g'], 'form_of': [{'word': 'nox'}], 'tags': ['genitive']}]}) == ('nox', ['genitive'])
 assert lf(s('genitive singular uncontracted of ζεῦγος (zeûgos)'))[0] == 'ζεῦγος'
+# le catene non si rovesciano: una radice non ha etimi automatici, una parola non deriva da una lingua figlia
+from wiktionary import Importatore
+def arco(imp, esito, etimo, h=None):
+    h = h or esito + '#wikt'
+    imp.ipotesi[h] = {'chiave': h, 'esito': esito, 'etichetta': 'Wiktionary', 'stato': 'accolta', 'confidenza': 3, 'origine': 'etimo', 'nota': None}
+    imp.relazioni.append({'chiave': h + '#0', 'ipotesi': h, 'etimo': etimo, 'esito': esito, 'tipo': 'generico', 'ordine': 1, 'affisso': None, 'conf': 3, 'forma': None})
+ha = lambda imp, k: any(h['esito'] == k for h in imp.ipotesi.values())
+imp = Importatore()
+steh, stn = imp.lessema('ine-pro', '*steh₂-'), imp.lessema('ine-pro', '*stnéh₂ti')
+kais, caes = imp.lessema('gem-pro', '*kaisaraz'), imp.lessema('la', 'Caesar')
+imp.intermedi[steh][(stn, 'generico', 3, None)] += 1
+imp.intermedi[kais][(caes, 'prestito', 3, None)] += 1
+imp.risolvi_intermedi()
+assert not ha(imp, steh), '*steh₂- non deriva dal suo derivato *stnéh₂ti'
+tema, meh = imp.lessema('ine-pro', '*meh₂-tu-'), imp.lessema('ine-pro', '*meh₂-')
+arco(imp, tema, meh)
+imp.togli_archi_impossibili()
+assert ha(imp, tema), 'un tema (*meh₂-tu-) deriva dalla sua radice (*meh₂-)'
+assert ha(imp, kais), '*kaisaraz < Caesar resta: un prestito dal latino al germanico è possibile'
+boln, palla = imp.lessema('ine-pro', '*bʰolnós'), imp.lessema('lng', '*palla')
+laudo, lodare = imp.lessema('la', 'laudo'), imp.lessema('it', 'lodare')
+arco(imp, boln, palla); arco(imp, laudo, lodare)
+imp.togli_archi_impossibili()
+assert not ha(imp, boln) and not ha(imp, laudo), 'nessuna parola deriva da una lingua figlia della sua'
+# carne: dal nodo generico *(s)ker- alla radice dichiarata *(s)ker-@cut, se tutte le parole sotto concordano
+imp = Importatore()
+carne, caro, karo = imp.lessema('it', 'carne'), imp.lessema('la', 'caro'), imp.lessema('itc-pro', '*karō')
+gen, cut, turn = imp.lessema('ine-pro', '*(s)ker-'), imp.lessema('ine-pro', '*(s)ker-', ident='cut'), imp.lessema('ine-pro', '*(s)ker-', ident='turn')
+corte, cors = imp.lessema('it', 'cortina'), imp.lessema('itc-pro', '*korts')
+arco(imp, carne, caro); arco(imp, caro, karo); arco(imp, karo, gen); arco(imp, corte, cors); arco(imp, cors, gen)
+imp.radici = {(carne, cut), (corte, turn), (corte, cut)}
+imp.precisa_omografe()
+etimo = {r['esito']: r['etimo'] for r in imp.relazioni}
+assert etimo[karo] == cut, '*karō punta a *(s)ker- «tagliare»'
+assert etimo[cors] == gen, 'con dichiarazioni discordi l\'arco resta sul nodo generico'
+# audientia: il ripiego sulla radice dichiarata non sceglie a caso tra due radici
+imp = Importatore()
+aud, audience = imp.lessema('la', 'audientia'), imp.lessema('it', 'audience')
+h2ew, dheh1 = imp.lessema('ine-pro', '*h₂ew-', ident='perceive'), imp.lessema('ine-pro', '*dʰeh₁-')
+arco(imp, audience, aud)
+imp.radici = {(audience, h2ew), (audience, dheh1)}
+imp.chiudi_su_radici()
+assert not ha(imp, aud), 'due radici dichiarate alla pari: nessun legame'
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \

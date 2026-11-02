@@ -21,9 +21,10 @@ select pg_temp.verifica(pg_temp.antenati_slug('it/carne') @> array['la/caro', 'i
   'carne < caro < *karō: la catena si legge dal testo');
 select pg_temp.verifica((select forma_citata from relazione where esito_id = lx('it/carne') and etimo_id = lx('la/caro')) = 'carnem',
   'la forma citata conserva la grafia di Wiktionary (carnem)');
-select pg_temp.verifica(pg_temp.antenati_slug('it/carne') @> array['ine-pro/sker'],
-  'la radice dichiarata (*(s)ker-) chiude la catena in cima');
-select pg_temp.verifica((select tipo from relazione where esito_id = lx('itc-pro/karo') and etimo_id = lx('ine-pro/sker')) in ('derivazione', 'generico'),
+select pg_temp.verifica(pg_temp.antenati_slug('it/carne') @> array[(select slug from lessema where id_esterno = 'enwikt:ine-pro:*(s)ker-@cut')],
+  'la catena arriva alla radice dichiarata, *(s)ker- «tagliare», non al nodo generico delle omografe');
+select pg_temp.verifica((select tipo from relazione where esito_id = lx('itc-pro/karo')
+                                and etimo_id = (select id from lessema where id_esterno = 'enwikt:ine-pro:*(s)ker-@cut')) in ('derivazione', 'generico'),
   'dalla radice si arriva per formazione o per legame indeterminato, mai per eredità: niente falsi allotropi');
 select pg_temp.verifica(pg_temp.antenati_slug('it/abate') @> array['la/abbas', 'arc/abba']
                         and pg_temp.antenati_slug('it/abate') && array['grc/abba', 'grc/abbas'],
