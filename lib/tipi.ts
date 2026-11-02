@@ -38,6 +38,8 @@ export interface Attestazione {
   forma_attestata?: string | null; testo: string; rif?: string | null; tipo: string; banca_dati?: string | null; url?: string | null;
   anno_da: number; anno_a?: number | null; precisione: string; citazione?: string | null; nota?: string | null; rimandi: Rimando[];
   provenienza?: string;
+  // stima: terminus ante quem trovato in automatico, da verificare («attestato almeno dal …»)
+  stima?: boolean; confidenza?: number | null;
 }
 export interface Strato { codice: string; nome: string; licenza: string; share_alike: boolean; attribuzione?: string | null }
 export interface Lessema extends Nodo {
