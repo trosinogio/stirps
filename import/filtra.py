@@ -1,5 +1,6 @@
 # Filtra il dump di Kaikki: lemmi con etimologia (JSONL) e glosse di tutti i lemmi (TSV).
 import json, os, re, sys
+from collections import Counter
 LINGUA = os.environ.get('LINGUA', 'it')
 UTILI = {'inh', 'inh+', 'bor', 'bor+', 'lbor', 'slbor', 'ubor', 'obor', 'der', 'der+', 'uder', 'cal', 'calque', 'sl', 'psm',
          'bf', 'back-form', 'clipping', 'ellipsis', 'af', 'affix', 'suffix', 'prefix', 'confix', 'compound', 'blend',
@@ -81,6 +82,9 @@ if __name__ == '__main__':
     out = open(sys.argv[1], 'w', encoding='utf-8')
     glosse = open(sys.argv[2], 'w', encoding='utf-8')
     forme = open(os.environ['FORME'], 'w', encoding='utf-8') if os.environ.get('FORME') else None
+    # SENZA: per ogni lemma senza etimologia utile, la causa (diagnosi: perché zoo non ha una catena)
+    senza_f = open(os.environ['SENZA'], 'w', encoding='utf-8') if os.environ.get('SENZA') else None
+    cause, modelli_ignoti = Counter(), Counter()
     for riga in sys.stdin:
         n += 1
         try: v = json.loads(riga)
@@ -114,7 +118,16 @@ if __name__ == '__main__':
         if not tpl:
             tpl = menzione_come_der(v)
             promosse += bool(tpl)
-        if not tpl: senza += 1; continue
+        if not tpl:
+            senza += 1
+            nomi = sorted({t.get('name') or '' for t in (v.get('etymology_templates') or [])} - {''})
+            causa = 'modelli non letti' if nomi else 'solo testo' if (v.get('etymology_text') or '').strip() else 'nessuna etimologia'
+            cause[causa] += 1
+            modelli_ignoti.update(nomi)
+            if senza_f:
+                senza_f.write(f"{v['word']}\t{v.get('pos') or ''}\t{causa}\t{','.join(nomi)}\t"
+                              f"{(v.get('etymology_text') or '').replace(chr(9), ' ').replace(chr(10), ' ')[:200]}\n")
+            continue
         heads = [{'n': h.get('name'), 'a': h.get('args', {})} for h in (v.get('head_templates') or [])[:1]]
         testa = ((v.get('head_templates') or [{}])[0].get('expansion') or '')
         canonica = next((f['form'] for f in (v.get('forms') or []) if 'canonical' in (f.get('tags') or [])), None) or testa.split(' (')[0].split(' ')[0] or None
@@ -125,3 +138,6 @@ if __name__ == '__main__':
     print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}', file=sys.stderr)
+    if senza:
+        print(f'  senza etimologia utile, per causa: {dict(cause)}; modelli non letti più frequenti: '
+              f'{modelli_ignoti.most_common(25)}', file=sys.stderr)

@@ -29,7 +29,7 @@ scarica() {   # scarica <nome inglese della lingua> : stampa il dump di Kaikki
 }
 
 echo "1/4  scarico e filtro il dump di Kaikki ($NOME)"
-scarica "$NOME" | python3 filtra.py "$DATI/lemmi.jsonl" "$DATI/glosse.tsv"
+scarica "$NOME" | SENZA="$DATI/senza_etimologia.tsv" python3 filtra.py "$DATI/lemmi.jsonl" "$DATI/glosse.tsv"
 ARGOMENTI=()
 for voce in $(printf '%s' "$CHIUSURA" | sed 's/ \([a-z][a-z-]*:\)/\n\1/g' | tr ' ' '~'); do
   codice=${voce%%:*}; nome=$(printf '%s' "${voce#*:}" | tr '~' ' ')
