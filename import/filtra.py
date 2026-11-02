@@ -85,6 +85,9 @@ if __name__ == '__main__':
     # SENZA: per ogni lemma senza etimologia utile, la causa (diagnosi: perché zoo non ha una catena)
     senza_f = open(os.environ['SENZA'], 'w', encoding='utf-8') if os.environ.get('SENZA') else None
     cause, modelli_ignoti = Counter(), Counter()
+    # DIAGNOSI_MODELLI=ety,etymon: alcuni esempi grezzi di quei modelli nel registro, per imparare a leggerli
+    diagnosi = set(filter(None, os.environ.get('DIAGNOSI_MODELLI', '').split(',')))
+    esempi_diagnosi = Counter()
     for riga in sys.stdin:
         n += 1
         try: v = json.loads(riga)
@@ -92,6 +95,11 @@ if __name__ == '__main__':
         if v.get('lang_code') != LINGUA: continue
         tpl = v.get('etymology_templates') or []
         sensi = v.get('senses') or []
+        for t in tpl:
+            if t.get('name') in diagnosi and esempi_diagnosi[t['name']] < 10:
+                esempi_diagnosi[t['name']] += 1
+                print('  esempio ' + json.dumps({'parola': v.get('word'), 'modello': t, 'testo': (v.get('etymology_text') or '')[:300],
+                                                  'altri': [x.get('name') for x in tpl]}, ensure_ascii=False), file=sys.stderr)
         if forma_flessa(v):
             flesse += 1
             flesse_dalla_glossa += not marcata(v)
