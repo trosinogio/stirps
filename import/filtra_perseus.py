@@ -16,7 +16,7 @@ Solo libreria standard.
 """
 import re, sys, unicodedata, xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
-from wiktionary import nome_pagina, translit_grc, base_lingua   # gli stessi titoli e la stessa traslitterazione
+from wiktionary import nome_pagina, translit_grc, base_lingua, lemma_valido   # stessi titoli, traslitterazione, regole
 
 # ---- Beta Code (TLG) → Unicode ----
 LETTERE = dict(zip('abgdezhqiklmncoprstufxywv', 'αβγδεζηθικλμνξοπρστυφχψωϝ'))
@@ -41,7 +41,7 @@ def da_beta(b):
         if basso in LETTERE:
             lettera = LETTERE[basso]
             if basso == 's' and i + 1 < n and b[i + 1] in '123':
-                lettera, i = {'1': 'σ', '2': 'ς', '3': 'ϲ'}[b[i + 1]], i + 1
+                lettera, i = 'σ', i + 1             # s1, s2, s3 (lunato): il sigma finale lo decide la posizione
             if maiuscola:
                 lettera, maiuscola = lettera.upper(), False
             lettere.append([lettera, pendenti])
@@ -196,6 +196,10 @@ def leggi(percorso, voci, conta):
                 continue
             glossa, pos = glossa_ls(el), pos_ls(el, lemma)
         lemma = nome_pagina(lingua, unicodedata.normalize('NFC', lemma))
+        if not lemma_valido(lingua, lemma):             # lettere (A, α), lettere epicoriche (ϝ), abbreviazioni
+            conta[f'non_valide_{lingua}'] += 1
+            el.clear()
+            continue
         voci.append([f"perseus:{'lsj' if lsj else 'ls'}:{ident}", lingua, lemma, pos, glossa])
         el.clear()
 

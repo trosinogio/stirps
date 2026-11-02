@@ -62,12 +62,13 @@ jobs:
           python3 - <<'PY'
           import gzip
           wz = {tuple(r.split('\t')[:2]) for r in gzip.open('../dati/glosse_it.tsv.gz', 'rt', encoding='utf-8')}
-          gia = {r.split('\t')[0] for r in gzip.open('../dati/glosse_tradotte.tsv.gz', 'rt', encoding='utf-8')}
+          # già tentate: la stessa voce con la stessa glossa inglese, confermata o scartata (terza colonna vuota)
+          gia = {tuple(r.rstrip('\n').split('\t')[:2]) for r in gzip.open('../dati/glosse_tradotte.tsv.gz', 'rt', encoding='utf-8')}
           n = 0
           with open('chiavi.txt', 'w', encoding='utf-8') as out:
               for r in open('voci.tsv', encoding='utf-8'):
                   c = r.rstrip('\n').split('\t')
-                  if len(c) < 8 or c[1] == 'it' or c[7] in ('', '\\N') or c[0] in gia or (c[1], c[2]) in wz:
+                  if len(c) < 8 or c[1] == 'it' or c[7] in ('', '\\N') or (c[0], c[7]) in gia or (c[1], c[2]) in wz:
                       continue
                   out.write(c[0] + '\n'); n += 1
           print(f'voci da tradurre: {n}')
@@ -95,7 +96,7 @@ jobs:
           print(f'glosse tradotte: {prima} di prima, {len(righe) - prima} nuove')
           PY
           gzip -9 -n -c glosse_tradotte.tsv > ../dati/glosse_tradotte.tsv.gz
-          echo "::notice title=Glosse tradotte::$(zcat ../dati/glosse_tradotte.tsv.gz | wc -l) in tutto"
+          echo "::notice title=Glosse tradotte::$(zcat ../dati/glosse_tradotte.tsv.gz | awk -F'\t' '$3 != ""' | wc -l) confermate, $(zcat ../dati/glosse_tradotte.tsv.gz | wc -l) tentate"
 
       - name: Pacchetto dati
         run: |

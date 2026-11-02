@@ -291,6 +291,13 @@ svg.cresce{animation:cresce .95s cubic-bezier(.3,0,.2,1) both}
 .iniziali a{min-width:30px;text-align:center;padding:4px 6px;border:1px solid var(--filo);border-radius:4px;text-decoration:none;color:var(--ink-2)}
 .iniziali a[aria-current="page"]{border-color:var(--ink);color:var(--ink);font-weight:700}
 .iniziali.sotto{margin-top:6px;font-size:13px}
+.sezioni-indice{display:flex;gap:18px;margin:14px 0 0;font:15px var(--sans)}
+.sezioni-indice a{text-decoration:none;color:var(--ink-2);padding-bottom:3px;border-bottom:2px solid transparent}
+.sezioni-indice a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
+.pagine-indice{display:flex;flex-wrap:wrap;gap:4px 14px;margin:10px 0 0;font:13px var(--sans)}
+.pagine-indice a{color:var(--ink-2);text-decoration:none}
+.pagine-indice a[aria-current="page"]{color:var(--ink);font-weight:700}
+.sezioni-indice span{color:var(--ink-2);font-weight:400;font-size:13px}
 .iniziali.sotto a{min-width:34px;padding:2px 5px}
 .totali{font:14px var(--sans);color:var(--ink-2);margin:10px 0 0}
 .altre{margin:14px 0 0}

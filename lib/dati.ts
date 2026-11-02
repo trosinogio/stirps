@@ -1,7 +1,8 @@
+import { cache } from 'react';
 // Accesso ai dati: ogni pagina chiama una funzione SQL e riceve JSON pronto.
 import { query } from './db';
 import type { Lang } from './i18n';
-import type { ElencoRadici, Indice, LinguaGeo, Nodo, Opera, ParoleLingua, RisultatoRicerca, Scheda } from './tipi';
+import type { ElencoRadici, Indice, LinguaGeo, LinguaInfo, Nodo, Opera, ParoleLingua, RisultatoRicerca, Scheda } from './tipi';
 
 // ANTEPRIMA=1 mostra anche le bozze (il seme pilota è tutto in bozza)
 export const ANTEPRIMA = process.env.ANTEPRIMA === '1';
@@ -45,8 +46,8 @@ export async function elencoRadici(lang: Lang, dichiarate: boolean, pagina: numb
   return r[0].e;
 }
 
-export async function paroleLingua(codice: string, lang: Lang, iniziale: string | null): Promise<ParoleLingua> {
-  const r = await query<{ p: ParoleLingua }>('select parole_lingua($1, $2, $3, $4) as p', [codice, lang, ANTEPRIMA, iniziale]);
+export async function paroleLingua(codice: string, lang: Lang, iniziale: string | null, nomi = false, pagina = 1): Promise<ParoleLingua> {
+  const r = await query<{ p: ParoleLingua }>('select parole_lingua($1, $2, $3, $4, $5, $6) as p', [codice, lang, ANTEPRIMA, iniziale, nomi, pagina]);
   return r[0].p;
 }
 
@@ -54,6 +55,12 @@ export async function cerca(q: string, lang: Lang): Promise<RisultatoRicerca[]> 
   return query<RisultatoRicerca>(
     'select slug, punteggio, per_significato, voce from cerca_universale($1, $2, 12, $3)', [q, lang, ANTEPRIMA]);
 }
+
+// la testata della pagina di una lingua: una query sola, condivisa da metadati e pagina
+export const linguaInfo = cache(async (codice: string, lang: Lang): Promise<LinguaInfo | null> => {
+  const r = await query<{ l: LinguaInfo | null }>('select lingua_json($1, $2, $3) as l', [codice, lang, ANTEPRIMA]);
+  return r[0]?.l ?? null;
+});
 
 export async function lingueGeo(lang: Lang): Promise<LinguaGeo[]> {
   return query<LinguaGeo>(

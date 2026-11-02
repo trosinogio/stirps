@@ -455,17 +455,12 @@ begin
   get diagnostics n = row_count;
   r := r || jsonb_build_object('ipotesi_tornate_accolte', n);
 
-  -- 3. voci importate rimaste senza legami (per esempio i doppioni con i segni vocalici)
+  -- 3. voci importate rimaste senza legami (per esempio i doppioni con i segni vocalici, o le voci che il parser non
+  --    considera più parole): le glosse importate, anche tradotte, non le trattengono
   delete from lessema l
    where l.provenienza = 'wiktionary' and l.stato_editoriale = 'importato' and l.id_esterno is not null
      and not exists (select 1 from stg_lessema s where s.chiave = l.id_esterno)
-     and not exists (select 1 from relazione x where x.etimo_id = l.id or x.esito_id = l.id)
-     and not exists (select 1 from ipotesi h where h.esito_id = l.id)
-     and not exists (select 1 from attestazione a where a.lessema_id = l.id)
-     and not exists (select 1 from accezione c where c.lessema_id = l.id)
-     and not exists (select 1 from connessione c where c.da_id = l.id or c.a_id = l.id)
-     and not exists (select 1 from rimando m where m.lessema_id = l.id)
-     and not exists (select 1 from glossa g where g.lessema_id = l.id and g.provenienza <> 'wikizionario');
+     and voce_intatta(l.id);
   get diagnostics n = row_count;
   r := r || jsonb_build_object('lessemi_tolti', n);
 

@@ -379,10 +379,12 @@ begin
       select 'la', 'z' || chr(97 + g % 3) || 'prova' || g, 'it', 'bozza' from generate_series(1, 2100) g;
     p := parole_lingua('la', 'it', true, 'Z');
     perform pg_temp.verifica(
-      p->>'iniziale' = 'Z' and p->>'sottoiniziale' = 'ZA' and jsonb_array_length(p->'parole') = 700
+      p->>'iniziale' = 'Z' and p->>'sottoiniziale' = 'ZA' and jsonb_array_length(p->'parole') = 500
+      and jsonb_array_length(p->'pagine') = 2
+      and jsonb_array_length(parole_lingua('la', 'it', true, 'ZA', false, 2)->'parole') = 200
       and (select string_agg(x->>'iniziale', ' ' order by x->>'iniziale') from jsonb_array_elements(p->'sottoiniziali') x) like 'ZA ZB ZC%'
       and (parole_lingua('la', 'it', true, 'ZB')->>'sottoiniziale') = 'ZB',
-      'un''iniziale con più di 2000 parole si sfoglia per le prime due lettere (za, zb, zc)');
+      'un''iniziale con più di 2000 parole si sfoglia per le prime due lettere (za, zb, zc), e un gruppo di 700 in due pagine');
     raise exception using errcode = 'P0098', message = 'annulla';
   exception when sqlstate 'P0098' then null;
   end;
@@ -390,5 +392,34 @@ end $$;
 select pg_temp.verifica(
   (select p->>'sottoiniziale' is null and jsonb_array_length(p->'sottoiniziali') = 0 from parole_lingua('la', 'it', true, 'C') p),
   'un''iniziale con poche parole resta una pagina sola');
+-- l'indice segue l'alfabeto: 23 lettere latine (J sotto I, U sotto V), 24 greche; il resto resta fuori dall'indice.
+-- I nomi propri (np, o senza parte del discorso e con la maiuscola) hanno un indice a parte
+do $$
+declare la jsonb; gr jsonb; nomi jsonb;
+begin
+  begin
+    insert into lessema (lingua, lemma, pos, glossa_lingua, stato_editoriale) values
+      ('la', 'uxorprova', null, 'it', 'bozza'), ('la', 'iamprova', null, 'it', 'bozza'), ('la', 'jamprova', null, 'it', 'bozza'),
+      ('la', 'wilprova', null, 'it', 'bozza'), ('la', 'Iuliusprova', null, 'it', 'bozza'), ('la', 'Romanusprova', 'agg.', 'it', 'bozza'),
+      ('grc', 'ϝοῖκοςπροβα', null, 'it', 'bozza'), ('grc', 'οἶκοςπροβα', null, 'it', 'bozza');
+    la := parole_lingua('la', 'it', true, null);
+    gr := parole_lingua('grc', 'it', true, null);
+    nomi := parole_lingua('la', 'it', true, 'I', true);
+    perform pg_temp.verifica(
+      (select bool_and(x->>'iniziale' = any (regexp_split_to_array('ABCDEFGHIKLMNOPQRSTVXYZ', ''))) from jsonb_array_elements(la->'iniziali') x)
+      and (select bool_and(x->>'iniziale' = any (regexp_split_to_array('ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ', ''))) from jsonb_array_elements(gr->'iniziali') x)
+      and exists (select 1 from jsonb_array_elements(parole_lingua('la', 'it', true, 'V')->'parole') x where x->>'lemma' = 'uxorprova')
+      and (select count(*) from jsonb_array_elements(parole_lingua('la', 'it', true, 'I')->'parole') x
+            where x->>'lemma' in ('iamprova', 'jamprova', 'Iuliusprova')) = 2,
+      'l''indice segue l''alfabeto: 23 lettere latine (uxor sotto V, iam e jam sotto I, niente W), 24 greche (niente Ϝ)');
+    perform pg_temp.verifica(
+      exists (select 1 from jsonb_array_elements(nomi->'parole') x where x->>'lemma' = 'Iuliusprova')
+      and exists (select 1 from jsonb_array_elements(parole_lingua('la', 'it', true, 'R')->'parole') x where x->>'lemma' = 'Romanusprova')
+      and (nomi->>'totale_nomi')::int > 0,
+      'i nomi propri hanno un indice a parte (Iulius); gli aggettivi con la maiuscola restano tra le parole (Romanus)');
+    raise exception using errcode = 'P0098', message = 'annulla';
+  exception when sqlstate 'P0098' then null;
+  end;
+end $$;
 
 \echo '— collaudo completato'

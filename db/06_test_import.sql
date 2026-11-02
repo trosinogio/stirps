@@ -141,6 +141,9 @@ select pg_temp.verifica(not exists (select 1 from lessema where slug in ('la/bab
 select pg_temp.verifica((select glossa from lessema where slug = 'la/caros') = 'heavy sleep, stupor, torpor'
                         and not exists (select 1 from ipotesi where esito_id = lx('la/caros')),
   'un lemma latino senza etimologia entra lo stesso, con la sua glossa e senza catena: la lingua è completa (cāros)');
+select pg_temp.verifica(not exists (select 1 from lessema where lemma in ('A', '☉', 'Ϝ', 'ϝοῖκος', '𐠀𐠙'))
+                        and lx('la/carus') is not null,
+  'non sono parole e restano fuori: lettere (A, Ϝ), simboli (☉), lettere epicoriche (ϝοῖκος), sillabario cipriota');
 
 \echo '— glosse italiane dal Wikizionario e prime attestazioni'
 select pg_temp.verifica(
