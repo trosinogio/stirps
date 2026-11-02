@@ -60,11 +60,11 @@ def autori(uscita):
             scarti += 1; continue
         ident = ('phi' if lingua == 'la' else 'tlg') + cifre.group().zfill(4)
         # il terminus ante quem: morte, fine dell'attività, floruit; la nascita più sessant'anni, in mancanza d'altro
-        a = None
+        a = precisione = None
         for chiave, prec, scarto in (('morte', 'pm', 0), ('fine', 'pf', 0), ('fl', 'pfl', 0), ('nascita', 'pn', 60)):
             if v.get(chiave):
-                if int(v.get(prec, 9)) < 7:      # millennio o meno: «−1000» per un poeta del VI secolo, troppo vago
-                    break
+                if int(v.get(prec, 9)) < 7:      # millennio o meno: «−1000» per un poeta del VI secolo, troppo vago;
+                    continue                     # si prova la data successiva (fine dell'attività, floruit…)
                 a = anno(v[chiave]) + scarto
                 precisione = 'secolo' if int(v.get(prec, 9)) <= 7 else 'circa' if int(v.get(prec, 9)) == 8 or scarto else 'esatta'
                 break
