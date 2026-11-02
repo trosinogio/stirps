@@ -400,6 +400,14 @@ def antenato_lingua(c):
     return cur[6] if cur and cur[6] != c else None
 
 
+def forma_ricostruita(l):
+    """«radice» per una radice ricostruita (*meh₂-, *(s)ker-), «tema» per un tema con un trattino interno (*meh₂-tu-,
+    *wréǵ-ye-), None per il resto. Una radice è la cima della sua famiglia; un tema deriva dalla sua radice."""
+    if not l.get('ricostruito') or not l['lemma'].endswith('-'):
+        return None
+    return 'tema' if '-' in l['lemma'].strip('-') else 'radice'
+
+
 def discende_da(a, b):
     """La lingua a discende (strettamente) dalla lingua b."""
     b, visti = base_lingua(b), set()
@@ -912,8 +920,10 @@ class Importatore:
         le, lx = self.lessemi.get(etimo), self.lessemi.get(esito)
         if not le or not lx:
             return None
-        if lx['ricostruito'] and lx['lemma'].endswith('-'):
+        if forma_ricostruita(lx) == 'radice':
             return 'radice_con_un_etimo'
+        if forma_ricostruita(lx) == 'tema' and (forma_ricostruita(le) != 'radice' or base_lingua(le['lingua']) != base_lingua(lx['lingua'])):
+            return 'tema_da_una_non_radice'      # *meh₂-tu- viene da *meh₂-, non da una parola o da un altro tema
         if discende_da(le['lingua'], lx['lingua']):
             return 'etimo_in_una_lingua_figlia'
         return None
@@ -1025,7 +1035,7 @@ class Importatore:
                 continue
             if cima in accolte or any(h['esito'] == cima for h in self.ipotesi.values() if h['stato'] == 'accolta'):
                 continue
-            if self.lessemi[cima]['lemma'].endswith('-'):
+            if forma_ricostruita(self.lessemi[cima]) == 'radice':
                 self.stat['radici_dichiarate_in_conflitto'] += 1   # una radice non discende da un'altra radice
                 continue
             voti[cima][radice] += 1

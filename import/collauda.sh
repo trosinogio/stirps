@@ -42,6 +42,10 @@ imp.intermedi[steh][(stn, 'generico', 3, None)] += 1
 imp.intermedi[kais][(caes, 'prestito', 3, None)] += 1
 imp.risolvi_intermedi()
 assert not ha(imp, steh), '*steh₂- non deriva dal suo derivato *stnéh₂ti'
+tema, meh = imp.lessema('ine-pro', '*meh₂-tu-'), imp.lessema('ine-pro', '*meh₂-')
+arco(imp, tema, meh)
+imp.togli_archi_impossibili()
+assert ha(imp, tema), 'un tema (*meh₂-tu-) deriva dalla sua radice (*meh₂-)'
 assert ha(imp, kais), '*kaisaraz < Caesar resta: un prestito dal latino al germanico è possibile'
 boln, palla = imp.lessema('ine-pro', '*bʰolnós'), imp.lessema('lng', '*palla')
 laudo, lodare = imp.lessema('la', 'laudo'), imp.lessema('it', 'lodare')
