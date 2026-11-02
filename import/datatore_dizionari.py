@@ -3,7 +3,7 @@
 più antico tra quelli che la voce cita, come stima della prima attestazione (terminus ante quem). Solo libreria standard.
 
     python3 datatore_dizionari.py autori autori.tsv
-        Interroga Wikidata: gli autori con un identificativo PHI (P1055) o TLG (P1041), con nascita, morte, floruit,
+        Interroga Wikidata: gli autori con un identificativo PHI o TLG (proprietà cercate per etichetta), con nascita, morte, floruit,
         periodo d'attività. Scrive: lingua, identificativo, nome, anno_da, anno_a, precisione, wikidata.
     python3 datatore_dizionari.py stime autori.tsv stime.tsv lat.ls.perseus-eng2.xml grc.lsj.perseus-eng*.xml
         Scrive: chiave della voce del dizionario, lingua, lemma, anno, precisione, autore, opera, fonte, confidenza.
@@ -17,9 +17,12 @@ from filtra_perseus import da_beta, GRECO
 from wiktionary import nome_pagina
 
 SPARQL = 'https://query.wikidata.org/sparql'
+# Le proprietà si cercano per etichetta, non per numero: i numeri delle copie di Wikidata (kg.jstor.org…) sono altri,
+# e P1055 di Wikidata è l'identificativo NLM di una rivista.
 QUERY = """
-SELECT ?id ?prop ?item ?nome ?morte ?pm ?fine ?pf ?fl ?pfl ?nascita ?pn WHERE {
-  VALUES ?prop { wdt:P1055 wdt:P1041 }
+SELECT ?etichetta ?id ?item ?nome ?morte ?pm ?fine ?pf ?fl ?pfl ?nascita ?pn WHERE {
+  ?p a wikibase:Property ; wikibase:propertyType wikibase:ExternalId ; rdfs:label ?etichetta ; wikibase:directClaim ?prop .
+  FILTER(lang(?etichetta) = 'en' && (CONTAINS(?etichetta, 'TLG author') || CONTAINS(?etichetta, 'PHI Latin Texts author')))
   ?item ?prop ?id .
   OPTIONAL { ?item rdfs:label ?nome FILTER(lang(?nome) = 'it') }
   OPTIONAL { ?item p:P570/psv:P570 [ wikibase:timeValue ?morte; wikibase:timePrecision ?pm ] }
@@ -47,11 +50,15 @@ def autori(uscita):
             if prova == 3:
                 raise
             time.sleep(20 * (prova + 1))
-    migliori = {}
+    migliori, proprieta, scarti = {}, {}, 0
     for r in dati['results']['bindings']:
         v = {k: x['value'] for k, x in r.items()}
-        lingua = 'la' if v['prop'].endswith('P1055') else 'grc'
-        ident = ('phi' if lingua == 'la' else 'tlg') + v['id'].zfill(4)
+        lingua = 'grc' if 'TLG' in v['etichetta'] else 'la'
+        proprieta[v['etichetta']] = proprieta.get(v['etichetta'], 0) + 1
+        cifre = re.search(r'\d+', v['id'])
+        if not cifre or len(cifre.group()) > 4:
+            scarti += 1; continue
+        ident = ('phi' if lingua == 'la' else 'tlg') + cifre.group().zfill(4)
         # il terminus ante quem: morte, fine dell'attività, floruit; la nascita più sessant'anni, in mancanza d'altro
         for chiave, prec, scarto in (('morte', 'pm', 0), ('fine', 'pf', 0), ('fl', 'pfl', 0), ('nascita', 'pn', 60)):
             if v.get(chiave):
@@ -60,15 +67,20 @@ def autori(uscita):
                 break
         else:
             continue
+        if not -1500 <= a <= 1500:      # un autore del TLG o del PHI non è morto dopo il 1500: la data è sbagliata
+            scarti += 1; continue
         nome = v.get('nome') or v['item'].rsplit('/', 1)[-1]
         candidato = (a, precisione, nome, v['item'].rsplit('/', 1)[-1])
-        # più elementi di Wikidata per lo stesso autore: vale la data più antica
-        if ident not in migliori or a < migliori[ident][1][0]:
+        # più date o più elementi per lo stesso autore: vale la più tarda, la più prudente per un terminus ante quem
+        if ident not in migliori or a > migliori[ident][1][0]:
             migliori[ident] = (lingua, candidato)
+    per_lingua = {l: sum(1 for x in migliori.values() if x[0] == l) for l in ('la', 'grc')}
+    print(f'proprietà: {proprieta}; autori datati: {per_lingua}; scartati: {scarti}', file=sys.stderr)
+    if min(per_lingua.values()) < 100:   # il PHI ha ~360 autori, il TLG ~3000: meno di cento vuol dire una query sbagliata
+        sys.exit('troppo pochi autori: la query di Wikidata non trova le proprietà giuste')
     with open(uscita, 'w', encoding='utf-8') as f:
         for ident, (lingua, (a, precisione, nome, item)) in sorted(migliori.items()):
             f.write('\t'.join((lingua, ident, nome.replace('\t', ' '), str(a), '\\N', precisione, item)) + '\n')
-    print(f'autori datati: {len(migliori)}', file=sys.stderr)
 
 
 IDENT = re.compile(r'(phi\d{4}|tlg,?\d{4})(?:[.,](\w+))?')
