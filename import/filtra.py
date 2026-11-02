@@ -11,12 +11,18 @@ DA_TESTO = re.compile(r'^\s*(from|derived from|deverbal from|back-formation from
 def menzione_come_der(v):
     """Un'etimologia scritta solo nel testo, con i modelli di menzione: «From the verb {{m|it|segare}}». Se il testo
     comincia con «From» (o «Derived from», «Deverbal from», «Back-formation from») e la voce non ha modelli etimologici,
-    la prima menzione diventa un der: un legame indeterminato, o una derivazione, mai un'eredità."""
+    la prima menzione diventa un der: un legame indeterminato, o una derivazione, mai un'eredità. Solo se la menzione sta
+    nella prima frase, quella del «From», e la frase non parla di composti (+), influenze o confronti: in «From dividere,
+    influenced by French devise» devise non è l'etimo."""
     tpl = v.get('etymology_templates') or []
-    if any(t.get('name') in UTILI for t in tpl) or not DA_TESTO.match(v.get('etymology_text') or ''):
+    testo = v.get('etymology_text') or ''
+    if any(t.get('name') in UTILI for t in tpl) or not DA_TESTO.match(testo):
+        return []
+    frase = re.split(r'[.,;:(]', testo, maxsplit=1)[0]
+    if re.search(r'\+|influenc|compare|\bcf\b', frase, re.I):
         return []
     m = next((t for t in tpl if t.get('name') in MENZIONI and (t.get('args') or {}).get('2')), None)
-    if m is None:
+    if m is None or (m.get('expansion') or m['args']['2']) not in frase:
         return []
     a = m['args']
     return [{'n': 'der', 'a': {'1': v.get('lang_code'), '2': a['1'], '3': a['2'], **({'t': a['4']} if a.get('4') else {})},
