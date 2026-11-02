@@ -25,7 +25,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 - `npm run dev`: sviluppo (con un `DATABASE_URL` locale).
 - `npx tsc --noEmit`: controllo dei tipi.
-- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, gli 89 del seme (`db/04_test.sql`) e gli 87 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
+- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, i 90 del seme (`db/04_test.sql`) e gli 87 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
 - `node scripts/applica-sql.mjs file.sql`: applica un file SQL in una transazione.
 - `node scripts/esporta-redazione.mjs cartella`: copia del lavoro della redazione in JSON; ogni notte la fa `.github/workflows/copia-redazione.yml` nel ramo `copia-redazione`.
 - Import completo da Wiktionary: `import/importa.sh` (scarica i dump di Kaikki; latino e greco entrano interi, `INTERE=la,grc`, con i lemmi del Lewis & Short e dell’LSJ che Wiktionary non ha, dal Perseus: `DIZIONARI=1`); collaudo del parser: `import/collauda.sh`. Vedi `import/LEGGIMI.md`.
@@ -73,6 +73,7 @@ Come cambia il database:
 - **Testi:** nei file di testi, mai sparsi nei componenti. Nel testo per il lettore apostrofo tipografico (’) e caporali (« »); nel codice apici diritti.
 - **Colori:** variabili CSS in `app/globals.css`. La classe `r-<ramo>` imposta `--pig`, il colore del ramo linguistico.
 - **Pagine dinamiche:** `storie` e `redazione` sono `force-dynamic`; le voci usano ISR (`revalidate`).
+- **Stemma:** i nomi propri da cui non derivano parole comuni restano nascosti finché il lettore non li chiede (`nomiNascondibili()` in `lib/albero.ts`); oltre 12 figli se ne disegnano 6, quelli con i rami più grandi, e gli altri vanno in una lista a tendina con il filtro (`dividiFigli()`), un `<details>` nello stemma verticale.
 - **Prefetch:** i link negli elenchi (`VoceLink`, iniziali, pagine) hanno `prefetch={false}`. Con il valore predefinito ogni link visibile fa calcolare al server una pagina intera, e su 290 mila voci quasi nessuna è in cache.
 - **Pagine pesanti:** prima di pubblicare un elenco, misura il peso dell’HTML e il tempo della prima visita (`next build` e `next start` in locale, con `NEON_AUTH_COOKIE_SECRET` di prova).
 

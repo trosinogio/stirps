@@ -13,6 +13,7 @@ export interface Nodo {
   glossa?: string | null;
   glossa_lingua?: string | null;
   glossa_automatica?: boolean;
+  nome_proprio?: boolean;
 }
 export interface NodoCatena extends Nodo { profondita: number; esito: number; tipo: string; tipo_etichetta?: string | null; confidenza_catena: number; attestata?: { anno_da: number; anno_a: number | null; precisione: string } | null; passaggio_data?: { anno_da: number; anno_a: number | null; precisione: string | null } | null }
 export interface NodoDiscendente extends Nodo { profondita: number; etimo: number; tipo: string; tipo_etichetta?: string | null }
@@ -91,6 +92,6 @@ export interface LinguaGeo { codice: string; nome: string; lat: number | null; l
 // Nodo dello stemma: piatto e serializzabile, passa dal server al browser.
 export interface NodoPiatto {
   id: number; slug: string; lemma: string; lingua: string; lingua_sigla: string; lingua_nome: string;
-  ramo: string | null; ricostruito: boolean; glossa?: string | null;
+  ramo: string | null; ricostruito: boolean; glossa?: string | null; nome_proprio?: boolean;
   tipo: string | null; tipo_etichetta?: string | null; padre: number | null;
 }
