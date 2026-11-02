@@ -392,6 +392,7 @@ class Importatore:
         self.formazioni_ambigue = set()   # voci formate con un prefisso o da più basi (Εὔβοια = εὐ- + βοῦς)
         self.chiusura = {}           # lingua -> indici delle voci di chiusura
         self.participi = set()       # (lingua, pagina) dei participi citati come etimi
+        self.non_forme = set()       # chiavi con una riga in glosse.tsv: hanno almeno un senso che non è una forma flessa
         self.attestazioni = {}       # chiave del lessema -> (anno_da, anno_a, precisione)
         self.intere = set()          # lingue di chiusura importate intere (--intere la,grc), non solo dove le catene arrivano
         self.stat = Counter()
@@ -459,6 +460,10 @@ class Importatore:
             pos = 's.m.' if g.startswith('m') and 'f' not in g else 's.f.' if g.startswith('f') and 'm' not in g else 's.'
         glossa = (v.get('g') or [None])[0]
         k0 = self.lessema(lingua_voce, parola, glossa=glossa[:200] if glossa else None, pos=pos, omografo=omo)
+        if v.get('fl'):                 # forma flessa con un'etimologia sua (filtra.forma_flessa): vedi togli_forme_flesse
+            self.lessemi[k0].setdefault('forma', True)
+        else:
+            self.lessemi[k0]['forma'] = False
         if k0 in self.ipotesi:          # stessa etimologia, altra parte del discorso
             self.stat['voci_duplicate'] += 1
             return
@@ -777,10 +782,33 @@ class Importatore:
                 break
 
 
+    def togli_forme_flesse(self):
+        """Una voce che Wiktionary dà solo come forma flessa (filtra.forma_flessa) non è un lemma ed esce, con le sue
+        ipotesi, salvo che: un'altra parola ne derivi (è un etimo in una catena: minimo per minimale); la sua etimologia
+        venga da un'altra lingua (ottimo < optimus: una forma lessicalizzata, che i dizionari registrano); la pagina abbia
+        anche un senso che non è una forma (una riga in glosse.tsv). Vicinissimo (vicino + -issimo) esce."""
+        tolte = 0
+        while True:
+            etimi = {r['etimo'] for r in self.relazioni}
+            lingua = {k: base_lingua(l['lingua']) for k, l in self.lessemi.items()}
+            da_fuori = {r['esito'] for r in self.relazioni if lingua.get(r['etimo']) != lingua.get(r['esito'])}
+            via = {k for k, l in self.lessemi.items()
+                   if l.get('forma') and k not in etimi and k not in da_fuori and k not in self.non_forme}
+            if not via:
+                break
+            tolte += len(via)
+            self.togli(via, 'ipotesi_tolte_forme_flesse')
+        self.stat['forme_flesse_tolte'] = tolte
+
     def togli_non_validi(self):
         """Le voci che non sono parole (lemma_valido) escono, con gli archi che le toccano; un'ipotesi che resta senza
         archi esce anch'essa: meglio nessuna etimologia che una catena attraverso un frammento di testo."""
         via = {k for k, l in self.lessemi.items() if not lemma_valido(l['lingua'], l['lemma'], l['ricostruito'])}
+        self.togli(via, 'ipotesi_tolte_non_valide')
+        self.stat['voci_non_valide'] = len(via)
+
+    def togli(self, via, conto):
+        """Toglie le voci in via, gli archi che le toccano e le ipotesi rimaste senza archi."""
         for k in via:
             del self.lessemi[k]
         prima = Counter(r['ipotesi'] for r in self.relazioni)
@@ -793,8 +821,7 @@ class Importatore:
         self.radici = {x for x in self.radici if x[0] not in via and x[1] not in via}
         self.doppioni = {x for x in self.doppioni if x[0] not in via and x[1] not in via}
         self.attestazioni = {k: v for k, v in self.attestazioni.items() if k not in via}
-        self.stat['voci_non_valide'] = len(via)
-        self.stat['ipotesi_tolte_non_valide'] = len(tolte)
+        self.stat[conto] += len(tolte)
 
     def aggiungi_lemmi_interi(self):
         """Nelle lingue intere entrano anche i lemmi senza etimologia, con glossa e parte del discorso: la lingua è
@@ -1032,6 +1059,7 @@ def completa_glosse(imp, percorso, lingua=None):
     for riga in open(percorso, encoding='utf-8'):
         parola, etimn, pos, g = (riga.rstrip('\n').split('\t') + ['', '', '', ''])[:4]
         omo = int(etimn) if etimn.isdigit() else 1
+        imp.non_forme.add(chiave(lingua, nome_pagina(lingua, parola), omo))   # filtra.py non scrive righe per le forme
         if g:
             gl.setdefault(chiave(lingua, nome_pagina(lingua, parola), omo), g)
     n = 0
@@ -1078,6 +1106,7 @@ if __name__ == '__main__':
     imp.chiudi_su_radici()
     imp.togli_cicli()
     imp.aggiungi_lemmi_interi()
+    imp.togli_forme_flesse()
     imp.togli_non_validi()
     st = imp.scrivi(args[1])
     print(json.dumps(dict(st), indent=1))

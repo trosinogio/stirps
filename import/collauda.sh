@@ -17,6 +17,29 @@ d = {'lang_code': 'it', 'etymology_text': 'From dividere, influenced by French d
 assert f(d) == [], 'una menzione fuori dalla prima frase (un\'influenza) non è l\'etimo'
 c = {'lang_code': 'it', 'etymology_text': 'From pesce + cane.', 'etymology_templates': [{'name': 'm', 'args': {'1': 'it', '2': 'pesce'}, 'expansion': 'pesce'}]}
 assert f(c) == [], 'un composto non è una derivazione dalla prima parte'
+# le forme flesse non sono voci: anche quando Wiktionary non marca il senso, la glossa lo dice
+from filtra import forma_flessa as ff
+s = lambda *g: {'senses': [{'glosses': [x]} for x in g]}
+assert ff(s('second-person plural present passive indicative/imperative of contemperō')), 'forma dalla glossa'
+assert ff({'senses': [{'glosses': ['genitive singular of nox'], 'form_of': [{'word': 'nox'}]}, {'tags': ['no-gloss']}]}), 'un senso vuoto non salva una forma'
+assert not ff(s('perfect passive participle of amō', 'beloved, dear')), 'un senso lessicale e la voce resta'
+assert not ff(s('alternative form of riappressare')) and not ff(s('comparative studies')), 'varianti e falsi amici restano'
+# il parser toglie le forme con un'etimologia sua, salvo gli etimi, le etimologie da un'altra lingua e i sensi lessicali
+from wiktionary import Importatore
+imp = Importatore()
+k = {w: imp.lessema(l, w) for l, w in (('it', 'vicinissimo'), ('it', 'vicino'), ('it', 'ottimo'), ('la', 'optimus'),
+                                       ('it', 'minimo'), ('it', 'minimale'), ('it', 'fermissimo'), ('it', 'fermo'))}
+for w in ('vicinissimo', 'ottimo', 'minimo', 'fermissimo'):
+    imp.lessemi[k[w]]['forma'] = True
+imp.non_forme.add(k['fermissimo'])
+for esito, etimo in (('vicinissimo', 'vicino'), ('ottimo', 'optimus'), ('minimale', 'minimo'), ('fermissimo', 'fermo')):
+    h = k[esito] + '#wikt'
+    imp.ipotesi[k[esito]] = {'chiave': h, 'esito': k[esito], 'etichetta': 'Wiktionary', 'stato': 'accolta', 'confidenza': 3, 'origine': 'etimo', 'nota': None}
+    imp.relazioni.append({'chiave': h + '#0', 'ipotesi': h, 'etimo': k[etimo], 'esito': k[esito], 'tipo': 'derivazione'})
+imp.togli_forme_flesse()
+assert k['vicinissimo'] not in imp.lessemi and k['vicinissimo'] not in imp.ipotesi, 'vicinissimo esce, con la sua ipotesi'
+assert all(k[w] in imp.lessemi for w in ('ottimo', 'minimo', 'fermissimo', 'minimale', 'vicino')), 'gli altri restano'
+assert imp.stat['forme_flesse_tolte'] == 1
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \

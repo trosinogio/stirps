@@ -68,6 +68,18 @@ Restano fuori:
 
 I modificatori in linea dei modelli (`scorciare<t:to shorten>`) si staccano dal termine in `lessema()`.
 
+**Le forme flesse non sono voci, in nessuna lingua** (novembre 2026). Una voce è una forma flessa se ogni suo senso con una glossa lo è (`forma_flessa()` in `filtra.py`):
+- lo dice Wiktionary: il modello `nonlemma`, oppure `form_of` o il tag `form-of`;
+- oppure lo dice la glossa: «second-person plural present passive indicative/imperative of contemperō», «genitive singular of nox», «superlative degree of piccolo», «past participle of fare».
+
+Serve la glossa perché Wiktionary non marca sempre il senso: prima di questa regola erano entrate così circa 5.000 forme latine, 322 greche e 103 italiane. Basta un senso lessicale perché la voce resti un lemma (*amatus*, «beloved»). Le varianti («alternative form of», «Epic form of») non sono forme flesse.
+
+Come si trattano:
+- una forma senza etimologia propria va solo in `forme.tsv`, che lega una forma citata in una catena al suo lemma (*noctem* → *nox*);
+- una forma con un'etimologia propria arriva al parser segnata (`fl`), e `togli_forme_flesse()` la toglie con le sue ipotesi, salvo che un'altra parola ne derivi (*minimo* per *minimale*), che la sua etimologia venga da un'altra lingua (*ottimo* < *optimus*, una forma lessicalizzata) o che la pagina abbia anche un senso lessicale. *Vicinissimo* (*vicino* + *-issimo*) esce.
+
+Il registro del filtro riporta quante forme ha riconosciuto in tutto, quante dalla sola glossa e quante con un'etimologia propria: un numero che cambia molto da un import all'altro va guardato.
+
 Le parole scritte nel sillabario cipriota, che Wiktionary mette sotto il greco antico, diventano voci del **greco arcadocipriota** (`grc-arp`, varietà del greco antico), con il loro indice per segni. Le parole con lettere epicoriche (ϝοῖκος) restano voci del greco, forme attestate, ma fuori dall’indice a 24 lettere, come nell’LSJ, che le cita sotto la forma comune; si trovano con la ricerca.
 
 **Etimologie scritte solo nel testo.** Una voce senza modelli etimologici, ma con un testo che comincia con «From», «Derived from», «Deverbal from» o «Back-formation from» e un modello di menzione («From the verb {{m|it|segare}}»), non si scarta più. La prima menzione diventa un `der` (`menzione_come_der()` in `filtra.py`), cioè un legame indeterminato o una derivazione, mai un’eredità.
