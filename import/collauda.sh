@@ -24,6 +24,20 @@ assert ff(s('second-person plural present passive indicative/imperative of conte
 assert ff({'senses': [{'glosses': ['genitive singular of nox'], 'form_of': [{'word': 'nox'}]}, {'tags': ['no-gloss']}]}), 'un senso vuoto non salva una forma'
 assert not ff(s('perfect passive participle of amō', 'beloved, dear')), 'un senso lessicale e la voce resta'
 assert not ff(s('alternative form of riappressare')) and not ff(s('comparative studies')), 'varianti e falsi amici restano'
+# {{ety}}/{{etymon}}, il sistema nuovo di Wiktionary, diventa il modello classico equivalente
+from filtra import da_ety
+assert da_ety({'args': {'1': 'la', '2': ':af', '3': 'audiēns', '4': '-ia'}}, 'la')['args'] == {'1': 'la', '2': 'audiēns', '3': '-ia'}
+assert da_ety({'args': {'1': 'it', '2': ':inh', '3': 'la:aquila'}}, 'it')['name'] == 'inh'
+assert da_ety({'args': {'1': 'la', '2': ':bor', '3': 'grc:Α', '4': ':influence', '5': 'ett:𐌀'}}, 'la')['args']['3'] == 'Α', ':influence non è un etimo'
+assert da_ety({'args': {'1': 'it', '2': ':influence', '3': 'fr:x'}}, 'it') is None
+assert da_ety({'args': {'1': 'la', '2': ':af', '3': 'ad<id:to>', '4': 'quiēscō'}}, 'la')['args']['2'] == 'ad-<id:to>', 'il preverbo è un prefisso'
+assert da_ety({'args': {'1': 'grc', '2': ':af', '3': 'κατά', '4': 'βαίνω'}}, 'grc')['args']['2'] == 'κατά-'
+assert da_ety({'args': {'1': 'la', '2': ':inh', '3': 'itc-pro:<id:x>'}}, 'la') is None, 'un termine vuoto non è un etimo'
+from filtra import porta_etimo
+assert not porta_etimo({'name': 'suffix', 'args': {'1': 'la', '2': '-ia'}}), '{{suffix|la|-ia}} senza base non dà un etimo: vale {{ety}}'
+assert porta_etimo({'name': 'suffix', 'args': {'1': 'la', '2': 'audiēns', '3': 'ia'}}) and porta_etimo({'name': 'inh', 'args': {'1': 'it', '2': 'la', '3': 'aquila'}})
+from wiktionary import lemma_valido
+assert not lemma_valido('itc-pro', '', True) and not lemma_valido('ine-pro', '*', True), 'un lemma vuoto non è una voce'
 from filtra import lemma_della_forma as lf
 assert lf(s('second-person plural present passive indicative/imperative of contemperō')) == ('contemperō', ['second-person', 'plural', 'present', 'passive', 'indicative', 'imperative'])
 assert lf({'senses': [{'glosses': ['g'], 'form_of': [{'word': 'nox'}], 'tags': ['genitive']}]}) == ('nox', ['genitive'])
