@@ -6,6 +6,61 @@ UTILI = {'inh', 'inh+', 'bor', 'bor+', 'lbor', 'slbor', 'ubor', 'obor', 'der', '
          'bf', 'back-form', 'clipping', 'ellipsis', 'af', 'affix', 'suffix', 'prefix', 'confix', 'compound', 'blend',
          'named-after', 'onom', 'onomatopoeic', 'unk', 'unc', 'root', 'doublet', 'dbt', 'it-deverbal', 'etydate'}
 MENZIONI = {'m', 'l', 'm+', 'mention', 'link', 'l-self'}
+# abbreviazioni dei modelli classici, con gli stessi argomenti
+ALIAS = {'suf': 'suffix', 'pre': 'prefix', 'com': 'compound', 'com+': 'compound', 'con': 'confix', 'univ': 'af',
+         'univerbation': 'af', 'back-formation': 'bf', 'learned borrowing': 'lbor', 'semi-learned borrowing': 'slbor',
+         'borrowed': 'bor', 'inherited': 'inh', 'derived': 'der'}
+# i modelli che portano un etimo (gli altri utili sono radici, date, doppioni, origini ignote…)
+CON_ETIMO = {'inh', 'inh+', 'bor', 'bor+', 'lbor', 'slbor', 'ubor', 'obor', 'der', 'der+', 'uder', 'cal', 'calque', 'sl',
+             'psm', 'bf', 'back-form', 'clipping', 'ellipsis', 'af', 'affix', 'suffix', 'prefix', 'confix', 'compound',
+             'blend', 'it-deverbal'}
+# {{ety}} e {{etymon}}, il sistema nuovo di Wiktionary (21.527 voci latine a novembre 2026): argomento 1 la lingua della
+# voce, poi parole chiave con i due punti (:inh, :bor, :af…) seguite dai loro termini, «lingua:termine<id:…><alt:…><t:…>»
+# o solo «termine» se è della stessa lingua; senza parola chiave vale :from. Dicono solo il primo livello: gli etimi
+# hanno le loro voci. Si convertono nel modello classico equivalente, e il parser resta com'è.
+ETY_CHIAVI = {'inh': 'inh', 'bor': 'bor', 'ubor': 'ubor', 'obor': 'obor', 'lbor': 'lbor', 'slbor': 'slbor', 'der': 'der',
+              'from': 'der', 'calque': 'cal', 'cal': 'cal', 'sl': 'sl', 'psm': 'psm', 'bf': 'bf', 'back-formation': 'bf',
+              'clipping': 'clipping', 'ellipsis': 'ellipsis', 'af': 'af', 'afeq': 'af', 'affix': 'af', 'compound': 'af',
+              'com': 'af', 'univ': 'af', 'univerbation': 'af', 'blend': 'blend'}
+
+
+def da_ety(t, lingua):
+    '''Un {{ety}}/{{etymon}} come modello classico: {{ety|la|:af|fābula<id:discourse>|-lus<alt:-la>}} → {{af|la|…}},
+    {{ety|it|:inh|la:aquila}} → {{inh|it|la|aquila}}. :influence, :cog e le chiavi che non danno un etimo non contano.
+    None se non c'è un etimo.'''
+    a = t.get('args') or {}
+    lv = (a.get('1') or lingua).strip()
+    gruppi, chiave, termini = [], 'from', []
+    for _, x in sorted((int(k), v) for k, v in a.items() if k.isdigit() and int(k) >= 2 and v and v.strip()):
+        x = x.strip()
+        if x.startswith(':'):
+            if termini:
+                gruppi.append((chiave, termini))
+                termini = []
+            chiave = re.split(r'[<\s]', x[1:], maxsplit=1)[0]
+        else:
+            termini.append(x)
+    if termini:
+        gruppi.append((chiave, termini))
+    for chiave, termini in gruppi:
+        nome = ETY_CHIAVI.get(chiave)
+        if not nome:
+            continue
+        if nome in ('af', 'blend'):
+            return {'name': nome, 'args': {'1': lv, **{str(i): x for i, x in enumerate(termini, 2)}}, 'expansion': ''}
+        x = termini[0]
+        mod = dict(re.findall(r'<(\w+):([^<>]*)>', x))
+        termine = re.sub(r'<[^<>]*>', '', x).strip()
+        m = re.match(r'^([a-z]{2,3}(?:-[a-z]{2,4})*):(.+)$', termine)
+        lt, termine = (m.group(1), m.group(2).strip()) if m else (lv, termine)
+        if nome in ('bf', 'clipping', 'ellipsis'):
+            return {'name': nome, 'args': {'1': lv, '2': termine if lt == lv else f'{lt}:{termine}'}, 'expansion': ''}
+        args = {'1': lv, '2': lt, '3': termine}
+        for k, dove in (('alt', '4'), ('t', 't'), ('id', 'id')):
+            if mod.get(k):
+                args[dove] = mod[k]
+        return {'name': nome, 'args': args, 'expansion': ''}
+    return None
 DA_TESTO = re.compile(r'^\s*(from|derived from|deverbal from|back-formation from)\b', re.I)
 # Le glosse che descrivono una forma flessa: «second-person plural present passive indicative/imperative of contemperō»,
 # «genitive singular of nox», «superlative degree of piccolo», «past participle of fare». Servono quando Wiktionary non
@@ -78,7 +133,7 @@ def menzione_come_der(v):
 
 
 if __name__ == '__main__':
-    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = 0
+    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = 0
     out = open(sys.argv[1], 'w', encoding='utf-8')
     glosse = open(sys.argv[2], 'w', encoding='utf-8')
     forme = open(os.environ['FORME'], 'w', encoding='utf-8') if os.environ.get('FORME') else None
@@ -122,7 +177,15 @@ if __name__ == '__main__':
                                  (g[0] if g else '').replace('\t', ' ').replace('\n', ' ')[:200],
                                  ','.join(x.replace(',', ' ') for x in distintive if x),
                                  '1' if (v.get('original_title') or '').startswith('Reconstruction:') else '')) + '\n')
-        tpl = [{'n': t['name'], 'a': t.get('args', {}), 'e': t.get('expansion', '')} for t in tpl if t.get('name') in UTILI]
+        tpl = [{**t, 'name': ALIAS.get(t.get('name'), t.get('name'))} for t in tpl]
+        classici = [t for t in tpl if t.get('name') in UTILI]
+        if not any(t['name'] in CON_ETIMO for t in classici):
+            # solo per le voci che non hanno già un etimo nei modelli classici: quelle che leggiamo bene non cambiano
+            conv = next((c for c in (da_ety(t, LINGUA) for t in tpl if t.get('name') in ('ety', 'etymon')) if c), None)
+            if conv:
+                classici = [conv] + classici
+                dalla_ety += 1
+        tpl = [{'n': t['name'], 'a': t.get('args', {}), 'e': t.get('expansion', '')} for t in classici]
         if not tpl:
             tpl = menzione_come_der(v)
             promosse += bool(tpl)
@@ -143,7 +206,7 @@ if __name__ == '__main__':
                               'tpl': tpl, 'g': g, 'h': heads, 'c': canonica,
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
-    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}), forme flesse {flesse} '
+    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, da {{{{ety}}}} {dalla_ety}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}', file=sys.stderr)
     if senza:

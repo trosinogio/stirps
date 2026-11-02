@@ -27,7 +27,7 @@ jobs:
       - name: Dump di Kaikki ed etimologie
         run: |
           cd import
-          DIAGNOSI_MODELLI=ety,etymon SOLO_ANALISI=1 WIKIZIONARIO=0 INTERE=la,grc ./importa.sh
+          SOLO_ANALISI=1 WIKIZIONARIO=0 INTERE=la,grc ./importa.sh
           jq -c . dati/it/rapporto_parser.json
           echo "::notice title=Parser::$(jq -c '{lessemi, ipotesi, relazioni, voci, intere_la, intere_grc, lemmi_interi_la, lemmi_interi_grc}' dati/it/rapporto_parser.json)"
           echo "::notice title=Perseus::$(tail -1 dati/it/rapporto_perseus.txt)"

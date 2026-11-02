@@ -24,6 +24,12 @@ assert ff(s('second-person plural present passive indicative/imperative of conte
 assert ff({'senses': [{'glosses': ['genitive singular of nox'], 'form_of': [{'word': 'nox'}]}, {'tags': ['no-gloss']}]}), 'un senso vuoto non salva una forma'
 assert not ff(s('perfect passive participle of amō', 'beloved, dear')), 'un senso lessicale e la voce resta'
 assert not ff(s('alternative form of riappressare')) and not ff(s('comparative studies')), 'varianti e falsi amici restano'
+# {{ety}}/{{etymon}}, il sistema nuovo di Wiktionary, diventa il modello classico equivalente
+from filtra import da_ety
+assert da_ety({'args': {'1': 'la', '2': ':af', '3': 'audiēns', '4': '-ia'}}, 'la')['args'] == {'1': 'la', '2': 'audiēns', '3': '-ia'}
+assert da_ety({'args': {'1': 'it', '2': ':inh', '3': 'la:aquila'}}, 'it')['name'] == 'inh'
+assert da_ety({'args': {'1': 'la', '2': ':bor', '3': 'grc:Α', '4': ':influence', '5': 'ett:𐌀'}}, 'la')['args']['3'] == 'Α', ':influence non è un etimo'
+assert da_ety({'args': {'1': 'it', '2': ':influence', '3': 'fr:x'}}, 'it') is None
 from filtra import lemma_della_forma as lf
 assert lf(s('second-person plural present passive indicative/imperative of contemperō')) == ('contemperō', ['second-person', 'plural', 'present', 'passive', 'indicative', 'imperative'])
 assert lf({'senses': [{'glosses': ['g'], 'form_of': [{'word': 'nox'}], 'tags': ['genitive']}]}) == ('nox', ['genitive'])
