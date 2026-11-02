@@ -8,7 +8,8 @@ type NodoMinimo = Pick<Nodo, 'slug' | 'lemma' | 'ramo' | 'ricostruito' | 'lingua
 
 export function VoceLink({ n, lang, sigla = true, radice = false }: { n: NodoMinimo; lang: Lang; sigla?: boolean; radice?: boolean }) {
   return (
-    <Link className={`voce ${classeRamo(n.ramo)}`} href={`/${lang}/${radice ? 'r' : 'w'}/${n.slug}`}>
+    // niente prefetch: un elenco ha anche migliaia di voci, e ognuna farebbe calcolare in anticipo una pagina al server
+    <Link className={`voce ${classeRamo(n.ramo)}`} href={`/${lang}/${radice ? 'r' : 'w'}/${n.slug}`} prefetch={false}>
       <span className="lemma">{fmt(n)}</span>
       {sigla && <span className="sigla">{n.lingua_sigla}</span>}
     </Link>

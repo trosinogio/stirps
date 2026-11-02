@@ -514,42 +514,80 @@ select jsonb_build_object(
 $$;
 
 -- Le parole di una lingua per iniziale: con 70 mila parole un elenco unico non è una pagina
-create function parole_lingua(p_codice text, p_lingua text default 'it', p_anteprima boolean default false, p_iniziale text default null)
+create function parole_lingua(p_codice text, p_lingua text default 'it', p_anteprima boolean default false, p_iniziale text default null,
+                              p_nomi boolean default false, p_pagina int default 1)
 returns jsonb language sql stable as $$
+-- l'indice per lettere: chiave_indice (le prime due lettere secondo l'alfabeto: 23 latine con J sotto I e U sotto V,
+-- 24 greche) e nome_proprio sono colonne generate di lessema, indicizzate; i nomi propri hanno un indice a parte
 with
--- l'indice segue l'alfabeto della lingua: 23 lettere per il latino (J sotto I, U sotto V, come nella grafia classica),
--- 24 per il greco; le parole che cominciano con altro restano voci, ma fuori dall'indice
-al as (select case when p_codice ~ '^la(-|$)' then 'ABCDEFGHIKLMNOPQRSTVXYZ'
-                   when p_codice ~ '^grc(-|$)' then 'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ' end as lettere),
-lf as (select l.*, case when p_codice ~ '^la(-|$)' then translate(upper(coalesce(nullif(l.lemma_norm, ''), l.lemma)), 'JU', 'IV')
-                        else upper(coalesce(nullif(l.lemma_norm, ''), l.lemma)) end as f
-       from lessema l where l.lingua = p_codice and visibile(l.stato_editoriale, p_anteprima)),
--- le prime due lettere: le parole di una lettera sola e quelle come «a priori» o «a-» stanno nel gruppo «A-»
-lx as (select l.*, left(l.f, 1) as ini,
-              case when substr(l.f, 2, 1) ~ '^[[:alpha:]]$' and (al.lettere is null or strpos(al.lettere, substr(l.f, 2, 1)) > 0)
-                   then left(l.f, 2) else left(l.f, 1) || '-' end as ini2
-       from lf l, al
-      where al.lettere is null or strpos(al.lettere, left(l.f, 1)) > 0),
-ini as (select ini, count(*) as n, (ini !~ '^[[:alpha:]]') as simbolo from lx group by ini),
-scelta as (select coalesce(upper(left(p_iniziale, 1)), case when (select count(*) from lx) <= 400 then null
+ix as (select chiave_indice as ini2, left(chiave_indice, 1) as ini, count(*) as n
+         from lessema where lingua = p_codice and nome_proprio = p_nomi and chiave_indice is not null
+                        and visibile(stato_editoriale, p_anteprima)
+        group by chiave_indice),
+ini as (select ini, sum(n) as n, (ini !~ '^[[:alpha:]]') as simbolo from ix group by ini),
+scelta as (select coalesce(upper(left(p_iniziale, 1)), case when (select sum(n) from ini) <= 400 then null
                                          -- si apre sulla prima iniziale vera: non su una I con una sola parola greca
-                                         else (select ini from ini order by simbolo, n * 100 < (select count(*) from lx), ini
+                                         else (select ini from ini order by simbolo, n * 100 < (select sum(n) from ini), ini
                                                 limit 1) end) as v),
 -- un'iniziale con più di 2000 parole si sfoglia per le prime due lettere (Αβ, Αγ…): pagine leggere anche per il greco
-sotto as (select x.ini2, count(*) as n from lx x, scelta sc where x.ini = sc.v group by x.ini2),
+sotto as (select x.ini2, x.n from ix x, scelta sc where x.ini = sc.v),
 scelta2 as (select case when (select sum(n) from sotto) > 2000
                         then coalesce((select ini2 from sotto where ini2 = upper(p_iniziale)),
-                                      (select ini2 from sotto order by ini2 like '_-', ini2 limit 1)) end as v)
+                                      (select ini2 from sotto order by ini2 like '_-', ini2 limit 1)) end as v),
+-- un gruppo con più di 500 voci si divide in pagine, con le parole guida come nei dizionari a stampa (κάβαισος – καθαίρω)
+gruppo as (select l.id, l.slug, l.lingua, l.lemma, l.ricostruito, l.translit, l.glossa, l.glossa_lingua,
+                  row_number() over (order by l.lemma_norm, l.lemma, l.id) as rn
+             from lessema l, scelta sc, scelta2 s2
+            where l.lingua = p_codice and l.nome_proprio = p_nomi and l.chiave_indice is not null
+              and visibile(l.stato_editoriale, p_anteprima)
+              and (sc.v is null or left(l.chiave_indice, 1) = sc.v) and (s2.v is null or l.chiave_indice = s2.v)),
+pagine as (select (rn - 1) / 500 + 1 as n, (array_agg(lemma order by rn))[1] as da, (array_agg(lemma order by rn desc))[1] as a
+             from gruppo group by 1),
+pg as (select least(greatest(coalesce(p_pagina, 1), 1), greatest((select max(n) from pagine), 1)) as n),
+tot as (select count(*) filter (where not nome_proprio) as parole, count(*) filter (where nome_proprio) as nomi
+          from lessema where lingua = p_codice and visibile(stato_editoriale, p_anteprima))
 select jsonb_build_object(
-  'totale', (select count(*) from lf),
+  'totale', (select case when p_nomi then nomi else parole end from tot),
+  'totale_parole', (select parole from tot),
+  'totale_nomi', (select nomi from tot),
   'iniziale', (select v from scelta),
   'iniziali', coalesce((select jsonb_agg(jsonb_build_object('iniziale', ini, 'n', n) order by simbolo, ini) from ini), '[]'::jsonb),
   'sottoiniziale', (select v from scelta2),
+  'pagina', (select n from pg),
+  'pagine', case when (select count(*) from pagine) > 1
+                 then (select jsonb_agg(jsonb_build_object('da', da, 'a', a) order by n) from pagine) else '[]'::jsonb end,
   'sottoiniziali', case when (select v from scelta2) is null then '[]'::jsonb
                         else (select jsonb_agg(jsonb_build_object('iniziale', ini2, 'n', n) order by ini2) from sotto) end,
-  'parole', coalesce((select jsonb_agg(nodo_json(x.id, p_lingua, p_anteprima) order by x.lemma_norm, x.lemma)
-                        from lx x, scelta sc, scelta2 s2
-                       where (sc.v is null or x.ini = sc.v) and (s2.v is null or x.ini2 = s2.v)), '[]'::jsonb))
+  -- gli stessi campi di nodo_json(), ma la lingua si legge una volta sola
+  'parole', coalesce((select jsonb_agg(jsonb_build_object('id', x.id, 'slug', x.slug, 'lingua', x.lingua,
+                          'lingua_nome', g.nome, 'lingua_sigla', g.sigla, 'ramo', g.ramo, 'lemma', x.lemma,
+                          'ricostruito', x.ricostruito, 'translit', x.translit, 'glossa', coalesce(t.testo, x.glossa),
+                          'glossa_lingua', case when t.testo is not null then t.lingua else x.glossa_lingua end,
+                          'glossa_automatica', coalesce(t.provenienza = 'traduzione-automatica' and t.stato_editoriale = 'importato', false))
+                        order by x.rn)
+                        from gruppo x
+                        cross join (select coalesce(etichetta_in('lingua', codice, p_lingua), nome) as nome,
+                                           coalesce(etichetta_in('lingua', codice, p_lingua, 'breve'), sigla) as sigla, ramo
+                                      from lingua where codice = p_codice) g
+                        left join glossa t on t.lessema_id = x.id and t.accezione_id is null and t.lingua = p_lingua
+                                          and visibile(t.stato_editoriale, p_anteprima)
+                       where (x.rn - 1) / 500 + 1 = (select n from pg)), '[]'::jsonb))
+$$;
+
+-- La testata della pagina di una lingua, senza calcolare l'indice di tutto il dizionario
+create function lingua_json(p_codice text, p_lingua text default 'it', p_anteprima boolean default false)
+returns jsonb language sql stable as $$
+  select jsonb_build_object(
+      'codice', g.codice,
+      'nome', coalesce(etichetta_in('lingua', g.codice, p_lingua), g.nome),
+      'sigla', coalesce(etichetta_in('lingua', g.codice, p_lingua, 'breve'), g.sigla),
+      'famiglia', g.famiglia, 'famiglia_nome', coalesce(etichetta_in('famiglia', g.famiglia, p_lingua), g.famiglia),
+      'ramo', coalesce(g.ramo, 'proto'), 'ramo_nome', etichetta_in('ramo', coalesce(g.ramo, 'proto'), p_lingua),
+      'antenato', g.antenato, 'varieta_di', g.varieta_di,
+      'antenato_nome', (select coalesce(etichetta_in('lingua', a.codice, p_lingua), a.nome) from lingua a where a.codice = g.antenato),
+      'varieta_di_nome', (select coalesce(etichetta_in('lingua', v.codice, p_lingua), v.nome) from lingua v where v.codice = g.varieta_di))
+  from lingua g
+  where g.codice = p_codice and exists (select 1 from lessema l where l.lingua = g.codice and visibile(l.stato_editoriale, p_anteprima))
 $$;
 
 -- ---------------------------------------------------------------------

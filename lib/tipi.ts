@@ -68,12 +68,18 @@ export interface LinguaIndice {
   codice: string; nome: string; sigla: string; famiglia: string | null; famiglia_nome: string | null;
   ramo: string; ramo_nome: string | null; antenato: string | null; varieta_di: string | null; n: number;
 }
+export interface LinguaInfo {
+  codice: string; nome: string; sigla: string; famiglia: string | null; famiglia_nome: string | null; ramo: string;
+  ramo_nome: string | null; antenato: string | null; varieta_di: string | null; antenato_nome: string | null; varieta_di_nome: string | null;
+}
 export interface Indice { radici: RadiceIndice[]; lingue: LinguaIndice[]; totali: { lessemi: number; lingue: number; radici: number; capostipiti: number } }
 export interface ElencoRadici { totale: number; pagina: number; per_pagina: number; radici: (Nodo & { discendenti: number; lingue: number })[] }
 export interface ParoleLingua {
-  totale: number; iniziale: string | null; iniziali: { iniziale: string; n: number }[];
+  totale: number; totale_parole: number; totale_nomi: number; iniziale: string | null; iniziali: { iniziale: string; n: number }[];
   // un'iniziale con molte parole si sfoglia per le prime due lettere
   sottoiniziale: string | null; sottoiniziali: { iniziale: string; n: number }[];
+  // un gruppo con più di 500 voci si divide in pagine: per ciascuna la prima e l'ultima parola
+  pagina: number; pagine: { da: string; a: string }[];
   parole: Nodo[];
 }
 export interface RisultatoRicerca { slug: string; punteggio: number; per_significato: boolean; voce: Nodo }

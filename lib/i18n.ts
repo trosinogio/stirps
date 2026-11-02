@@ -119,6 +119,7 @@ export interface Testi {
   successive: string;
   iniziali: string;
   sottoIniziali: string;
+  indiceSezioni: string; indiceParole: string; indiceNomi: string; pagineIndice: string;
   fonteStrato: (nome: string, licenza: string) => string;
   glosseAltrove: (lingua: string) => string;
   secondo: (fonte: string) => string;
@@ -291,6 +292,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     successive: 'Successive ›',
     iniziali: 'Iniziali',
     sottoIniziali: 'Prime due lettere',
+    indiceSezioni: 'Sezioni dell’indice', indiceParole: 'Parole', indiceNomi: 'Nomi propri', pagineIndice: 'Pagine',
     fonteStrato: (n, l) => `Fonte: ${n} (${l})`,
     glosseAltrove: (l) => `Le glosse senza traduzione restano ${l ? 'in ' + l : 'nella lingua d’origine'}, come le ha fornite la fonte.`,
     secondo: (f) => `secondo ${f}`,
@@ -470,6 +472,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     successive: 'Next ›',
     iniziali: 'Initials',
     sottoIniziali: 'First two letters',
+    indiceSezioni: 'Index sections', indiceParole: 'Words', indiceNomi: 'Proper names', pagineIndice: 'Pages',
     fonteStrato: (n, l) => `Source: ${n} (${l})`,
     glosseAltrove: (l) => `Glosses without a translation stay ${l ? 'in ' + l : 'in the original language'}, as the source provided them.`,
     secondo: (f) => `according to ${f}`,

@@ -41,6 +41,21 @@ comment on function norm(text) is
 -- L'indirizzo di una voce: lingua/forma normalizzata, con il trattino degli affissi (it/foto-, it/-grafia: non
 -- coincidono con le parole foto e grafia) e il numero d'omografo (it/zefiro-2). Le radici ricostruite non hanno
 -- trattino (ine-pro/sek). È la sola fonte della regola: la usano la colonna slug e i controlli dell'import.
+-- La chiave dell'indice di una lingua: le prime due lettere della forma normalizzata, secondo l'alfabeto della lingua
+-- (23 lettere latine, con J sotto I e U sotto V; 24 greche). «A-» raccoglie le parole di una lettera e quelle come
+-- «a priori»; null per le parole che cominciano fuori dall'alfabeto (W latina, Ϝ greca), che restano fuori dall'indice.
+-- È nella colonna generata lessema.chiave_indice: se cambia, la colonna va ricalcolata (update lessema set lemma = lemma).
+create or replace function indice_iniziali(p_lingua text, p_forma text) returns text
+language sql immutable parallel safe
+return (with a as (select case when p_lingua ~ '^la(-|$)' then 'ABCDEFGHIKLMNOPQRSTVXYZ'
+                               when p_lingua ~ '^grc(-|$)' then 'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ' end as lettere,
+                          case when p_lingua ~ '^la(-|$)' then translate(upper(p_forma), 'JU', 'IV') else upper(p_forma) end as f)
+        select case when f is null or f = '' then null
+                    when lettere is not null and strpos(lettere, left(f, 1)) = 0 then null
+                    when substr(f, 2, 1) ~ '^[[:alpha:]]$' and (lettere is null or strpos(lettere, substr(f, 2, 1)) > 0) then left(f, 2)
+                    else left(f, 1) || '-' end
+          from a);
+
 create function slug_di(p_lingua text, p_lemma text, p_translit text, p_omografo int, p_ricostruito boolean) returns text
 language sql immutable parallel safe
 return p_lingua || '/'
@@ -138,6 +153,9 @@ create table lessema (
   lemma_norm        text generated always as (norm(lemma)) stored,
   translit_norm     text generated always as (norm(translit)) stored,
   slug              text generated always as (slug_di(lingua, lemma, translit, omografo, ricostruito)) stored,
+  -- l'indice per lettere della lingua (parole_lingua): calcolato una volta, non a ogni pagina
+  chiave_indice     text generated always as (indice_iniziali(lingua, coalesce(nullif(norm(lemma), ''), lemma))) stored,
+  nome_proprio      boolean generated always as (coalesce(pos, '') = 'np' or (pos is null and lemma ~ '^-?[[:upper:]]')) stored,
   unique (lingua, lemma, omografo),
   unique (slug),
   check (lemma = btrim(lemma) and lemma <> ''),
@@ -461,6 +479,7 @@ create table wiktionary_radice (
 comment on table wiktionary_radice is 'Radici dichiarate da Wiktionary (template root): servono a misurare quanto le catene arrivano alla radice.';
 create index glossa_testo_trgm       on glossa using gin (norm(testo) gin_trgm_ops);
 create index lessema_glossa_trgm     on lessema using gin (norm(glossa) gin_trgm_ops);
+create index lessema_indice          on lessema (lingua, nome_proprio, chiave_indice) include (stato_editoriale);
 
 -- Informazioni sul database stesso: la versione del pacchetto dati importato (vedi scripts/inizializza-db.mjs)
 create table if not exists meta (
