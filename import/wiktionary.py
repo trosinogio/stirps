@@ -832,17 +832,17 @@ class Importatore:
         return lingua, pagina, omo, forma_extra
 
     def scegli_glossa(self, l):
-        """La glossa di una voce: quella della sua voce di Wiktionary (apis, «bee (insect of the clade Anthophila)»), non
-        quella delle menzioni nelle catene altrui (t=bee); senza voce propria, la glossa già pubblicata se è ancora tra
-        le candidate (--glosse-precedenti), così una lingua nuova non la cambia (*h₁es-, «to be, exist», non «to be»):
-        le definizioni e le traduzioni di Claude restano legate alla glossa da cui sono nate. Altrimenti la più citata."""
-        if l.get('propria') and l['glosse'].get(l['propria']):
-            return l['propria']
+        """La glossa di una voce. Prima quella già pubblicata, se è ancora tra le candidate (--glosse-precedenti): una
+        lingua nuova non la cambia (*h₁es-, «to be, exist», non «to be»; vacca, «cow»), e le definizioni e le traduzioni
+        di Claude restano legate alla glossa da cui sono nate. Poi quella della sua voce di Wiktionary (apis, «bee
+        (insect of the clade Anthophila)»), non quella delle menzioni nelle catene altrui (t=bee). Poi la più citata."""
         if not l['glosse']:
             return None
         prima = self.glosse_precedenti.get(l['chiave'])
-        if prima and prima in l['glosse']:
+        if prima and (prima in l['glosse'] or prima == l.get('ident')):
             return prima
+        if l.get('propria') and l['glosse'].get(l['propria']):
+            return l['propria']
         return l['glosse'].most_common(1)[0][0]
 
     def ammessa(self, lingua, v):

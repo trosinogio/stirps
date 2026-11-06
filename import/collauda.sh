@@ -137,6 +137,13 @@ for _ in range(3):
     api = imp.lessema('la', 'apis', glossa='bee')
 imp.voce({'w': 'apis', 'p': 'noun', 'en': None, 't': '', 'g': ['bee (insect of the clade Anthophila)'], 'h': [], 'c': None, 'rec': False, 'tpl': []}, lingua_voce='la')
 assert imp.scegli_glossa(imp.lessemi[api]) == 'bee (insect of the clade Anthophila)', imp.lessemi[api]
+imp.glosse_precedenti = {api: 'bee'}
+assert imp.scegli_glossa(imp.lessemi[api]) == 'bee', 'la glossa già pubblicata viene prima di quella della voce'
+dr = imp.lessema('ine-pro', '*h₂eǵ-', glossa='to drive', ident='drive')
+imp.lessemi[dr]['ident'] = 'drive'
+imp.glosse_precedenti = {dr: 'drive'}
+assert imp.scegli_glossa(imp.lessemi[dr]) == 'drive', 'l\'identificativo pubblicato di una radice omografa resta'
+imp.glosse_precedenti = {}
 es = imp.lessema('ine-pro', '*h₁es-', glossa='to be')
 imp.lessema('ine-pro', '*h₁es-', glossa='to be'); imp.lessema('ine-pro', '*h₁es-', glossa='to be, exist')
 assert imp.scegli_glossa(imp.lessemi[es]) == 'to be', 'senza glossa precedente vince la più citata'
