@@ -157,6 +157,7 @@ if __name__ == '__main__':
                   ('etimo fuori dalla lingua, senza nomi propri né locuzioni', [r for r in proprie if comune(r) and fuori(r)])]
         if lingua in freq:
             ambiti.append((f'lessico comune ({len(freq[lingua])} forme)', [r for r in proprie if comune(r) and r[2].lower() in freq[lingua]]))
+            ambiti.append(('lessico comune ed etimo fuori', [r for r in proprie if comune(r) and (fuori(r) or r[2].lower() in freq[lingua])]))
         print(f'  ambiti (voci della lingua + voci portate dalle catene = spazio):')
         for nome_a, rr in ambiti:
             c = chiusura([r[0] for r in rr])

@@ -28,9 +28,10 @@ jobs:
       CON_ETIMOLOGIA: en,fr,de,ru
       # dell'inglese, il lessico comune (i lemmi tra le 50 mila forme più frequenti) e le parole con l'etimo fuori
       # dall'inglese (ESTERNI), senza nomi propri né locuzioni
-      ELENCHI: en=../dati/frequenze_en.tsv.gz
-      ESTERNI: en
-      GLOSSE_TRADOTTE: '0'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
+      # la stessa regola per francese, tedesco e russo (stima del 6 novembre 2026: 114 MB invece di 239 per le lingue intere)
+      ELENCHI: en=../dati/frequenze_en.tsv.gz fr=../dati/frequenze_fr.tsv.gz de=../dati/frequenze_de.tsv.gz ru=../dati/frequenze_ru.tsv.gz
+      ESTERNI: en,fr,de,ru
+      GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
