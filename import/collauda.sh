@@ -109,6 +109,10 @@ with open(f'{td}/de_glosse.tsv', 'w') as f:
     f.write('Haus\t1\tnoun\thouse\t\t\n')
 completa_glosse(imp, f'{td}/de_glosse.tsv', 'de')
 assert imp.lessemi[haus]['pos'] == 's.' and imp.scegli_glossa(imp.lessemi[haus]) == 'house', imp.lessemi[haus]
+# un nome tedesco che il dump non ha (Besitzer in Ladenbesitzer) è un nome comune; un nome di due parole resta senza
+bes, rd = imp.lessema('de', 'Besitzer'), imp.lessema('de', 'Rudolf Diesel')
+imp.nomi_tedeschi()
+assert imp.lessemi[bes]['pos'] == 's.' and imp.lessemi[rd]['pos'] is None
 # la traslitterazione della voce stessa, per la ricerca: дом → dom
 imp.voce({'w': 'дом', 'p': 'noun', 'en': None, 't': '', 'g': ['house'], 'h': [], 'c': None, 'rec': False, 'tpl': [], 'r': 'dom'}, lingua_voce='ru')
 assert imp.lessemi[imp.lessema('ru', 'дом')]['translit'] == 'dom'

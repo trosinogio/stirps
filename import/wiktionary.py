@@ -246,6 +246,8 @@ def codice_lingua(c):
 # dell'ebraico (e dell'aramaico in scrittura ebraica), harakat dell'arabo, vocali del siriaco. La hamza resta: è una lettera.
 SEGNI_VOCALICI = re.compile('[\u0591-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7\u064b-\u0652\u0670\u0640\u0730-\u074a]')
 SENZA_VOCALI = {'ar', 'arc', 'he', 'hbo', 'syc', 'fa', 'fa-cls', 'ota', 'ur'}
+# le lingue che scrivono i nomi comuni con la maiuscola: tedesco e varietà
+MAIUSCOLA_DEI_NOMI = {'de', 'gsw', 'lb', 'bar', 'pdc', 'ksh'}
 # i segni che Wiktionary toglie dal nome della pagina: le menzioni nelle catene li scrivono (hūs, ċild, во́дка), le voci
 # no (hus, cild, водка), e senza toglierli la stessa parola diventa due nodi e la famiglia si spezza. Non si toccano i
 # segni che scrivono suoni o parole diverse: il norreno háls, il francese dé, il protogermanico berô, ё e й in russo
@@ -863,6 +865,16 @@ class Importatore:
             return l['propria']
         return l['glosse'].most_common(1)[0][0]
 
+    def nomi_tedeschi(self):
+        """In tedesco la maiuscola è dei nomi comuni: una voce con la maiuscola, di una parola, senza voce nel dump e senza
+        parte del discorso (Besitzer in Ladenbesitzer) è un nome comune, non un nome proprio; i nomi propri Wiktionary
+        li segna come tali (np)."""
+        for l in self.lessemi.values():
+            if l['lingua'] in MAIUSCOLA_DEI_NOMI and not l['pos'] and not l['ricostruito'] and l['lemma'][:1].isupper() \
+                    and ' ' not in l['lemma']:
+                l['pos'] = 's.'
+                self.stat['nomi_comuni_con_la_maiuscola'] += 1
+
     def ammessa(self, lingua, v):
         """Una voce entra da sola, senza che una catena la raggiunga, solo se la sua lingua non ha un elenco o se è
         nell'elenco (le forme più frequenti) o, con --esterni, ha l'etimo in un'altra lingua; e mai un nome proprio o
@@ -1348,6 +1360,7 @@ if __name__ == '__main__':
         p = percorsi.split(',') + ['', '']
         if p[1]:
             completa_glosse(imp, p[1], lingua)
+    imp.nomi_tedeschi()
     imp.risolvi_intermedi()
     imp.precisa_omografe()
     imp.chiudi_su_radici()
