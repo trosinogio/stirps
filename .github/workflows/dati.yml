@@ -21,13 +21,16 @@ jobs:
     env:
       # le lingue di chiusura (import/importa.sh): l'inglese entra con tutte le voci che hanno un'etimologia
       # (CON_ETIMOLOGIA), con l'inglese medio e antico e il norreno (l'anglonormanno su Kaikki non c'è) per chiudere le sue catene
-      CHIUSURA: 'la:Latin fro:Old French grc:Ancient Greek en:English enm:Middle English ang:Old English non:Old Norse'
+      # francese, tedesco e russo (stima del 6 novembre 2026), con le loro lingue antiche: francese medio, alto tedesco medio
+      # e antico, slavo orientale antico e slavo ecclesiastico antico; un dump che Kaikki non ha è solo un avviso
+      CHIUSURA: 'la:Latin fro:Old French grc:Ancient Greek en:English enm:Middle English ang:Old English non:Old Norse fr:French frm:Middle French de:German gmh:Middle High German goh:Old High German ru:Russian orv:Old East Slavic cu:Old Church Slavonic'
       INTERE: la,grc
-      CON_ETIMOLOGIA: en
+      CON_ETIMOLOGIA: en,fr,de,ru
       # dell'inglese, il lessico comune (i lemmi tra le 50 mila forme più frequenti) e le parole con l'etimo fuori
       # dall'inglese (ESTERNI), senza nomi propri né locuzioni
-      ELENCHI: en=../dati/frequenze_en.tsv.gz
-      ESTERNI: en
+      # la stessa regola per francese, tedesco e russo (stima del 6 novembre 2026: 114 MB invece di 239 per le lingue intere)
+      ELENCHI: en=../dati/frequenze_en.tsv.gz fr=../dati/frequenze_fr.tsv.gz de=../dati/frequenze_de.tsv.gz ru=../dati/frequenze_ru.tsv.gz
+      ESTERNI: en,fr,de,ru
       GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +45,7 @@ jobs:
           git fetch -q --depth 1 origin main && git show FETCH_HEAD:dati/lessemi.tsv.gz > /tmp/precedenti.tsv.gz
           PRECEDENTI=/tmp/precedenti.tsv.gz SOLO_ANALISI=1 WIKIZIONARIO=0 ./importa.sh
           jq -c . dati/it/rapporto_parser.json
-          echo "::notice title=Parser::$(jq -c '{lessemi, ipotesi, relazioni, voci, intere_la, intere_grc, intere_en, lemmi_interi_la, lemmi_interi_grc}' dati/it/rapporto_parser.json)"
+          echo "::notice title=Parser::$(jq -c '{lessemi, ipotesi, relazioni, voci, intere_la, intere_grc, intere_en, intere_fr, intere_de, intere_ru, lemmi_interi_la, lemmi_interi_grc}' dati/it/rapporto_parser.json)"
           echo "::notice title=Perseus::$(tail -1 dati/it/rapporto_perseus.txt)"
 
       - name: Diagnosi delle etimologie mancanti
@@ -127,7 +130,7 @@ jobs:
       - name: Pacchetto dati
         run: |
           t=import/dati/it/tsv
-          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni dizionari autori stime; do
+          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni dizionari autori stime pronunce; do
             gzip -9 -n -c "$t/$f.tsv" > "dati/$f.tsv.gz"
           done
           # voci per lingua, prima e dopo
@@ -156,7 +159,8 @@ jobs:
           # rispetto al pacchetto pubblicato, quello di main
           git fetch -q --depth 1 origin main
           for f in lessemi ipotesi relazioni attestazioni; do git show FETCH_HEAD:dati/$f.tsv.gz > /tmp/prima/$f.tsv.gz; done
-          python3 import/stima_import.py /tmp/prima dati en --attuale 349 | tee /tmp/stima.txt
+          python3 import/stima_import.py /tmp/prima dati fr,de,ru --attuale 557 \
+            --frequenze fr=dati/frequenze_fr.tsv.gz,de=dati/frequenze_de.tsv.gz,ru=dati/frequenze_ru.tsv.gz | tee /tmp/stima.txt
           echo "::notice title=Stima::$(head -4 /tmp/stima.txt | tr '\n' ' ')"
 
       - name: Commit sul ramo

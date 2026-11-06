@@ -93,6 +93,46 @@ assert not ff(s('a dog used for hunting')), 'un senso lessicale resta'
 from filtra import non_parola
 assert non_parola({'word': 'NASA', 'pos': 'name'}) and non_parola({'word': '&', 'pos': 'symbol'}) and non_parola({'word': 'lol', 'pos': 'abbrev'})
 assert not non_parola({'word': 'laser', 'pos': 'noun'}) and not non_parola({'word': 'I', 'pos': 'pron'})
+# le lingue si incontrano nello stesso nodo: la menzione con i segni e la voce senza sono la stessa pagina
+from wiktionary import nome_pagina as npg
+assert npg('ru', 'во́дка') == 'водка' and npg('ru', 'ёж') == 'ёж' and npg('ru', 'йод') == 'йод', 'ё e й sono lettere'
+assert npg('ang', 'ċēol') == 'ceol' and npg('ang', 'sæterdæġ') == 'sæterdæg' and npg('enm', 'fōtmāl') == 'fotmal'
+assert npg('non', 'háls') == 'háls' and npg('fr', 'dé') == 'dé' and npg('gem-pro', '*berô') == '*berô'
+assert lemma_valido('ru', 'водка') and lemma_valido('de', 'Straße') and lemma_valido('fr', 'cœur') and not lemma_valido('ru', 'vodka')
+# la parte del discorso dalle glosse: Haus, in tedesco, è un nome comune
+from wiktionary import completa_glosse
+import tempfile
+td = tempfile.mkdtemp()
+imp = Importatore()
+haus = imp.lessema('de', 'Haus')
+with open(f'{td}/de_glosse.tsv', 'w') as f:
+    f.write('Haus\t1\tnoun\thouse\t\t\n')
+completa_glosse(imp, f'{td}/de_glosse.tsv', 'de')
+assert imp.lessemi[haus]['pos'] == 's.' and imp.scegli_glossa(imp.lessemi[haus]) == 'house', imp.lessemi[haus]
+# un nome tedesco che il dump non ha (Besitzer in Ladenbesitzer) è un nome comune; un nome di due parole resta senza
+bes, rd = imp.lessema('de', 'Besitzer'), imp.lessema('de', 'Rudolf Diesel')
+imp.nomi_tedeschi()
+assert imp.lessemi[bes]['pos'] == 's.' and imp.lessemi[rd]['pos'] is None
+# la traslitterazione della voce stessa, per la ricerca: дом → dom
+imp.voce({'w': 'дом', 'p': 'noun', 'en': None, 't': '', 'g': ['house'], 'h': [], 'c': None, 'rec': False, 'tpl': [], 'r': 'dom'}, lingua_voce='ru')
+assert imp.lessemi[imp.lessema('ru', 'дом')]['translit'] == 'dom'
+# la pronuncia: IPA con la varietà, sillabazione, audio; dal lemma con etimologia e dalla settima colonna delle glosse
+import json
+from filtra import pronuncia
+pv = {'sounds': [{'ipa': '/ˈka.roː/', 'tags': ['Classical-Latin']}, {'ipa': '[ˈkaː.ro]', 'tags': ['Ecclesiastical-Latin']},
+                 {'audio': 'LL-Q397 (lat)-caro.wav', 'ogg_url': 'https://upload.wikimedia.org/x/LL-Q397_caro.ogg'}, {'rhymes': '-aro'}],
+      'hyphenations': [{'parts': ['ca', 'ro']}]}
+assert pronuncia(pv) == {'i': [['/ˈka.roː/', 'Classical-Latin'], ['[ˈkaː.ro]', 'Ecclesiastical-Latin']], 's': 'ca‧ro', 'a': 'LL-Q397 (lat)-caro.wav'}, pronuncia(pv)
+assert pronuncia({'sounds': [{'rhymes': '-aro'}]}) is None
+assert pronuncia({'sounds': [{'ipa': '[ˈkaː.ro]', 'raw_tags': ['Ecclesiastical']}]})['i'] == [['[ˈkaː.ro]', 'Ecclesiastical']]
+imp.voce({'w': 'caro', 'p': 'noun', 'en': None, 't': '', 'g': ['flesh'], 'h': [], 'c': None, 'rec': False, 'tpl': [], 'pr': pronuncia(pv)}, lingua_voce='la')
+assert imp.lessemi[imp.lessema('la', 'caro')]['pronuncia']['s'] == 'ca‧ro'
+with open(f'{td}/de_glosse2.tsv', 'w') as f:
+    f.write('Haus\t1\tnoun\thouse\t\t\t' + json.dumps({'i': [['/haʊ̯s/', '']]}, ensure_ascii=False) + '\n')
+imp2 = Importatore()
+h2 = imp2.lessema('de', 'Haus')
+completa_glosse(imp2, f'{td}/de_glosse2.tsv', 'de')
+assert imp2.lessemi[h2]['pronuncia'] == {'i': [['/haʊ̯s/', '']]}, imp2.lessemi[h2]
 import json, tempfile
 d = tempfile.mkdtemp()
 with open(f'{d}/en_lemmi.jsonl', 'w') as f:
@@ -167,7 +207,7 @@ LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.t
 cd esempio/tsv
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
 truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_radice, stg_attestazione, stg_wikizionario,
-         stg_glossa_wikidata, stg_glossa_tradotta, stg_dizionario, stg_autore, stg_stima, stg_definizione;
+         stg_glossa_wikidata, stg_glossa_tradotta, stg_dizionario, stg_autore, stg_stima, stg_definizione, stg_pronuncia;
 \copy stg_lingua from 'lingue.tsv'
 \copy stg_lessema from 'lessemi.tsv'
 \copy stg_ipotesi from 'ipotesi.tsv'
@@ -181,12 +221,14 @@ truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_
 \copy stg_dizionario from '../dizionari.tsv'
 \copy stg_autore from '../autori.tsv'
 \copy stg_stima from '../stime.tsv'
+\copy stg_pronuncia from 'pronunce.tsv'
 select importa_wiktionary();
 select importa_dizionari();
 select importa_stime();
 select importa_glosse_wikizionario();
 select importa_glosse_aggiuntive();
 select importa_definizioni();
+select importa_pronunce();
 refresh materialized view mv_allotropi;
 refresh materialized view mv_famiglia;
 SQL

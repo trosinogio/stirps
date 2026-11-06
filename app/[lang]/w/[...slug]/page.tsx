@@ -2,12 +2,13 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { isLang, TESTI, type Lang, type Testi } from '@/lib/i18n';
-import { lingueGeo, scheda, periodiLingue } from '@/lib/dati';
+import { lingueGeo, pronuncia, scheda, periodiLingue } from '@/lib/dati';
 import { classeRamo, datazione, fmt, G, nodiUnici, perLingua, tx } from '@/lib/forme';
 import { Fiducia, intercala, VoceLink } from '@/components/comuni';
 import Mappa from '@/components/Mappa';
 import Automatica from '@/components/Automatica';
 import Definizione from '@/components/Definizione';
+import Pronuncia from '@/components/Pronuncia';
 import LineaTempo, { type NodoTempo } from '@/components/LineaTempo';
 import type { Attestazione, NodoCatena, Relazione, Rimando, Scheda } from '@/lib/tipi';
 
@@ -138,7 +139,8 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
   const { lang, slug } = await params;
   if (!isLang(lang)) notFound();
   const t = TESTI[lang];
-  const sc = await scheda(slug.map(decodeURIComponent).join('/'), lang);
+  const s = slug.map(decodeURIComponent).join('/');
+  const [sc, pr] = await Promise.all([scheda(s, lang), pronuncia(s)]);
   if (!sc) notFound();
   const L = sc.lessema;
   const strato = sc.strati.find((x) => x.codice === L.provenienza);
@@ -185,6 +187,7 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
       <header className="testa-voce">
         <h1 className={`voce-titolo ${classeRamo(L.ramo)}`}><span className="lemma">{fmt(L)}</span></h1>
         {L.translit && <p className="translit">{L.translit}</p>}
+        <Pronuncia pr={pr} lang={lang} />
         <p className={`meta ${classeRamo(L.ramo)}`}>
           <Link className="lingua-b lingua-n" href={`/${lang}/l/${L.lingua}`}>{L.lingua_nome}</Link>
           {L.pos && <span>{t.pos[L.pos] ?? L.pos}</span>}

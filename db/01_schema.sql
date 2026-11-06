@@ -362,6 +362,17 @@ create table opera (
 comment on column opera.lingue      is 'Lingue (codici) per cui l''opera è un riferimento: decide quali opere suggerire in una voce.';
 comment on column opera.modello_url is 'Indirizzo di consultazione per lemma, con {lemma} al posto della parola: genera i collegamenti «Da consultare».';
 
+-- La pronuncia della voce, da Wiktionary: le trascrizioni IPA con la loro varietà (latino classico ed ecclesiastico,
+-- inglese britannico e americano…), la sillabazione, un file audio di Wikimedia Commons. Una riga per voce.
+create table if not exists pronuncia (
+  lessema_id        bigint primary key references lessema on delete cascade,
+  ipa               jsonb not null default '[]',           -- [["/ˈka.roː/", "Classical-Latin"], …]
+  sillabazione      text,                                  -- ca‧ro
+  audio             text,                                  -- nome del file su Wikimedia Commons
+  provenienza       text not null default 'wiktionary'
+);
+comment on table pronuncia is 'Pronuncia della voce da Wiktionary (CC BY-SA): IPA con la varietà, sillabazione, audio di Wikimedia Commons.';
+
 -- Frequenze d'uso: ordinano la ricerca e la coda di verifica (si parte dalle parole più usate)
 create table frequenza (
   lingua      text not null references lingua,
