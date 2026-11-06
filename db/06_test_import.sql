@@ -416,4 +416,22 @@ select pg_temp.verifica(
 select pg_temp.verifica((select testo || '|' || provenienza from glossa where lessema_id = lx('la/mobilis') and lingua = 'it') = 'mobile, sciolto|traduzione-automatica',
   'senza la traduzione di Claude torna quella di OPUS-MT');
 
+
+\echo '— pronunce'
+truncate stg_pronuncia;
+insert into stg_pronuncia
+select id_esterno, '{"i": [["/ˈka.ro/", "Classical-Latin"], ["[ˈkaː.ro]", "Ecclesiastical-Latin"]], "s": "ca‧ro", "a": "LL-caro.wav"}'
+  from lessema where slug = 'la/caro';
+select importa_pronunce();
+select pg_temp.verifica((select ipa->0->>0 || '|' || (ipa->1->>1) || '|' || sillabazione || '|' || audio from pronuncia where lessema_id = lx('la/caro'))
+                        = '/ˈka.ro/|Ecclesiastical-Latin|ca‧ro|LL-caro.wav',
+  'la pronuncia entra: le trascrizioni IPA con la varietà, la sillabazione, l''audio');
+select pg_temp.verifica((select (r->>'nuove')::int + (r->>'cambiate')::int from (select importa_pronunce() as r) x) = 0,
+  'una pronuncia uguale non si riscrive');
+truncate stg_pronuncia;
+create temp table esito_pronunce as select importa_pronunce() as r;   -- la cancellazione si vede dall'istruzione dopo
+select pg_temp.verifica((select (r->>'tolte')::int from esito_pronunce) = 1
+                        and not exists (select 1 from pronuncia where lessema_id = lx('la/caro')),
+  'una pronuncia che Wiktionary non dà più si toglie');
+
 \echo '— collaudo dell’import completato'

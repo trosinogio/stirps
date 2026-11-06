@@ -95,3 +95,10 @@ export interface NodoPiatto {
   ramo: string | null; ricostruito: boolean; glossa?: string | null; nome_proprio?: boolean;
   tipo: string | null; tipo_etichetta?: string | null; padre: number | null;
 }
+
+/** La pronuncia di una voce, da Wiktionary: trascrizioni IPA con la varietà, sillabazione, audio di Wikimedia Commons. */
+export interface Pronuncia {
+  ipa: [string, string][];
+  sillabazione: string | null;
+  audio: string | null;
+}

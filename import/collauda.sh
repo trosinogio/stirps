@@ -120,6 +120,7 @@ pv = {'sounds': [{'ipa': '/ˈka.roː/', 'tags': ['Classical-Latin']}, {'ipa': '[
       'hyphenations': [{'parts': ['ca', 'ro']}]}
 assert pronuncia(pv) == {'i': [['/ˈka.roː/', 'Classical-Latin'], ['[ˈkaː.ro]', 'Ecclesiastical-Latin']], 's': 'ca‧ro', 'a': 'LL-Q397 (lat)-caro.wav'}, pronuncia(pv)
 assert pronuncia({'sounds': [{'rhymes': '-aro'}]}) is None
+assert pronuncia({'sounds': [{'ipa': '[ˈkaː.ro]', 'raw_tags': ['Ecclesiastical']}]})['i'] == [['[ˈkaː.ro]', 'Ecclesiastical']]
 imp.voce({'w': 'caro', 'p': 'noun', 'en': None, 't': '', 'g': ['flesh'], 'h': [], 'c': None, 'rec': False, 'tpl': [], 'pr': pronuncia(pv)}, lingua_voce='la')
 assert imp.lessemi[imp.lessema('la', 'caro')]['pronuncia']['s'] == 'ca‧ro'
 with open(f'{td}/de_glosse2.tsv', 'w') as f:
@@ -202,7 +203,7 @@ LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.t
 cd esempio/tsv
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
 truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_radice, stg_attestazione, stg_wikizionario,
-         stg_glossa_wikidata, stg_glossa_tradotta, stg_dizionario, stg_autore, stg_stima, stg_definizione;
+         stg_glossa_wikidata, stg_glossa_tradotta, stg_dizionario, stg_autore, stg_stima, stg_definizione, stg_pronuncia;
 \copy stg_lingua from 'lingue.tsv'
 \copy stg_lessema from 'lessemi.tsv'
 \copy stg_ipotesi from 'ipotesi.tsv'
@@ -216,12 +217,14 @@ truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_
 \copy stg_dizionario from '../dizionari.tsv'
 \copy stg_autore from '../autori.tsv'
 \copy stg_stima from '../stime.tsv'
+\copy stg_pronuncia from 'pronunce.tsv'
 select importa_wiktionary();
 select importa_dizionari();
 select importa_stime();
 select importa_glosse_wikizionario();
 select importa_glosse_aggiuntive();
 select importa_definizioni();
+select importa_pronunce();
 refresh materialized view mv_allotropi;
 refresh materialized view mv_famiglia;
 SQL

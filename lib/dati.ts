@@ -2,7 +2,7 @@ import { cache } from 'react';
 // Accesso ai dati: ogni pagina chiama una funzione SQL e riceve JSON pronto.
 import { query } from './db';
 import type { Lang } from './i18n';
-import type { ElencoRadici, Indice, LinguaGeo, LinguaInfo, Nodo, Opera, ParoleLingua, RisultatoRicerca, Scheda } from './tipi';
+import type { ElencoRadici, Indice, LinguaGeo, LinguaInfo, Nodo, Opera, ParoleLingua, Pronuncia, RisultatoRicerca, Scheda } from './tipi';
 
 // ANTEPRIMA=1 mostra anche le bozze (il seme pilota è tutto in bozza)
 export const ANTEPRIMA = process.env.ANTEPRIMA === '1';
@@ -10,6 +10,13 @@ export const ANTEPRIMA = process.env.ANTEPRIMA === '1';
 export async function scheda(slug: string, lang: Lang): Promise<Scheda | null> {
   const r = await query<{ s: Scheda | null }>('select scheda($1, $2, $3) as s', [slug, ANTEPRIMA, lang]);
   return r[0]?.s ?? null;
+}
+
+// La pronuncia della voce (tabella pronuncia), letta accanto alla scheda: null se Wiktionary non ne dà
+export async function pronuncia(slug: string): Promise<Pronuncia | null> {
+  const r = await query<Pronuncia>(
+    'select p.ipa, p.sillabazione, p.audio from pronuncia p join lessema l on l.id = p.lessema_id where l.slug = $1', [slug]);
+  return r[0] ?? null;
 }
 
 export async function indice(lang: Lang, limite = 40): Promise<Indice> {
