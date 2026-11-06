@@ -121,6 +121,14 @@ h2{font-family:var(--serif);font-weight:700;font-size:22px;line-height:1.25;marg
 .pronuncia .audio{display:inline-flex;align-items:center;gap:8px}
 .pronuncia audio{height:30px;max-width:220px}
 .pronuncia .audio a{font-size:12px;color:var(--ink-3)}
+.forme-testa{margin:2px 0 0;color:var(--ink-2);font-size:15px;font-style:italic}
+.in-breve{margin:18px 0 6px;padding:12px 16px;border:1px solid var(--linea, rgba(0,0,0,.1));border-radius:8px;background:var(--foglio)}
+.in-breve h2{margin:0 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-family:var(--sans)}
+.in-breve dl{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 20px}
+.in-breve dt{font-size:12px;color:var(--ink-3);font-family:var(--sans)}
+.in-breve dd{margin:2px 0 0;font-size:16px}
+.sensi-w .et{font-size:13px;color:var(--ink-3);font-style:italic}
+.nota-fonte{font-size:13px;color:var(--ink-3);margin:6px 0 0}
 .meta{font:14px var(--sans);color:var(--ink-2);display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;margin:6px 0 0}
 .meta .lingua-n{color:var(--pig)}
 .etichetta{font:12.5px var(--sans);border:1px solid var(--filo-2);border-radius:4px;padding:1px 7px;color:var(--ink-2)}

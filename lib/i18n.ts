@@ -63,6 +63,8 @@ export interface Testi {
   formaRicostruita: string;
   formaAntiquata: string;
   pronuncia: { titolo: string; sillabazione: string; ascolta: string; audio: string; varieta: (etichette: string) => string };
+  inBreve: { titolo: string; origine: string; radice: string; attestazione: string; parenti: string; parentiN: (n: number, lingue: number) => string };
+  scheda: { etichette: (etichette: string) => string; grammatica: (testo: string) => string; sensiWiktionary: string };
   dati: (nome: string, licenza: string) => string;
   sezioni: {
     origine: string; ipotesi: string; ipotesiFonti: string; significati: string; mito: string; sorelle: string;
@@ -196,6 +198,41 @@ const VARIETA_IT: Record<string, string> = {
 const varieta = (mappa: Record<string, string> | null) => (etichette: string) =>
   etichette.split(',').filter(Boolean).map((e) => mappa?.[e] ?? e.replace(/-/g, ' ')).join(', ');
 
+// le etichette d'uso e gli ambiti delle accezioni di Wiktionary, e i termini grammaticali della riga delle forme
+const ETICHETTE_IT: Record<string, string> = {
+  archaic: 'arcaico', obsolete: 'obsoleto', dated: 'datato', rare: 'raro', figuratively: 'figurato', metaphorically: 'metaforico',
+  colloquial: 'colloquiale', informal: 'informale', slang: 'gergale', vulgar: 'volgare', derogatory: 'spregiativo',
+  pejorative: 'peggiorativo', offensive: 'offensivo', poetic: 'poetico', literary: 'letterario', formal: 'formale',
+  humorous: 'scherzoso', euphemistic: 'eufemistico', dialectal: 'dialettale', regional: 'regionale', historical: 'storico',
+  transitive: 'transitivo', intransitive: 'intransitivo', reflexive: 'riflessivo', pronominal: 'pronominale',
+  uncountable: 'non numerabile', countable: 'numerabile', idiomatic: 'idiomatico', ironic: 'ironico', childish: 'infantile',
+  nonstandard: 'non standard', proscribed: 'sconsigliato', 'Late-Latin': 'latino tardo', 'Medieval-Latin': 'latino medievale',
+  'Ecclesiastical-Latin': 'latino ecclesiastico', 'New-Latin': 'latino moderno', 'Classical-Latin': 'latino classico',
+  Epic: 'epico', Attic: 'attico', Ionic: 'ionico', Doric: 'dorico', Koine: 'koinè', Byzantine: 'bizantino',
+  medicine: 'medicina', law: 'diritto', botany: 'botanica', zoology: 'zoologia', music: 'musica', religion: 'religione',
+  mathematics: 'matematica', physics: 'fisica', chemistry: 'chimica', anatomy: 'anatomia', military: 'ambito militare',
+  nautical: 'marineria', grammar: 'grammatica', linguistics: 'linguistica', philosophy: 'filosofia', architecture: 'architettura',
+  economics: 'economia', mythology: 'mitologia', astronomy: 'astronomia', geography: 'geografia', biology: 'biologia',
+  computing: 'informatica', sports: 'sport', cooking: 'cucina', agriculture: 'agricoltura', rhetoric: 'retorica',
+  Christianity: 'cristianesimo', theology: 'teologia', politics: 'politica', geology: 'geologia', pathology: 'patologia',
+};
+const GRAMMATICA_IT: Record<string, string> = {
+  genitive: 'genitivo', dative: 'dativo', accusative: 'accusativo', nominative: 'nominativo', ablative: 'ablativo',
+  plural: 'plurale', singular: 'singolare', feminine: 'femminile', masculine: 'maschile', neuter: 'neutro',
+  declension: 'declinazione', conjugation: 'coniugazione', first: 'prima', second: 'seconda', third: 'terza',
+  fourth: 'quarta', fifth: 'quinta', present: 'presente', infinitive: 'infinito', perfect: 'perfetto', active: 'attivo',
+  passive: 'passivo', supine: 'supino', participle: 'participio', comparative: 'comparativo', superlative: 'superlativo',
+  diminutive: 'diminutivo', indeclinable: 'indeclinabile', imperfective: 'imperfettivo', perfective: 'perfettivo',
+  past: 'passato', 'past participle': 'participio passato', 'present participle': 'participio presente', and: 'e', or: 'o',
+  'not comparable': 'non comparabile', irregular: 'irregolare', future: 'futuro', aorist: 'aoristo', strong: 'forte', weak: 'debole',
+  auxiliary: 'ausiliare', 'no plural': 'senza plurale', 'plural only': 'solo plurale', animate: 'animato', inanimate: 'inanimato',
+};
+const etichette = (mappa: Record<string, string> | null) => (e: string) =>
+  e.split(',').filter(Boolean).map((x) => mappa?.[x] ?? x.replace(/-/g, ' ')).join(', ');
+// i termini grammatici inglesi della riga delle forme, parola per parola (le locuzioni prima): la forma resta com'è
+const GRAMMATICA_RE = new RegExp(`\\b(${Object.keys(GRAMMATICA_IT).sort((a, b) => b.length - a.length).join('|')})\\b`, 'g');
+const grammaticaIt = (testo: string) => testo.replace(GRAMMATICA_RE, (m) => GRAMMATICA_IT[m] ?? m);
+
 export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
   it: {
     nomeInterfaccia: 'Italiano',
@@ -254,6 +291,9 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     formaAntiquata: 'forma antiquata',
     pronuncia: { titolo: 'Pronuncia', sillabazione: 'sillabazione', ascolta: 'Ascolta la pronuncia',
                  audio: 'audio: Wikimedia Commons', varieta: varieta(VARIETA_IT) },
+    inBreve: { titolo: 'In breve', origine: 'Origine', radice: 'Capostipite', attestazione: 'Prima attestazione', parenti: 'Parole imparentate',
+               parentiN: (n, l) => `${n} ${n === 1 ? 'parola' : 'parole'} in ${l} ${l === 1 ? 'lingua' : 'lingue'}` },
+    scheda: { etichette: etichette(ETICHETTE_IT), grammatica: grammaticaIt, sensiWiktionary: 'Accezioni di Wiktionary, in inglese.' },
     dati: (n, l) => `dati ${n}, ${l}`,
     sezioni: {
       origine: 'Da dove viene', ipotesi: 'Ipotesi', ipotesiFonti: 'Ipotesi e fonti', significati: 'Significati', mito: 'Falso mito',
@@ -452,6 +492,9 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     formaAntiquata: 'archaic form',
     pronuncia: { titolo: 'Pronunciation', sillabazione: 'hyphenation', ascolta: 'Listen to the pronunciation',
                  audio: 'audio: Wikimedia Commons', varieta: varieta(null) },
+    inBreve: { titolo: 'At a glance', origine: 'Origin', radice: 'Earliest ancestor', attestazione: 'First attested', parenti: 'Related words',
+               parentiN: (n, l) => `${n} ${n === 1 ? 'word' : 'words'} in ${l} ${l === 1 ? 'language' : 'languages'}` },
+    scheda: { etichette: etichette(null), grammatica: (x) => x, sensiWiktionary: 'Senses from Wiktionary.' },
     dati: (n, l) => `${n} data, ${l}`,
     sezioni: {
       origine: 'Where it comes from', ipotesi: 'Hypotheses', ipotesiFonti: 'Hypothesis and sources', significati: 'Meanings',

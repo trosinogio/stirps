@@ -102,3 +102,9 @@ export interface Pronuncia {
   sillabazione: string | null;
   audio: string | null;
 }
+
+/** La riga delle forme e le accezioni di una voce, da Wiktionary: [testo, etichette d'uso separate da virgole]. */
+export interface Sensi {
+  testa: string | null;
+  sensi: [string, string][];
+}
