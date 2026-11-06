@@ -167,7 +167,7 @@ Il pacchetto `dati/*.tsv.gz` ha un'impronta (SHA-256 dei file e della logica d'i
 
 Se qualcosa va storto, il database resta com'era e il deploy si ferma. Dopo il commit svuota le tabelle di appoggio, fa il vacuum e scrive nel registro lo spazio occupato.
 
-**Lo spazio.** Il piano gratuito di Neon ha 0,5 GB. L'import scrive solo ciò che cambia: voci, ipotesi, archi e glosse uguali restano dove sono, perché in Postgres ogni riga riscritta lascia una copia morta fino al vacuum. Prima ogni reimport riscriveva quasi tutto. Con latino e greco completi (novembre 2026, 293 mila voci) un caricamento da zero occupa circa 290 MB, e un reimport con gli stessi dati non lo fa crescere.
+**Lo spazio.** Il piano gratuito di Neon ha 1 GB (era 0,5 GB). L'import scrive solo ciò che cambia: voci, ipotesi, archi e glosse uguali restano dove sono, perché in Postgres ogni riga riscritta lascia una copia morta fino al vacuum. Prima ogni reimport riscriveva quasi tutto. Con latino e greco completi (novembre 2026, 293 mila voci) un caricamento da zero occupa circa 290 MB, e un reimport con gli stessi dati non lo fa crescere.
 
 Prima di un deploy che cambia i dati conviene una copia del ramo di produzione, che su Neon è istantanea:
 
@@ -204,7 +204,7 @@ Il codice vive in un repository GitHub privato. Vercel non è collegato a GitHub
 - **Pubblicazione** (`.github/workflows/pubblica.yml`): parte dopo ogni collaudo riuscito su `main`, oppure a mano dalla scheda Actions.
   - Crea su Neon un ramo di riserva (`backup-AAAA-MM-GG-HHMM`, senza compute, che scade dopo 30 giorni).
   - Pubblica su Vercel con `scripts/pubblica-vercel-api.sh`, che usa l'API REST e non la CLI: il token è un token di progetto (`vcp_…`), che vede il progetto ma non l'utente, e la CLI con lui si ferma («User not found»). La build applica gli aggiornamenti datati.
-  - Controlla che gli aggiornamenti siano nel database, elenca le ipotesi verificate che non rispettano le norme e riporta lo spazio occupato (il piano gratuito di Neon ha 0,5 GB).
+  - Controlla che gli aggiornamenti siano nel database, elenca le ipotesi verificate che non rispettano le norme e riporta lo spazio occupato (il piano gratuito di Neon ha 1 GB).
   - Se un passo fallisce, i successivi non partono.
   - Richiede i segreti `VERCEL_TOKEN`, `NEON_API_KEY` e `DATABASE_URL_UNPOOLED`.
 - **Dati** (`.github/workflows/dati.yml`): rigenera il pacchetto `dati/` con un push su un ramo `dati-*`, oppure a mano.

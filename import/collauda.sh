@@ -85,6 +85,80 @@ arco(imp, audience, aud)
 imp.radici = {(audience, h2ew), (audience, dheh1)}
 imp.chiudi_su_radici()
 assert not ha(imp, aud), 'due radici dichiarate alla pari: nessun legame'
+# l'inglese: il suo alfabeto, le sue forme verbali, niente sigle; entrano solo le voci con un'etimologia (--con-etimologia)
+assert lemma_valido('en', 'hound') and lemma_valido('ang', 'þing') and lemma_valido('en', 'café') and lemma_valido('en', 'I')
+assert not lemma_valido('en', '4x4') and not lemma_valido('en', 'A'), 'cifre e lettere isolate non sono parole'
+assert ff(s('simple past tense and past participle of hound')) and ff(s('third-person singular simple present indicative form of hound'))
+assert not ff(s('a dog used for hunting')), 'un senso lessicale resta'
+from filtra import non_parola
+assert non_parola({'word': 'NASA', 'pos': 'name'}) and non_parola({'word': '&', 'pos': 'symbol'}) and non_parola({'word': 'lol', 'pos': 'abbrev'})
+assert not non_parola({'word': 'laser', 'pos': 'noun'}) and not non_parola({'word': 'I', 'pos': 'pron'})
+import json, tempfile
+d = tempfile.mkdtemp()
+with open(f'{d}/en_lemmi.jsonl', 'w') as f:
+    f.write(json.dumps({'w': 'hound', 'p': 'noun', 'en': None, 't': 'From Middle English hound.', 'g': ['A dog'], 'h': [], 'c': None,
+                        'rec': False, 'tpl': [{'n': 'inh', 'a': {'1': 'en', '2': 'enm', '3': 'hound'}, 'e': 'hound'}]}) + '\n')
+with open(f'{d}/en_glosse.tsv', 'w') as f:
+    f.write('hound\t1\tnoun\tA dog\t\t\nwoof\t1\tintj\tthe bark of a dog\t\t\n')
+for modo, attesi in (('con_etimologia', {'hound'}), ('intere', {'hound', 'woof'})):
+    imp = Importatore()
+    setattr(imp, modo, {'en'})
+    imp.carica_chiusura('en', f'{d}/en_lemmi.jsonl', None, f'{d}/en_glosse.tsv')
+    imp.chiudi(1); imp.aggiungi_lemmi_interi()
+    lemmi = {l['lemma'] for l in imp.lessemi.values() if l['lingua'] == 'en'}
+    assert lemmi == attesi, (modo, lemmi)
+# con un elenco (il lessico comune) entrano solo i lemmi dell'elenco, senza nomi propri né locuzioni; le voci raggiunte sì
+with open(f'{d}/en_lemmi.jsonl', 'a') as f:
+    for w, p in (('Hounslow', 'name'), ('hound dog', 'noun'), ('houndfish', 'noun'), ('dog', 'noun')):
+        f.write(json.dumps({'w': w, 'p': p, 'en': None, 't': '', 'g': [], 'h': [], 'c': None, 'rec': False,
+                            'tpl': [{'n': 'inh', 'a': {'1': 'en', '2': 'enm', '3': w}, 'e': w}]}) + '\n')
+imp = Importatore()
+imp.con_etimologia, imp.elenco = {'en'}, {'en': {'hound', 'hounslow', 'hound dog'}}
+imp.carica_chiusura('en', f'{d}/en_lemmi.jsonl', None, f'{d}/en_glosse.tsv')
+imp.lessema('en', 'dog')
+imp.chiudi(2)
+lemmi = {l['lemma'] for l in imp.lessemi.values() if l['lingua'] == 'en'}
+assert lemmi == {'hound', 'dog'}, lemmi
+# con --esterni entrano anche le voci fuori elenco con l'etimo in un'altra lingua (kennel < anglonormanno), non i composti
+with open(f'{d}/en_lemmi.jsonl', 'a') as f:
+    f.write(json.dumps({'w': 'kennel', 'p': 'noun', 'en': None, 't': '', 'g': [], 'h': [], 'c': None, 'rec': False,
+                        'tpl': [{'n': 'bor', 'a': {'1': 'en', '2': 'xno', '3': 'kenil'}, 'e': 'kenil'}]}) + '\n')
+    f.write(json.dumps({'w': 'houndlike', 'p': 'adj', 'en': None, 't': '', 'g': [], 'h': [], 'c': None, 'rec': False,
+                        'tpl': [{'n': 'suffix', 'a': {'1': 'en', '2': 'hound', '3': 'like'}, 'e': ''}]}) + '\n')
+imp = Importatore()
+imp.con_etimologia, imp.elenco, imp.esterni = {'en'}, {'en': {'hound'}}, {'en'}
+imp.carica_chiusura('en', f'{d}/en_lemmi.jsonl', None, f'{d}/en_glosse.tsv')
+imp.chiudi(2)
+lemmi = {l['lemma'] for l in imp.lessemi.values() if l['lingua'] == 'en'}
+assert lemmi == {'hound', 'dog', 'houndfish', 'kennel'}, lemmi
+# la glossa: quella della voce stessa prima delle menzioni (t=bee); senza voce propria, quella già pubblicata
+imp = Importatore()
+for _ in range(3):
+    api = imp.lessema('la', 'apis', glossa='bee')
+imp.voce({'w': 'apis', 'p': 'noun', 'en': None, 't': '', 'g': ['bee (insect of the clade Anthophila)'], 'h': [], 'c': None, 'rec': False, 'tpl': []}, lingua_voce='la')
+assert imp.scegli_glossa(imp.lessemi[api]) == 'bee (insect of the clade Anthophila)', imp.lessemi[api]
+imp.glosse_precedenti = {api: 'bee'}
+assert imp.scegli_glossa(imp.lessemi[api]) == 'bee', 'la glossa già pubblicata viene prima di quella della voce'
+dr = imp.lessema('ine-pro', '*h₂eǵ-', glossa='to drive', ident='drive')
+imp.lessemi[dr]['ident'] = 'drive'
+imp.glosse_precedenti = {dr: 'drive'}
+assert imp.scegli_glossa(imp.lessemi[dr]) == 'drive', 'l\'identificativo pubblicato di una radice omografa resta'
+imp.glosse_precedenti = {}
+es = imp.lessema('ine-pro', '*h₁es-', glossa='to be')
+imp.lessema('ine-pro', '*h₁es-', glossa='to be'); imp.lessema('ine-pro', '*h₁es-', glossa='to be, exist')
+assert imp.scegli_glossa(imp.lessemi[es]) == 'to be', 'senza glossa precedente vince la più citata'
+imp.glosse_precedenti = {es: 'to be, exist'}
+assert imp.scegli_glossa(imp.lessemi[es]) == 'to be, exist', 'la glossa pubblicata resta, se è ancora tra le candidate'
+imp.glosse_precedenti = {es: 'to exist'}
+assert imp.scegli_glossa(imp.lessemi[es]) == 'to be', 'una glossa pubblicata che non è più tra le candidate non resta'
+# un suffisso scritto senza trattino non è una base: forty < four + -y, non forty < «y»
+imp = Importatore()
+imp.chiusura['en'] = {'voci': [], 'lemmi': {'-y', 'forty', 'four'}, 'omografi': {}, 'forme': {}, 'participi': {}, 'flesse': {}, 'file_glosse': None}
+forty, y, four = imp.lessema('en', 'forty'), imp.lessema('en', 'y'), imp.lessema('en', 'four')
+arco(imp, forty, four)
+imp.relazioni.append({**imp.relazioni[-1], 'chiave': forty + '#wikt#1', 'etimo': y, 'ordine': 2})
+imp.togli_archi_impossibili()
+assert [r['etimo'] for r in imp.relazioni if r['esito'] == forty] == [four], imp.relazioni
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \

@@ -364,8 +364,15 @@ select l.id_esterno, coalesce(l.glossa, ''), v.t, v.d, 'claude-opus-5-5'
 insert into stg_definizione
 select id_esterno, 'una glossa che non c''è più', 'caro', 'Definizione nata da un''altra glossa.', 'claude-opus-5-5'
   from lessema where slug = 'la/carus';
+-- una definizione nata senza glossa (una radice, *tréyes) resta quando la voce riceve una glossa («three»)
+insert into stg_definizione
+select id_esterno, '', null, 'Definizione nata senza glossa.', 'claude-opus-5-5'
+  from lessema where glossa is not null and provenienza = 'wiktionary'
+   and slug not in ('la/mobilis', 'la/caro', 'it/pausare', 'it/centavo', 'la/carus') order by slug limit 1;
 select importa_glosse_aggiuntive();
 select importa_definizioni();
+select pg_temp.verifica(exists (select 1 from definizione where testo = 'Definizione nata senza glossa.' and provenienza = 'claude'),
+  'una definizione nata senza glossa resta quando la voce riceve una glossa');
 select pg_temp.verifica((select testo || '|' || provenienza from glossa where lessema_id = lx('la/mobilis') and lingua = 'it') = 'mobile, movibile|claude'
                         and (nodo_json(lx('la/mobilis'), 'it')->>'glossa_automatica')::boolean,
   'la traduzione di Claude prende il posto di quella di OPUS-MT, ed è segnata come automatica');

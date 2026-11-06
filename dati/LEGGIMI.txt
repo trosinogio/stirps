@@ -8,6 +8,11 @@ Lexicon, 9ª ed., 1940) che Wiktionary non ha, dall'edizione digitale del Perseu
 http://www.perseus.tufts.edu/), file TEI di github.com/PerseusDL/lexica al commit 1c34cdf, estratti con
 import/filtra_perseus.py. Licenza CC BY-SA 4.0: chi li riusa deve citare il Perseus Digital Library.
 
+Dal 6 novembre 2026 entrano anche le voci inglesi del lessico comune con le loro catene (inglese medio e antico, norreno).
+
+frequenze_en.tsv.gz: le 50 mila forme inglesi più frequenti nei sottotitoli di OpenSubtitles 2018, da FrequencyWords di
+Hermit Dave (CC BY-SA 4.0): scelgono il lessico comune dell'inglese da importare; non entrano nel database.
+
 glosse_tradotte.tsv.gz: traduzioni automatiche delle glosse inglesi (import/traduci_glosse.py), segnate ≈ nel dizionario.
 
 definizioni.tsv.gz: traduzioni e definizioni italiane scritte da Claude (Anthropic) con import/definisci.py: chiave della

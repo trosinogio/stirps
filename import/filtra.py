@@ -115,7 +115,17 @@ FORMA = re.compile(r'^(?:\([^)]*\)\s*)*(?:'
                    r'|(?:plural|singular|dual|inflection|gerund|supine)\s+of\b'
                    r'|(?:(?:present|perfect|future|past|aorist|imperfect)\s+)?(?:(?:active|passive|middle|mediopassive)\s+)?'
                    r'(?:infinitive|participle)\s+of\b'
-                   r'|(?:comparative|superlative)(?:\s+degree)?\s+of\b)', re.I)
+                   r'|(?:comparative|superlative)(?:\s+degree)?\s+of\b'
+                   r'|(?:simple\s+)?past\s+tense\b|simple\s+past\b)', re.I)      # inglese: «simple past tense and past participle of»
+
+# Le voci che non sono parole: sigle e abbreviazioni (NASA, BBC, SPQR), simboli, caratteri, segni d'interpunzione.
+# Le sigle diventate parole minuscole (laser, radar) restano.
+NON_PAROLE = {'abbrev', 'symbol', 'character', 'punct'}
+
+
+def non_parola(v):
+    w = v.get('word') or ''
+    return v.get('pos') in NON_PAROLE or (w.isupper() and sum(c.isalpha() for c in w) > 1)
 
 
 def marcata(v):
@@ -175,7 +185,7 @@ def menzione_come_der(v):
 
 
 if __name__ == '__main__':
-    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = 0
+    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = non_parole = 0
     out = open(sys.argv[1], 'w', encoding='utf-8')
     glosse = open(sys.argv[2], 'w', encoding='utf-8')
     forme = open(os.environ['FORME'], 'w', encoding='utf-8') if os.environ.get('FORME') else None
@@ -204,6 +214,9 @@ if __name__ == '__main__':
                 esempi_diagnosi[t['name']] += 1
                 print('  esempio ' + json.dumps({'parola': v.get('word'), 'modello': t, 'testo': (v.get('etymology_text') or '')[:300],
                                                   'altri': [x.get('name') for x in tpl]}, ensure_ascii=False), file=sys.stderr)
+        if non_parola(v):
+            non_parole += 1
+            continue
         if forma_flessa(v):
             flesse += 1
             flesse_dalla_glossa += not marcata(v)
@@ -257,7 +270,7 @@ if __name__ == '__main__':
         tenuti += 1
     print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, da {{{{ety}}}} {dalla_ety}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
-          f'lemmi senza etimologia utile {senza}', file=sys.stderr)
+          f'lemmi senza etimologia utile {senza}, sigle e simboli esclusi {non_parole}', file=sys.stderr)
     if senza:
         print(f'  senza etimologia utile, per causa: {dict(cause)}; modelli non letti più frequenti: '
               f'{modelli_ignoti.most_common(25)}', file=sys.stderr)

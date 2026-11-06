@@ -48,14 +48,15 @@ jobs:
         run: |
           api="https://console.neon.tech/api/v2/projects/$PROGETTO_NEON/branches"
           aut="Authorization: Bearer $NEON_API_KEY"
-          rami=$(curl -sS --fail-with-body -H "$aut" "$api")
+          # letture e cancellazioni si ripetono dopo un guasto passeggero (502 di Neon, 6 novembre 2026); la creazione no
+          rami=$(curl -sS --fail-with-body --retry 4 --retry-delay 15 --retry-all-errors --connect-timeout 30 -H "$aut" "$api")
           padre=$(jq -r --arg n "$RAMO_NEON" '.branches[] | select(.name == $n) | .id' <<< "$rami")
           if [ -z "$padre" ]; then echo "::error title=Pubblica::il ramo $RAMO_NEON non c'è su Neon"; exit 1; fi
           # il piano gratuito di Neon ha 10 rami: restano i due rami di riserva più recenti, più quello nuovo.
           # Si tolgono solo i rami che si chiamano backup-*, mai production né altri, e mai quelli con rami figli
           echo "- Rami su Neon: $(jq -r '[.branches[] | "\(.name) (\(.created_at[0:10])\(if .protected then ", protetto" else "" end)\(if .default then ", predefinito" else "" end))"] | join("; ")' <<< "$rami")" >> "$GITHUB_STEP_SUMMARY"
           for vecchio in $(jq -r '[.branches[].parent_id] as $padri | [.branches[] | select((.name | startswith("backup-")) and ([.id] | inside($padri) | not))] | sort_by(.created_at) | reverse | .[2:][] | .id + ":" + .name' <<< "$rami"); do
-            r=$(curl -sS -w '\n%{http_code}' -X DELETE -H "$aut" "$api/${vecchio%%:*}")
+            r=$(curl -sS -w '\n%{http_code}' --retry 4 --retry-delay 15 --connect-timeout 30 -X DELETE -H "$aut" "$api/${vecchio%%:*}")
             c=${r##*$'\n'}
             if [ "$c" -lt 300 ]; then
               echo "- Tolto il ramo di riserva più vecchio: \`${vecchio#*:}\`" >> "$GITHUB_STEP_SUMMARY"
@@ -123,7 +124,7 @@ jobs:
               echo "  - $r" >> "$GITHUB_STEP_SUMMARY"
             done <<< "$righe"
           fi
-          # lo spazio occupato: il piano gratuito di Neon ha 0,5 GB
+          # lo spazio occupato: il piano gratuito di Neon ha 1 GB
           spazio=$(sql "select pg_size_pretty(pg_database_size(current_database())) || ', ' || (select count(*) from lessema) || ' voci'")
           echo "::notice title=Spazio::$spazio"
           echo "- Spazio occupato: $spazio." >> "$GITHUB_STEP_SUMMARY"
