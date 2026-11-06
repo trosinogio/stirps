@@ -13,6 +13,7 @@ CHIUSURA="" DATABASE_URL="postgres://…" ./importa.sh                          
 WIKIZIONARIO=0 DATABASE_URL="postgres://…" ./importa.sh                       # senza glosse italiane
 LINGUA=fr NOME=French CHIUSURA="la:Latin fro:Old French" DATABASE_URL="…" ./importa.sh   # un'altra lingua
 INTERE="" DATABASE_URL="postgres://…" ./importa.sh                            # latino e greco solo dove arrivano le catene
+CHIUSURA="… en:English enm:Middle English ang:Old English" CON_ETIMOLOGIA=en ./importa.sh   # anche l’inglese con etimologia
 SOLO_ANALISI=1 ./importa.sh                         # solo le tabelle (dati/it/tsv), senza database
 DATABASE_URL="postgres://…" ./collauda.sh           # test su voci reali (esempio/)
 ```
@@ -25,6 +26,10 @@ Lo script lavora in quattro fasi e impiega circa quattro minuti:
 4. **Fusione, circa 30 secondi, più 8 di ricalcoli.** `importa_wiktionary()` fonde etimologie e attestazioni, `importa_dizionari()` aggiunge i lemmi del Perseus, `importa_glosse_wikizionario()` le glosse italiane; poi si ricalcolano allotropi e famiglie.
 
 L’import si può rilanciare: è idempotente. E scrive solo ciò che cambia: voci, ipotesi, archi e glosse uguali restano dove sono (lo verifica un test sullo `xmin` delle righe). In Postgres ogni riga riscritta lascia una copia morta che occupa spazio fino al vacuum: prima, ogni reimport riscriveva quasi tutto e raddoppiava le tabelle, e il piano gratuito di Neon ha 0,5 GB. Dopo il commit `scripts/inizializza-db.mjs` svuota le tabelle di appoggio e fa il vacuum.
+
+**Tre modi per una lingua di chiusura.** Di norma entrano solo le voci che una catena raggiunge. Con `INTERE` (latino, greco) entra tutta la lingua, anche i lemmi senza etimologia. Con `CON_ETIMOLOGIA` (inglese) entrano tutte le voci che hanno un’etimologia, ma non i lemmi vuoti: l’inglese ne ha centinaia di migliaia. Per l’inglese valgono il suo alfabeto in `lemma_valido()` (con æ, þ, ð, ƿ, ȝ dell’inglese antico e medio), le forme verbali in `FORMA` («simple past tense and past participle of») e, per tutte le lingue, `non_parola()` in `filtra.py`: sigle, abbreviazioni, simboli e segni non sono voci (NASA, BBC, SPQR); le sigle diventate parole minuscole (*laser*, *radar*) restano.
+
+**Prima di un import grande, la stima.** `stima_import.py` confronta il pacchetto nuovo con quello di prima e moltiplica le righe nuove per i byte per riga del database vero (indici compresi, misurati il 6 novembre 2026: voce 510, ipotesi 425, passaggio 355 più 100 nella vista delle famiglie, glossa 340, attestazione 336). Per la lingua esaminata conta parti del discorso, nomi propri e locuzioni, dice in che lingua finiscono le catene e stampa un campione da guardare a mano. Il workflow Dati la esegue prima del commit del pacchetto; la misura vera resta quella della build in locale (`[db] spazio occupato`).
 
 ## La chiusura delle catene
 

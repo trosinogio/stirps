@@ -325,6 +325,10 @@ CIPRIOTA = {chr(c) for c in range(0x10800, 0x10840)}
 LETTERE = {'la': set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZæœÆŒ'),
            'grc': set('αβγδεζηθικλμνξοπρσςτυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩϝϜϙϘϻϺͷͶͱͰͳͲϳͿ'),
            'grc-arp': CIPRIOTA}
+# inglese, inglese medio e antico, scozzese: l'alfabeto latino con le lettere antiche (æ, þ, ð, ƿ, ȝ); i segni
+# diacritici (café, ā) cadono con la normalizzazione NFD
+LETTERE.update(dict.fromkeys(('en', 'enm', 'ang', 'sco'), set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                                                             'æÆœŒþÞðÐƿǷȝȜ')))
 NON_LEMMA = re.compile(r'[()\[\]{}<>“”"=|]')
 
 
@@ -344,7 +348,9 @@ def lemma_valido(lingua, lemma, ricostruito=False):
         return False
     if sum(c in lettere for c in basi) == 1 and corpo == lemma:
         # una lettera sola è una parola solo con i suoi segni (ὁ, ὦ) o, in latino, minuscola (ā, ē, ō): A, α, Ϝ no
-        return len(unicodedata.normalize('NFD', corpo)) > 1 if base_lingua(lingua) == 'grc' else basi[0].islower()
+        if base_lingua(lingua) == 'grc':
+            return len(unicodedata.normalize('NFD', corpo)) > 1
+        return basi[0].islower() or (lingua == 'en' and corpo == 'I')     # il pronome inglese I è una parola
     return True
 
 
@@ -455,6 +461,8 @@ class Importatore:
         self.participi = set()       # (lingua, pagina) dei participi citati come etimi
         self.attestazioni = {}       # chiave del lessema -> (anno_da, anno_a, precisione)
         self.intere = set()          # lingue di chiusura importate intere (--intere la,grc), non solo dove le catene arrivano
+        self.con_etimologia = set()  # lingue di chiusura di cui entrano tutte le voci con un'etimologia, ma non i lemmi
+                                     # senza (--con-etimologia en): l'inglese ha centinaia di migliaia di lemmi vuoti
         self.stat = Counter()
 
     # ---- lessemi ----
@@ -813,7 +821,7 @@ class Importatore:
         for passo in range(passi):
             nuove = 0
             for lingua, idx in self.chiusura.items():
-                intera = passo == 0 and lingua in self.intere
+                intera = passo == 0 and (lingua in self.intere or lingua in self.con_etimologia)
                 for i, v in enumerate(idx['voci']):
                     if (lingua, i) in fatte:
                         continue
@@ -1198,8 +1206,8 @@ def completa_glosse(imp, percorso, lingua=None):
 
 if __name__ == '__main__':
     # wiktionary.py lemmi.jsonl uscita/ [glosse.tsv] [--chiudi la=lemmi.jsonl,glosse.tsv,forme.tsv]… [--passi N]
-    #               [--intere la,grc]
-    args, chiusure, passi, intere = [], [], 1, set()
+    #               [--intere la,grc] [--con-etimologia en]
+    args, chiusure, passi, intere, con_etimologia = [], [], 1, set(), set()
     it_ = iter(sys.argv[1:])
     for x in it_:
         if x == '--chiudi':
@@ -1208,10 +1216,13 @@ if __name__ == '__main__':
             passi = int(next(it_))
         elif x == '--intere':
             intere = {c for c in next(it_).split(',') if c}
+        elif x == '--con-etimologia':
+            con_etimologia = {c for c in next(it_).split(',') if c}
         else:
             args.append(x)
     imp = Importatore()
     imp.intere = intere
+    imp.con_etimologia = con_etimologia
     for c in chiusure:
         lingua, percorsi = c.split('=', 1)
         p = percorsi.split(',') + ['', '']

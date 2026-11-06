@@ -85,6 +85,28 @@ arco(imp, audience, aud)
 imp.radici = {(audience, h2ew), (audience, dheh1)}
 imp.chiudi_su_radici()
 assert not ha(imp, aud), 'due radici dichiarate alla pari: nessun legame'
+# l'inglese: il suo alfabeto, le sue forme verbali, niente sigle; entrano solo le voci con un'etimologia (--con-etimologia)
+assert lemma_valido('en', 'hound') and lemma_valido('ang', 'þing') and lemma_valido('en', 'café') and lemma_valido('en', 'I')
+assert not lemma_valido('en', '4x4') and not lemma_valido('en', 'A'), 'cifre e lettere isolate non sono parole'
+assert ff(s('simple past tense and past participle of hound')) and ff(s('third-person singular simple present indicative form of hound'))
+assert not ff(s('a dog used for hunting')), 'un senso lessicale resta'
+from filtra import non_parola
+assert non_parola({'word': 'NASA', 'pos': 'name'}) and non_parola({'word': '&', 'pos': 'symbol'}) and non_parola({'word': 'lol', 'pos': 'abbrev'})
+assert not non_parola({'word': 'laser', 'pos': 'noun'}) and not non_parola({'word': 'I', 'pos': 'pron'})
+import json, tempfile
+d = tempfile.mkdtemp()
+with open(f'{d}/en_lemmi.jsonl', 'w') as f:
+    f.write(json.dumps({'w': 'hound', 'p': 'noun', 'en': None, 't': 'From Middle English hound.', 'g': ['A dog'], 'h': [], 'c': None,
+                        'rec': False, 'tpl': [{'n': 'inh', 'a': {'1': 'en', '2': 'enm', '3': 'hound'}, 'e': 'hound'}]}) + '\n')
+with open(f'{d}/en_glosse.tsv', 'w') as f:
+    f.write('hound\t1\tnoun\tA dog\t\t\nwoof\t1\tintj\tthe bark of a dog\t\t\n')
+for modo, attesi in (('con_etimologia', {'hound'}), ('intere', {'hound', 'woof'})):
+    imp = Importatore()
+    setattr(imp, modo, {'en'})
+    imp.carica_chiusura('en', f'{d}/en_lemmi.jsonl', None, f'{d}/en_glosse.tsv')
+    imp.chiudi(1); imp.aggiungi_lemmi_interi()
+    lemmi = {l['lemma'] for l in imp.lessemi.values() if l['lingua'] == 'en'}
+    assert lemmi == attesi, (modo, lemmi)
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \

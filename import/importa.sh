@@ -5,6 +5,7 @@
 #   CHIUSURA="" DATABASE_URL=… ./importa.sh                                  # senza chiusura delle catene
 #   WIKIZIONARIO=0 DATABASE_URL=… ./importa.sh                               # senza glosse italiane del Wikizionario
 #   INTERE="" DATABASE_URL=… ./importa.sh                                    # latino e greco solo dove le catene arrivano
+#   CHIUSURA="… en:English enm:Middle English ang:Old English" CON_ETIMOLOGIA=en ./importa.sh   # anche l'inglese con etimologia
 #   DIZIONARI=0 DATABASE_URL=… ./importa.sh                                  # senza i lemmi del Lewis & Short e dell'LSJ
 #   SOLO_ANALISI=1 ./importa.sh                                              # si ferma alle tabelle (dati/it/tsv), senza database
 # Richiede python3, curl e psql. Lo schema (01–03) e db/05_import_wiktionary.sql devono essere già caricati.
@@ -16,6 +17,7 @@ CHIUSURA=${CHIUSURA-la:Latin fro:Old French grc:Ancient Greek}
 PASSI=${PASSI:-5}   # la chiusura si ripete finché trova voci nuove: βούτυρον → βοῦς → *gʷṓws
 WIKIZIONARIO=${WIKIZIONARIO:-1}
 INTERE=${INTERE-la,grc}   # lingue di chiusura importate intere: anche le voci che nessuna catena raggiunge
+CON_ETIMOLOGIA=${CON_ETIMOLOGIA-}   # lingue di chiusura di cui entrano tutte le voci con un'etimologia (en), senza i lemmi vuoti
 SOLO_ANALISI=${SOLO_ANALISI:-0}
 DIZIONARI=${DIZIONARI:-1}   # i lemmi del Lewis & Short e dell'LSJ che Wiktionary non ha (Perseus, CC BY-SA 4.0)
 PERSEUS=${PERSEUS:-1c34cdf756c63cf37db61bd366d733431dbd7aa0}   # commit di PerseusDL/lexica
@@ -46,7 +48,7 @@ fi
 
 echo "2/4  leggo le etimologie"
 python3 wiktionary.py "$DATI/lemmi.jsonl" "$DATI/tsv" "$DATI/glosse.tsv" ${ARGOMENTI[@]+"${ARGOMENTI[@]}"} --passi "$PASSI" \
-  ${INTERE:+--intere "$INTERE"} > "$DATI/rapporto_parser.json"
+  ${INTERE:+--intere "$INTERE"} ${CON_ETIMOLOGIA:+--con-etimologia "$CON_ETIMOLOGIA"} > "$DATI/rapporto_parser.json"
 if [ "$DIZIONARI" = 1 ]; then
   echo "     dizionari del Perseus: Lewis & Short e Liddell–Scott–Jones"
   mkdir -p dati/perseus
