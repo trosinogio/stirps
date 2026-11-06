@@ -93,6 +93,25 @@ assert not ff(s('a dog used for hunting')), 'un senso lessicale resta'
 from filtra import non_parola
 assert non_parola({'word': 'NASA', 'pos': 'name'}) and non_parola({'word': '&', 'pos': 'symbol'}) and non_parola({'word': 'lol', 'pos': 'abbrev'})
 assert not non_parola({'word': 'laser', 'pos': 'noun'}) and not non_parola({'word': 'I', 'pos': 'pron'})
+# le lingue si incontrano nello stesso nodo: la menzione con i segni e la voce senza sono la stessa pagina
+from wiktionary import nome_pagina as npg
+assert npg('ru', 'во́дка') == 'водка' and npg('ru', 'ёж') == 'ёж' and npg('ru', 'йод') == 'йод', 'ё e й sono lettere'
+assert npg('ang', 'ċēol') == 'ceol' and npg('ang', 'sæterdæġ') == 'sæterdæg' and npg('enm', 'fōtmāl') == 'fotmal'
+assert npg('non', 'háls') == 'háls' and npg('fr', 'dé') == 'dé' and npg('gem-pro', '*berô') == '*berô'
+assert lemma_valido('ru', 'водка') and lemma_valido('de', 'Straße') and lemma_valido('fr', 'cœur') and not lemma_valido('ru', 'vodka')
+# la parte del discorso dalle glosse: Haus, in tedesco, è un nome comune
+from wiktionary import completa_glosse
+import tempfile
+td = tempfile.mkdtemp()
+imp = Importatore()
+haus = imp.lessema('de', 'Haus')
+with open(f'{td}/de_glosse.tsv', 'w') as f:
+    f.write('Haus\t1\tnoun\thouse\t\t\n')
+completa_glosse(imp, f'{td}/de_glosse.tsv', 'de')
+assert imp.lessemi[haus]['pos'] == 's.' and imp.scegli_glossa(imp.lessemi[haus]) == 'house', imp.lessemi[haus]
+# la traslitterazione della voce stessa, per la ricerca: дом → dom
+imp.voce({'w': 'дом', 'p': 'noun', 'en': None, 't': '', 'g': ['house'], 'h': [], 'c': None, 'rec': False, 'tpl': [], 'r': 'dom'}, lingua_voce='ru')
+assert imp.lessemi[imp.lessema('ru', 'дом')]['translit'] == 'dom'
 import json, tempfile
 d = tempfile.mkdtemp()
 with open(f'{d}/en_lemmi.jsonl', 'w') as f:

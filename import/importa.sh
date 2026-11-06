@@ -40,7 +40,11 @@ for voce in $(printf '%s' "$CHIUSURA" | sed 's/ \([a-z][a-z-]*:\)/\n\1/g' | tr '
   codice=${voce%%:*}; nome=$(printf '%s' "${voce#*:}" | tr '~' ' ')
   echo "     chiusura delle catene: $nome"
   mkdir -p "dati/$codice"
-  scarica "$nome" | LINGUA=$codice FORME="dati/$codice/forme.tsv" python3 filtra.py "dati/$codice/lemmi.jsonl" "dati/$codice/glosse.tsv"
+  # un dump che Kaikki non ha (l'anglonormanno) è un avviso, non la fine del lavoro: la lingua resta fuori dalla chiusura
+  if ! scarica "$nome" | LINGUA=$codice FORME="dati/$codice/forme.tsv" python3 filtra.py "dati/$codice/lemmi.jsonl" "dati/$codice/glosse.tsv"; then
+    echo "::warning title=Chiusura::dump di Kaikki non disponibile per $nome: la lingua resta fuori"
+    continue
+  fi
   ARGOMENTI+=(--chiudi "$codice=dati/$codice/lemmi.jsonl,dati/$codice/glosse.tsv,dati/$codice/forme.tsv")
 done
 

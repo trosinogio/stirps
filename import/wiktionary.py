@@ -246,15 +246,25 @@ def codice_lingua(c):
 # dell'ebraico (e dell'aramaico in scrittura ebraica), harakat dell'arabo, vocali del siriaco. La hamza resta: è una lettera.
 SEGNI_VOCALICI = re.compile('[\u0591-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7\u064b-\u0652\u0670\u0640\u0730-\u074a]')
 SENZA_VOCALI = {'ar', 'arc', 'he', 'hbo', 'syc', 'fa', 'fa-cls', 'ota', 'ur'}
+# i segni che Wiktionary toglie dal nome della pagina: le menzioni nelle catene li scrivono (hūs, ċild, во́дка), le voci
+# no (hus, cild, водка), e senza toglierli la stessa parola diventa due nodi e la famiglia si spezza. Non si toccano i
+# segni che scrivono suoni o parole diverse: il norreno háls, il francese dé, il protogermanico berô, ё e й in russo
+SEGNI_DELLA_PAGINA = {'ang': '\u0304\u0306\u0307',             # macron, breve, punto: sæterdæġ → sæterdæg, iċ → ic
+                      'enm': '\u0304\u0306',                     # fōtmāl → fotmal
+                      'ru': '\u0301\u0300', 'uk': '\u0301\u0300', 'be': '\u0301\u0300', 'rue': '\u0301\u0300'}   # accento tonico
 
 
 def nome_pagina(lingua, termine):
     """Il titolo della pagina: per latino e greco senza macron e brevi (carō → caro);
-    per ebraico, aramaico, arabo e siriaco senza segni vocalici (אַבָּא → אבא)."""
+    per ebraico, aramaico, arabo e siriaco senza segni vocalici (אַבָּא → אבא); per inglese antico e medio e per il
+    russo senza i segni che Wiktionary toglie dal titolo (SEGNI_DELLA_PAGINA)."""
     if SENZA_QUANTITA.match(lingua or ''):
         termine = unicodedata.normalize('NFC', ''.join(ch for ch in unicodedata.normalize('NFD', termine) if ch not in '\u0304\u0306'))
     elif (lingua or '').split('-')[0] in SENZA_VOCALI or lingua in SENZA_VOCALI:
         termine = SEGNI_VOCALICI.sub('', unicodedata.normalize('NFC', termine))
+    elif lingua in SEGNI_DELLA_PAGINA:
+        segni = SEGNI_DELLA_PAGINA[lingua]
+        termine = unicodedata.normalize('NFC', ''.join(ch for ch in unicodedata.normalize('NFD', termine) if ch not in segni))
     return termine
 
 
@@ -329,6 +339,10 @@ LETTERE = {'la': set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZæœÆ
 # diacritici (café, ā) cadono con la normalizzazione NFD
 LETTERE.update(dict.fromkeys(('en', 'enm', 'ang', 'sco'), set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
                                                              'æÆœŒþÞðÐƿǷȝȜ')))
+# francese e tedesco: l'alfabeto latino (gli accenti e la dieresi cadono con NFD) con œ, æ, ß; russo: il cirillico
+LETTERE['fr'] = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZæÆœŒ')
+LETTERE['de'] = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZßẞ')
+LETTERE['ru'] = set('абвгдежзийклмнопрстуфхцчшщъыьэюяАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ')   # ё e й: е e и con il segno
 NON_LEMMA = re.compile(r'[()\[\]{}<>“”"=|]')
 
 
@@ -543,7 +557,8 @@ class Importatore:
             g = ((v.get('h') or [{}])[0].get('a') or {}).get('1', '')
             pos = 's.m.' if g.startswith('m') and 'f' not in g else 's.f.' if g.startswith('f') and 'm' not in g else 's.'
         glossa = (v.get('g') or [None])[0]
-        k0 = self.lessema(lingua_voce, parola, glossa=glossa[:200] if glossa else None, pos=pos, omografo=omo)
+        k0 = self.lessema(lingua_voce, parola, glossa=glossa[:200] if glossa else None, pos=pos, omografo=omo,
+                          translit=v.get('r') or None)
         if glossa:
             self.lessemi[k0].setdefault('propria', glossa[:200])   # la glossa della sua voce, non di una menzione
         if k0 in self.ipotesi:          # stessa etimologia, altra parte del discorso
@@ -1240,19 +1255,29 @@ class Importatore:
 
 def completa_glosse(imp, percorso, lingua=None):
     lingua = lingua or LINGUA
-    """Glosse dei lemmi italiani senza etimologia: servono alle basi delle derivazioni (virus in retrovirus)."""
-    gl = {}
+    """Glosse e parti del discorso dei lemmi senza etimologia: servono alle basi delle derivazioni (virus in
+    retrovirus), e una parte del discorso dice che Haus, in tedesco, è un nome comune e non un nome proprio."""
+    gl, cat = {}, {}
     for riga in open(percorso, encoding='utf-8'):
         parola, etimn, pos, g = (riga.rstrip('\n').split('\t') + ['', '', '', ''])[:4]
         omo = int(etimn) if etimn.isdigit() else 1
+        k = chiave(lingua, nome_pagina(lingua, parola), omo)
         if g:
-            gl.setdefault(chiave(lingua, nome_pagina(lingua, parola), omo), g)
-    n = 0
+            gl.setdefault(k, g)
+        if pos:
+            cat.setdefault(k, POS.get(pos) or ('s.' if pos == 'noun' else None))
+    n = np_ = 0
     for k, l in imp.lessemi.items():
-        if l['lingua'] == lingua and not l['glosse'] and k in gl:
+        if l['lingua'] != lingua:
+            continue
+        if not l['glosse'] and k in gl:
             l['glosse'][gl[k]] += 1
             n += 1
+        if not l['pos'] and cat.get(k) and not l['ricostruito']:
+            l['pos'] = cat[k]
+            np_ += 1
     imp.stat[f'glosse_completate_{lingua}'] = n
+    imp.stat[f'categorie_completate_{lingua}'] = np_
 
 
 if __name__ == '__main__':
