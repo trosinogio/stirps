@@ -20,8 +20,8 @@ jobs:
     timeout-minutes: 150
     env:
       # le lingue di chiusura (import/importa.sh): l'inglese entra con tutte le voci che hanno un'etimologia
-      # (CON_ETIMOLOGIA), con l'inglese medio e antico, l'anglonormanno e il norreno per chiudere le sue catene
-      CHIUSURA: 'la:Latin fro:Old French grc:Ancient Greek en:English enm:Middle English ang:Old English xno:Anglo-Norman non:Old Norse'
+      # (CON_ETIMOLOGIA), con l'inglese medio e antico e il norreno (l'anglonormanno su Kaikki non c'è) per chiudere le sue catene
+      CHIUSURA: 'la:Latin fro:Old French grc:Ancient Greek en:English enm:Middle English ang:Old English non:Old Norse'
       INTERE: la,grc
       CON_ETIMOLOGIA: en
       GLOSSE_TRADOTTE: '0'   # 0: si contano le voci da tradurre senza tradurle (stima dell'import inglese)
