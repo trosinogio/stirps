@@ -440,4 +440,8 @@ select pg_temp.verifica(
   (select bool_and((nodo_json(id)->>'nome_proprio')::boolean is not distinct from nome_proprio) from lessema),
   'nodo_json dice se una voce è un nome proprio: lo stemma li nasconde finché non si chiede di vederli');
 
+select pg_temp.verifica(
+  (select array_agg(x->>'sigla') from jsonb_array_elements(scheda('en/night', true, 'it')->'consultabili') x) @> array['AHD', 'Etymonline', 'OED'],
+  'una voce inglese rimanda alle tre fonti centrali: OED, American Heritage Dictionary, Etymonline');
+
 \echo '— collaudo completato'
