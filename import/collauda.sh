@@ -112,6 +112,22 @@ assert imp.lessemi[haus]['pos'] == 's.' and imp.scegli_glossa(imp.lessemi[haus])
 # la traslitterazione della voce stessa, per la ricerca: дом → dom
 imp.voce({'w': 'дом', 'p': 'noun', 'en': None, 't': '', 'g': ['house'], 'h': [], 'c': None, 'rec': False, 'tpl': [], 'r': 'dom'}, lingua_voce='ru')
 assert imp.lessemi[imp.lessema('ru', 'дом')]['translit'] == 'dom'
+# la pronuncia: IPA con la varietà, sillabazione, audio; dal lemma con etimologia e dalla settima colonna delle glosse
+import json
+from filtra import pronuncia
+pv = {'sounds': [{'ipa': '/ˈka.roː/', 'tags': ['Classical-Latin']}, {'ipa': '[ˈkaː.ro]', 'tags': ['Ecclesiastical-Latin']},
+                 {'audio': 'LL-Q397 (lat)-caro.wav', 'ogg_url': 'https://upload.wikimedia.org/x/LL-Q397_caro.ogg'}, {'rhymes': '-aro'}],
+      'hyphenations': [{'parts': ['ca', 'ro']}]}
+assert pronuncia(pv) == {'i': [['/ˈka.roː/', 'Classical-Latin'], ['[ˈkaː.ro]', 'Ecclesiastical-Latin']], 's': 'ca‧ro', 'a': 'LL-Q397 (lat)-caro.wav'}, pronuncia(pv)
+assert pronuncia({'sounds': [{'rhymes': '-aro'}]}) is None
+imp.voce({'w': 'caro', 'p': 'noun', 'en': None, 't': '', 'g': ['flesh'], 'h': [], 'c': None, 'rec': False, 'tpl': [], 'pr': pronuncia(pv)}, lingua_voce='la')
+assert imp.lessemi[imp.lessema('la', 'caro')]['pronuncia']['s'] == 'ca‧ro'
+with open(f'{td}/de_glosse2.tsv', 'w') as f:
+    f.write('Haus\t1\tnoun\thouse\t\t\t' + json.dumps({'i': [['/haʊ̯s/', '']]}, ensure_ascii=False) + '\n')
+imp2 = Importatore()
+h2 = imp2.lessema('de', 'Haus')
+completa_glosse(imp2, f'{td}/de_glosse2.tsv', 'de')
+assert imp2.lessemi[h2]['pronuncia'] == {'i': [['/haʊ̯s/', '']]}, imp2.lessemi[h2]
 import json, tempfile
 d = tempfile.mkdtemp()
 with open(f'{d}/en_lemmi.jsonl', 'w') as f:

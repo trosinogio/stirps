@@ -128,6 +128,23 @@ def non_parola(v):
     return v.get('pos') in NON_PAROLE or (w.isupper() and sum(c.isalpha() for c in w) > 1)
 
 
+def pronuncia(v):
+    '''La pronuncia della voce, da Wiktionary (CC BY-SA): fino a quattro trascrizioni IPA con la loro varietà
+    («Classical-Latin», «Received-Pronunciation»), la sillabazione e un file audio di Wikimedia Commons. None se
+    Wiktionary non ne dà.'''
+    ipa, audio = [], None
+    for s in v.get('sounds') or []:
+        if s.get('ipa'):
+            if len(ipa) < 4 and s['ipa'] not in (x[0] for x in ipa):
+                ipa.append([s['ipa'], ','.join(s.get('tags') or [])])
+        elif not audio and (s.get('audio') or s.get('ogg_url') or s.get('mp3_url')):
+            audio = s.get('audio') or (s.get('ogg_url') or s.get('mp3_url')).rsplit('/', 1)[-1]
+    sill = next(('‧'.join(h['parts']) for h in (v.get('hyphenations') or []) if isinstance(h, dict) and h.get('parts')), None) \
+        or next((h for h in (v.get('hyphenation') or []) if isinstance(h, str) and h), None)
+    d = {k: x for k, x in (('i', ipa), ('s', sill), ('a', audio)) if x}
+    return d or None
+
+
 def marcata(v):
     '''Forma flessa marcata da Wiktionary: il modello nonlemma, o tutti i sensi con form_of o il tag form-of.'''
     if any(t.get('name') == 'nonlemma' for t in v.get('etymology_templates') or []):
@@ -238,7 +255,9 @@ if __name__ == '__main__':
         glosse.write('\t'.join((v['word'], str(v.get('etymology_number') or 1), v.get('pos') or '',
                                  (g[0] if g else '').replace('\t', ' ').replace('\n', ' ')[:200],
                                  ','.join(x.replace(',', ' ') for x in distintive if x),
-                                 '1' if (v.get('original_title') or '').startswith('Reconstruction:') else '')) + '\n')
+                                 '1' if (v.get('original_title') or '').startswith('Reconstruction:') else '',
+                                 # settima colonna: la pronuncia, in JSON (IPA con la varietà, sillabazione, audio)
+                                 json.dumps(pronuncia(v), ensure_ascii=False) if pronuncia(v) else '')) + '\n')
         tpl = [{**t, 'name': ALIAS.get(t.get('name'), t.get('name'))} for t in tpl]
         classici = [t for t in tpl if t.get('name') in UTILI]
         if not any(porta_etimo(t) for t in classici):
@@ -268,6 +287,7 @@ if __name__ == '__main__':
                               'tpl': tpl, 'g': g, 'h': heads, 'c': canonica,
                               # la traslitterazione della voce (дом → dom), per la ricerca in caratteri latini
                               'r': next((f['form'] for f in (v.get('forms') or []) if 'romanization' in (f.get('tags') or [])), None),
+                              'pr': pronuncia(v),
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
     print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, da {{{{ety}}}} {dalla_ety}), forme flesse {flesse} '
