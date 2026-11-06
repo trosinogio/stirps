@@ -6,6 +6,23 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 rm -rf esempio/tsv
+# il ciclo completo del filtro su due voci in stile Kaikki: un lemma con etimologia, pronuncia e accezioni, e una forma
+PROVA=$(mktemp -d)
+cat > "$PROVA/kaikki.jsonl" <<'JSON'
+{"word": "caro", "lang_code": "la", "pos": "noun", "etymology_templates": [{"name": "inh", "args": {"1": "la", "2": "itc-pro", "3": "*karō"}, "expansion": "*karō"}], "etymology_text": "From *karō.", "head_templates": [{"name": "la-noun", "args": {}, "expansion": "carō f (genitive carnis); third declension"}], "sounds": [{"ipa": "/ˈka.roː/", "tags": ["Classical-Latin"]}, {"audio": "a \"b\".ogg"}], "senses": [{"glosses": ["flesh"]}, {"glosses": ["the body"], "tags": ["figuratively"]}]}
+{"word": "carnis", "lang_code": "la", "pos": "noun", "senses": [{"glosses": ["genitive singular of carō"], "form_of": [{"word": "carō"}]}]}
+JSON
+LINGUA=la python3 filtra.py "$PROVA/lemmi.jsonl" "$PROVA/glosse.tsv" < "$PROVA/kaikki.jsonl" 2> /dev/null
+python3 - "$PROVA" <<'PY'
+import json, sys
+d = sys.argv[1]
+lemmi = [json.loads(r) for r in open(f'{d}/lemmi.jsonl', encoding='utf-8')]
+glosse = [r.rstrip('\n').split('\t') for r in open(f'{d}/glosse.tsv', encoding='utf-8')]
+assert [l['w'] for l in lemmi] == ['caro'] and [g[0] for g in glosse] == ['caro'], 'la forma flessa resta fuori'
+assert lemmi[0]['pr']['a'] == 'a "b".ogg' and lemmi[0]['se']['t'].startswith('carō f'), lemmi[0]
+assert json.loads(glosse[0][6])['i'][0][1] == 'Classical-Latin' and json.loads(glosse[0][7])['s'][1] == ['the body', 'figuratively']
+PY
+rm -rf "$PROVA"
 # le etimologie scritte solo nel testo: la prima menzione diventa un der («From the verb {{m|it|segare}}»)
 python3 - <<'PY'
 from filtra import menzione_come_der as f
@@ -131,7 +148,7 @@ pv = {'sounds': [{'ipa': '/ˈka.roː/', 'tags': ['Classical-Latin']}, {'ipa': '[
 assert pronuncia(pv) == {'i': [['/ˈka.roː/', 'Classical-Latin'], ['[ˈkaː.ro]', 'Ecclesiastical-Latin']], 's': 'ca‧ro', 'a': 'LL-Q397 (lat)-caro.wav'}, pronuncia(pv)
 assert pronuncia({'sounds': [{'rhymes': '-aro'}]}) is None
 # i dati della scheda: la riga delle forme e le accezioni con le etichette d'uso, senza i sensi che sono forme
-from filtra import sensi
+from filtra import dati_scheda as sensi
 sv = {'word': 'caro', 'head_templates': [{'expansion': 'carō f (genitive carnis); third declension'}],
       'senses': [{'glosses': ['flesh, meat']}, {'glosses': ['the body'], 'tags': ['figuratively', 'feminine']},
                  {'glosses': ['pulp of fruit'], 'topics': ['botany']}, {'glosses': ['dative of x'], 'form_of': [{'word': 'x'}]}]}

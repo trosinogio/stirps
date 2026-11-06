@@ -155,7 +155,7 @@ USO = {'archaic', 'obsolete', 'dated', 'rare', 'figuratively', 'metaphorically',
        'Ecclesiastical-Latin', 'New-Latin', 'Classical-Latin', 'Epic', 'Attic', 'Ionic', 'Doric', 'Koine', 'Byzantine'}
 
 
-def sensi(v):
+def dati_scheda(v):
     '''I dati della scheda da Wiktionary (CC BY-SA): la riga delle forme del modello di intestazione («carō f (genitive
     carnis); third declension») e fino a otto accezioni, ciascuna con le etichette d'uso e l'ambito. None se non c'è nulla.'''
     out = []
@@ -291,7 +291,7 @@ if __name__ == '__main__':
                                  # settima colonna: la pronuncia, in JSON (IPA con la varietà, sillabazione, audio)
                                  json.dumps(pronuncia(v), ensure_ascii=False) if pronuncia(v) else '',
                                  # ottava colonna: la riga delle forme e le accezioni, in JSON
-                                 json.dumps(sensi(v), ensure_ascii=False) if sensi(v) else '')) + '\n')
+                                 json.dumps(dati_scheda(v), ensure_ascii=False) if dati_scheda(v) else '')) + '\n')
         tpl = [{**t, 'name': ALIAS.get(t.get('name'), t.get('name'))} for t in tpl]
         classici = [t for t in tpl if t.get('name') in UTILI]
         if not any(porta_etimo(t) for t in classici):
@@ -322,7 +322,7 @@ if __name__ == '__main__':
                               # la traslitterazione della voce (дом → dom), per la ricerca in caratteri latini
                               'r': next((f['form'] for f in (v.get('forms') or []) if 'romanization' in (f.get('tags') or [])), None),
                               'pr': pronuncia(v),
-                              'se': sensi(v),
+                              'se': dati_scheda(v),
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
     print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, da {{{{ety}}}} {dalla_ety}), forme flesse {flesse} '
