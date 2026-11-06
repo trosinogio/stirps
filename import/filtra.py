@@ -147,6 +147,31 @@ def pronuncia(v):
     return d or None
 
 
+# le etichette d'uso dei sensi che la scheda mostra (le altre etichette di Wiktionary sono grammaticali o tecniche)
+USO = {'archaic', 'obsolete', 'dated', 'rare', 'figuratively', 'metaphorically', 'colloquial', 'informal', 'slang',
+       'vulgar', 'derogatory', 'pejorative', 'offensive', 'poetic', 'literary', 'formal', 'humorous', 'euphemistic',
+       'dialectal', 'regional', 'historical', 'transitive', 'intransitive', 'reflexive', 'pronominal', 'uncountable',
+       'countable', 'idiomatic', 'ironic', 'childish', 'nonstandard', 'proscribed', 'Late-Latin', 'Medieval-Latin',
+       'Ecclesiastical-Latin', 'New-Latin', 'Classical-Latin', 'Epic', 'Attic', 'Ionic', 'Doric', 'Koine', 'Byzantine'}
+
+
+def sensi(v):
+    '''I dati della scheda da Wiktionary (CC BY-SA): la riga delle forme del modello di intestazione («carō f (genitive
+    carnis); third declension») e fino a otto accezioni, ciascuna con le etichette d'uso e l'ambito. None se non c'è nulla.'''
+    out = []
+    for s in v.get('senses') or []:
+        g = s.get('glosses') or []
+        if not g or s.get('form_of') or 'form-of' in (s.get('tags') or []):
+            continue
+        etichette = [t for t in (s.get('tags') or []) if t in USO] + list(s.get('topics') or [])[:2]
+        out.append([g[-1].replace('\t', ' ').replace('\n', ' ')[:200], ','.join(etichette)])   # un sottosenso: il più preciso
+        if len(out) == 8:
+            break
+    testa = ((v.get('head_templates') or [{}])[0].get('expansion') or '').replace('\t', ' ').replace('\n', ' ').strip()[:160]
+    d = {k: x for k, x in (('t', testa if testa and testa != v.get('word') else None), ('s', out)) if x}
+    return d or None
+
+
 def marcata(v):
     '''Forma flessa marcata da Wiktionary: il modello nonlemma, o tutti i sensi con form_of o il tag form-of.'''
     if any(t.get('name') == 'nonlemma' for t in v.get('etymology_templates') or []):
@@ -264,7 +289,9 @@ if __name__ == '__main__':
                                  ','.join(x.replace(',', ' ') for x in distintive if x),
                                  '1' if (v.get('original_title') or '').startswith('Reconstruction:') else '',
                                  # settima colonna: la pronuncia, in JSON (IPA con la varietà, sillabazione, audio)
-                                 json.dumps(pronuncia(v), ensure_ascii=False) if pronuncia(v) else '')) + '\n')
+                                 json.dumps(pronuncia(v), ensure_ascii=False) if pronuncia(v) else '',
+                                 # ottava colonna: la riga delle forme e le accezioni, in JSON
+                                 json.dumps(sensi(v), ensure_ascii=False) if sensi(v) else '')) + '\n')
         tpl = [{**t, 'name': ALIAS.get(t.get('name'), t.get('name'))} for t in tpl]
         classici = [t for t in tpl if t.get('name') in UTILI]
         if not any(porta_etimo(t) for t in classici):
@@ -295,6 +322,7 @@ if __name__ == '__main__':
                               # la traslitterazione della voce (дом → dom), per la ricerca in caratteri latini
                               'r': next((f['form'] for f in (v.get('forms') or []) if 'romanization' in (f.get('tags') or [])), None),
                               'pr': pronuncia(v),
+                              'se': sensi(v),
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
     print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, da {{{{ety}}}} {dalla_ety}), forme flesse {flesse} '

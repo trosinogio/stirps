@@ -130,7 +130,7 @@ jobs:
       - name: Pacchetto dati
         run: |
           t=import/dati/it/tsv
-          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni dizionari autori stime pronunce; do
+          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni dizionari autori stime pronunce sensi; do
             gzip -9 -n -c "$t/$f.tsv" > "dati/$f.tsv.gz"
           done
           # voci per lingua, prima e dopo

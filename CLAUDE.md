@@ -75,7 +75,7 @@ Come cambia il database:
 - **Colori:** variabili CSS in `app/globals.css`. La classe `r-<ramo>` imposta `--pig`, il colore del ramo linguistico.
 - **Pagine dinamiche:** `storie` e `redazione` sono `force-dynamic`; le voci usano ISR (`revalidate`).
 - **Stemma:** i nomi propri da cui non derivano parole comuni restano nascosti finché il lettore non li chiede (`nomiNascondibili()` in `lib/albero.ts`); oltre 12 figli se ne disegnano 6, quelli con i rami più grandi, e gli altri vanno in una lista a tendina con il filtro (`dividiFigli()`), un `<details>` nello stemma verticale.
-- **Prefetch:** i link negli elenchi (`VoceLink`, iniziali, pagine) hanno `prefetch={false}`. Con il valore predefinito ogni link visibile fa calcolare al server una pagina intera, e su 450 mila voci quasi nessuna è in cache.
+- **Prefetch:** i link negli elenchi (`VoceLink`, iniziali, pagine) hanno `prefetch={false}`. Con il valore predefinito ogni link visibile fa calcolare al server una pagina intera, e su 540 mila voci quasi nessuna è in cache.
 - **Pagine pesanti:** prima di pubblicare un elenco, misura il peso dell’HTML e il tempo della prima visita (`next build` e `next start` in locale, con `NEON_AUTH_COOKIE_SECRET` di prova).
 
 ## Trappole già incontrate
