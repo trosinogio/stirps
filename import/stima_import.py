@@ -3,7 +3,7 @@
 calcola lo spazio nel database con i byte per riga misurati sul database vero; per una lingua mostra che voci entrano
 e un campione di catene da guardare a mano.
 
-    python3 stima_import.py prima/ dati/ en --attuale 349     # cartelle con lessemi, ipotesi, relazioni… .tsv.gz
+    python3 stima_import.py prima/ dati/ en --attuale 349 [--frequenze en_50k.txt]   # cartelle con i .tsv.gz
 
 I byte per riga, indici compresi (pg_total_relation_size / righe), sono quelli del database del 6 novembre 2026:
 290 mila voci, 349 MB. Si rimisurano quando cambia lo schema.
@@ -75,38 +75,55 @@ if __name__ == '__main__':
         return passi
     def nome(k):
         r = d_less.get(k)
-        return f'{r[1]}:{r[2]}' if r else k
+        return (f'{r[1]}:{r[2]}' + (f' ({r[3]})' if r[3] not in ('1', '', '\\N') else '')) if r else k
     con = [r[0] for r in voci if r[0] in primo]
     cime = Counter((d_less.get(catena(k)[-1]) or ['', '?'])[1] for k in con)
     print(f'  lingua della cima delle {len(con)} catene:', dict(cime.most_common(12)))
     lunghezze = Counter(min(len(catena(k)) - 1, 6) for k in con)
     print('  passaggi per catena (6 = sei o più):', dict(sorted(lunghezze.items())))
-    # gli ambiti possibili: quante voci della lingua e quanto spazio, togliendo nomi propri, locuzioni, formazioni interne
-    # (il primo etimo è una parola della stessa lingua: doghouse < dog + house). Le voci nuove delle altre lingue (le
-    # chiusure: inglese medio e antico, protogermanico…) servono a tutti gli ambiti e si contano a parte.
-    n_ip, n_rel, etimo1 = Counter(), Counter(), {}
+    # gli ambiti possibili: quante voci della lingua entrano e quanto spazio occupano, con le voci nuove che le loro
+    # catene si portano dietro (inglese medio e antico, protogermanico, le basi inglesi di un composto…). Le formazioni
+    # interne hanno il primo etimo nella stessa lingua (doghouse < dog + house); il lessico comune sono i lemmi tra le
+    # forme più frequenti (--frequenze, una forma e un numero per riga, FrequencyWords).
+    n_ip, n_rel, etimi, etimo1 = Counter(), Counter(), {}, {}
     for h in leggi(dopo_d, 'ipotesi'):
         n_ip[h[1]] += 1
     for r in leggi(dopo_d, 'relazioni'):
         n_rel[r[2]] += 1
+        etimi.setdefault(r[2], []).append(r[3])
     for k, (e, _) in primo.items():
         etimo1[k] = (d_less.get(e) or ['', '?'])[1]
-    gia = {k for k in p_less}
+    gia = set(p_less)
     proprie = [r for r in voci if r[0] not in gia]
-    def costo(rr):
-        return mb(sum(BYTE['lessema'] + n_ip[r[0]] * BYTE['ipotesi'] + n_rel[r[0]] * (BYTE['relazione'] + BYTE['mv_famiglia'])
-                      for r in rr))
+    frequenti = set()
+    if '--frequenze' in sys.argv:
+        for riga in open(sys.argv[sys.argv.index('--frequenze') + 1], encoding='utf-8'):
+            if riga.split():
+                frequenti.add(riga.split()[0].lower())
+    def costo(k):
+        return BYTE['lessema'] + n_ip[k] * BYTE['ipotesi'] + n_rel[k] * (BYTE['relazione'] + BYTE['mv_famiglia'])
+    def chiusura(chiavi):
+        dentro, coda = set(chiavi), list(chiavi)
+        while coda:
+            for e in etimi.get(coda.pop(), ()):
+                if e not in dentro and e not in gia and e in d_less:
+                    dentro.add(e); coda.append(e)
+        return dentro
+    comune = lambda r: r[6] != 'np' and ' ' not in r[2]
+    fuori = lambda r: etimo1.get(r[0], lingua) != lingua
     ambiti = [('tutte', proprie),
-              ('senza nomi propri', [r for r in proprie if r[6] != 'np']),
-              ('senza nomi propri né locuzioni', [r for r in proprie if r[6] != 'np' and ' ' not in r[2]]),
-              ('solo con l\'etimo fuori dalla lingua', [r for r in proprie if etimo1.get(r[0], lingua) != lingua]),
-              ('etimo fuori, senza nomi propri né locuzioni',
-               [r for r in proprie if etimo1.get(r[0], lingua) != lingua and r[6] != 'np' and ' ' not in r[2]])]
-    altre = [k for k in nuove if d_less[k][1] != lingua]
-    print(f'\nambiti per {lingua} (voci nuove; più {len(altre)} voci nuove di altre lingue, circa '
-          f'{mb(len(altre) * (BYTE["lessema"] + BYTE["ipotesi"] + BYTE["relazione"] + BYTE["mv_famiglia"])):.0f} MB):')
+              ('senza nomi propri né locuzioni', [r for r in proprie if comune(r)]),
+              ('etimo fuori dalla lingua, senza nomi propri né locuzioni', [r for r in proprie if comune(r) and fuori(r)])]
+    if frequenti:
+        ambiti += [(f'lessico comune ({len(frequenti)} forme più frequenti)', [r for r in proprie if comune(r) and r[2].lower() in frequenti]),
+                   ('lessico comune ed etimo fuori', [r for r in proprie if comune(r) and (fuori(r) or r[2].lower() in frequenti)])]
+    tutte = chiusura([r[0] for r in proprie])
+    resto = [k for k in nuove if k not in tutte]
+    print(f'\nambiti per {lingua}: voci della lingua + voci portate dalle catene = spazio (le {len(resto)} voci nuove che '
+          f'non dipendono da {lingua} valgono {mb(sum(costo(k) for k in resto)):.0f} MB in ogni ambito)')
     for nome_a, rr in ambiti:
-        print(f'  {nome_a}: {len(rr)} voci, {costo(rr):.0f} MB')
+        c = chiusura([r[0] for r in rr])
+        print(f'  {nome_a}: {len(rr)} + {len(c) - len(rr)} voci = {mb(sum(costo(k) for k in c)):.0f} MB')
     print('  lingua del primo etimo:', dict(Counter(etimo1.get(r[0], '—') for r in proprie).most_common(10)))
 
     print('\ncampione di catene (da guardare a mano prima di pubblicare):')
