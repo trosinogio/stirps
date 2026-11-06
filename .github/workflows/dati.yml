@@ -24,7 +24,9 @@ jobs:
       CHIUSURA: 'la:Latin fro:Old French grc:Ancient Greek en:English enm:Middle English ang:Old English non:Old Norse'
       INTERE: la,grc
       CON_ETIMOLOGIA: en
-      GLOSSE_TRADOTTE: '0'   # 0: si contano le voci da tradurre senza tradurle (stima dell'import inglese)
+      # dell'inglese, il lessico comune: i lemmi tra le 50 mila forme più frequenti, senza nomi propri né locuzioni
+      ELENCHI: en=../dati/frequenze_en.tsv.gz
+      GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

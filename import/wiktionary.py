@@ -15,7 +15,7 @@ Regole principali
 - Per gli etimi intermedi spiegati in più voci vince la spiegazione più frequente; le altre sono alternative.
 - Gli affissi restano testo dell'arco (relazione.affisso), non diventano lessemi.
 """
-import json, re, sys, os, unicodedata
+import gzip, json, re, sys, os, unicodedata
 
 # lingua delle voci da importare (codice Wiktionary): LINGUA=fr python3 wiktionary.py …
 LINGUA = os.environ.get('LINGUA', 'it')
@@ -461,6 +461,8 @@ class Importatore:
         self.participi = set()       # (lingua, pagina) dei participi citati come etimi
         self.attestazioni = {}       # chiave del lessema -> (anno_da, anno_a, precisione)
         self.intere = set()          # lingue di chiusura importate intere (--intere la,grc), non solo dove le catene arrivano
+        self.elenco = {}             # per una lingua con etimologia, i soli lemmi ammessi (--elenco en=frequenze.tsv.gz):
+                                     # il lessico comune, senza nomi propri né locuzioni; le voci raggiunte entrano sempre
         self.con_etimologia = set()  # lingue di chiusura di cui entrano tutte le voci con un'etimologia, ma non i lemmi
                                      # senza (--con-etimologia en): l'inglese ha centinaia di migliaia di lemmi vuoti
         self.stat = Counter()
@@ -813,6 +815,12 @@ class Importatore:
                 self.stat[f'omografi_distinti_{lingua}'] += 1
         return lingua, pagina, omo, forma_extra
 
+    def ammessa(self, lingua, v):
+        """Una voce entra da sola, senza che una catena la raggiunga, solo se la sua lingua non ha un elenco o se è
+        nell'elenco (le forme più frequenti), non è un nome proprio e non è una locuzione."""
+        elenco = self.elenco.get(lingua)
+        return elenco is None or (v['w'].lower() in elenco and v.get('p') != 'name' and ' ' not in v['w'].strip())
+
     def chiudi(self, passi=1):
         """Importa le etimologie delle voci intermedie già presenti nel dizionario. Nelle lingue intere (--intere)
         il primo passaggio prende anche le voci attestate che nessuna catena raggiunge (lēvir, δαήρ): così le
@@ -834,7 +842,7 @@ class Importatore:
                         candidati = [(lingua, pagina)]
                     for lc, termine in candidati:
                         raggiunta = chiave(lc, termine, omo) in self.lessemi
-                        if raggiunta or (intera and not v.get('rec')):
+                        if raggiunta or (intera and not v.get('rec') and self.ammessa(lingua, v)):
                             fatte.add((lingua, i))
                             self.voce(v, lingua_voce=lc, parola=termine)
                             nuove += 1
@@ -1206,8 +1214,8 @@ def completa_glosse(imp, percorso, lingua=None):
 
 if __name__ == '__main__':
     # wiktionary.py lemmi.jsonl uscita/ [glosse.tsv] [--chiudi la=lemmi.jsonl,glosse.tsv,forme.tsv]… [--passi N]
-    #               [--intere la,grc] [--con-etimologia en]
-    args, chiusure, passi, intere, con_etimologia = [], [], 1, set(), set()
+    #               [--intere la,grc] [--con-etimologia en] [--elenco en=../dati/frequenze_en.tsv.gz]
+    args, chiusure, passi, intere, con_etimologia, elenchi = [], [], 1, set(), set(), {}
     it_ = iter(sys.argv[1:])
     for x in it_:
         if x == '--chiudi':
@@ -1216,6 +1224,11 @@ if __name__ == '__main__':
             passi = int(next(it_))
         elif x == '--intere':
             intere = {c for c in next(it_).split(',') if c}
+        elif x == '--elenco':
+            lingua_e, percorso_e = next(it_).split('=', 1)
+            with (gzip.open(percorso_e, 'rt', encoding='utf-8') if percorso_e.endswith('.gz') else open(percorso_e, encoding='utf-8')) as f:
+                # le colonne di dati/frequenze_*.tsv.gz: lingua, forma, rango, conteggio, fonte
+                elenchi[lingua_e] = {r.split('\t')[1].lower() for r in f if r.count('\t') >= 1}
         elif x == '--con-etimologia':
             con_etimologia = {c for c in next(it_).split(',') if c}
         else:
@@ -1223,6 +1236,7 @@ if __name__ == '__main__':
     imp = Importatore()
     imp.intere = intere
     imp.con_etimologia = con_etimologia
+    imp.elenco = elenchi
     for c in chiusure:
         lingua, percorsi = c.split('=', 1)
         p = percorsi.split(',') + ['', '']

@@ -107,6 +107,18 @@ for modo, attesi in (('con_etimologia', {'hound'}), ('intere', {'hound', 'woof'}
     imp.chiudi(1); imp.aggiungi_lemmi_interi()
     lemmi = {l['lemma'] for l in imp.lessemi.values() if l['lingua'] == 'en'}
     assert lemmi == attesi, (modo, lemmi)
+# con un elenco (il lessico comune) entrano solo i lemmi dell'elenco, senza nomi propri né locuzioni; le voci raggiunte sì
+with open(f'{d}/en_lemmi.jsonl', 'a') as f:
+    for w, p in (('Hounslow', 'name'), ('hound dog', 'noun'), ('houndfish', 'noun'), ('dog', 'noun')):
+        f.write(json.dumps({'w': w, 'p': p, 'en': None, 't': '', 'g': [], 'h': [], 'c': None, 'rec': False,
+                            'tpl': [{'n': 'inh', 'a': {'1': 'en', '2': 'enm', '3': w}, 'e': w}]}) + '\n')
+imp = Importatore()
+imp.con_etimologia, imp.elenco = {'en'}, {'en': {'hound', 'hounslow', 'hound dog'}}
+imp.carica_chiusura('en', f'{d}/en_lemmi.jsonl', None, f'{d}/en_glosse.tsv')
+imp.lessema('en', 'dog')
+imp.chiudi(2)
+lemmi = {l['lemma'] for l in imp.lessemi.values() if l['lingua'] == 'en'}
+assert lemmi == {'hound', 'dog'}, lemmi
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \
