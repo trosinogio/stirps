@@ -62,9 +62,9 @@ if __name__ == '__main__':
           f'con trattino {sum("-" in r[2].strip("-") for r in voci)}; ricostruite {sum(r[4] == "t" for r in voci)}')
     print('  per parte del discorso:', dict(Counter(r[6] if not vuoto(r[6]) else '?' for r in voci).most_common(12)))
     # dove arrivano le catene: la lingua della cima (primo etimo a ogni passo)
-    primo = {}
+    primo, accolte = {}, set(accolta.values())
     for r in leggi(dopo_d, 'relazioni'):
-        if r[1] in accolta.values():
+        if r[1] in accolte:
             o = int(r[5]) if r[5].isdigit() else 99
             if r[2] not in primo or o < primo[r[2]][1]:
                 primo[r[2]] = (r[3], o)

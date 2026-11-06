@@ -144,6 +144,7 @@ jobs:
 
       - name: Stima dell'import
         continue-on-error: true
+        timeout-minutes: 15
         run: |
           mkdir -p /tmp/prima
           for f in lessemi ipotesi relazioni attestazioni; do git show HEAD:dati/$f.tsv.gz > /tmp/prima/$f.tsv.gz; done
