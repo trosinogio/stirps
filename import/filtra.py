@@ -116,7 +116,8 @@ FORMA = re.compile(r'^(?:\([^)]*\)\s*)*(?:'
                    r'|(?:(?:present|perfect|future|past|aorist|imperfect)\s+)?(?:(?:active|passive|middle|mediopassive)\s+)?'
                    r'(?:infinitive|participle)\s+of\b'
                    r'|(?:comparative|superlative)(?:\s+degree)?\s+of\b'
-                   r'|(?:simple\s+)?past\s+tense\b|simple\s+past\b)', re.I)      # inglese: «simple past tense and past participle of»
+                   r'|(?:simple\s+)?past\s+tense\b|simple\s+past\b'                # inglese: «simple past tense and past participle of»
+                   r'|compound\s+of\b)', re.I)       # italiano, forme con pronomi attaccati: «compound of the infinitive dire with ve and la»
 
 # Le voci che non sono parole: sigle e abbreviazioni (NASA, BBC, SPQR), simboli, caratteri, segni d'interpunzione.
 # Le sigle diventate parole minuscole (laser, radar) restano.
@@ -157,6 +158,11 @@ def lemma_della_forma(v):
                 return fo['word'], s.get('tags') or []
     for s in v.get('senses') or []:
         g = (s.get('glosses') or [''])[0]
+        # forme con pronomi attaccati: il lemma è l'infinito, o quello della forma spiegata tra virgole
+        # («compound of the infinitive dire with ve and la» → dire; «compound of dando, the gerund of dare, with la» → dare)
+        c = re.match(r'compound\s+of\s+(?:the\s+infinitive\s+([^\s(),;:]+)|[^,]+,\s+the\s+[^,]*?\bof\s+([^\s(),;:]+))', g, re.I)
+        if c:
+            return c.group(1) or c.group(2), ['compound']
         m = FORMA.match(g) and re.search(r'\bof\s+([^\s(),;:]+)', g)
         if m:
             return m.group(1), [x for x in re.split(r'[\s/]+', g[:m.start()].lower()) if x]

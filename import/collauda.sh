@@ -90,6 +90,12 @@ assert lemma_valido('en', 'hound') and lemma_valido('ang', 'þing') and lemma_va
 assert not lemma_valido('en', '4x4') and not lemma_valido('en', 'A'), 'cifre e lettere isolate non sono parole'
 assert ff(s('simple past tense and past participle of hound')) and ff(s('third-person singular simple present indicative form of hound'))
 assert not ff(s('a dog used for hunting')), 'un senso lessicale resta'
+# le forme italiane con pronomi attaccati non sono lemmi: dirvela, dandola; il lemma è l'infinito
+assert ff(s('compound of the infinitive dire with ve (the conjunctive variant of vi) and la'))
+assert lf(s('compound of the infinitive dire with ve (the conjunctive variant of vi) and la'))[0] == 'dire'
+assert lf(s('compound of dando, the gerund of dare, with la'))[0] == 'dare'
+assert lf(s('compound of fa\', the second-person singular imperative form of fare, with le'))[0] == 'fare'
+assert not ff(s('A compound of mercury and another metal.')), 'una definizione che contiene «compound of» resta'
 from filtra import non_parola
 assert non_parola({'word': 'NASA', 'pos': 'name'}) and non_parola({'word': '&', 'pos': 'symbol'}) and non_parola({'word': 'lol', 'pos': 'abbrev'})
 assert not non_parola({'word': 'laser', 'pos': 'noun'}) and not non_parola({'word': 'I', 'pos': 'pron'})
