@@ -146,6 +146,13 @@ jobs:
           echo "::notice title=Voci per lingua (prima, dopo)::$(tr '\n' ';' < /tmp/confronto.txt)"
           ls -la dati/
 
+      - name: Analizzatore etimologico (conteggio)
+        continue-on-error: true
+        run: |
+          cd import
+          python3 analizza.py conta dati/it/glosse.tsv ../dati | tee /tmp/analisi.txt
+          echo "::notice title=Analizzatore::$(head -1 /tmp/analisi.txt)"
+
       - name: Controllo delle radici
         run: |
           python3 import/controlla_radici.py dati | tee /tmp/radici.txt
