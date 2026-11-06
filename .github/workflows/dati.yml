@@ -130,7 +130,7 @@ jobs:
       - name: Pacchetto dati
         run: |
           t=import/dati/it/tsv
-          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni dizionari autori stime pronunce; do
+          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni dizionari autori stime pronunce sensi; do
             gzip -9 -n -c "$t/$f.tsv" > "dati/$f.tsv.gz"
           done
           # voci per lingua, prima e dopo
@@ -145,6 +145,13 @@ jobs:
           cat /tmp/confronto.txt
           echo "::notice title=Voci per lingua (prima, dopo)::$(tr '\n' ';' < /tmp/confronto.txt)"
           ls -la dati/
+
+      - name: Analizzatore etimologico (conteggio)
+        continue-on-error: true
+        run: |
+          cd import
+          python3 analizza.py conta dati/it/glosse.tsv ../dati | tee /tmp/analisi.txt
+          echo "::notice title=Analizzatore::$(head -1 /tmp/analisi.txt)"
 
       - name: Controllo delle radici
         run: |

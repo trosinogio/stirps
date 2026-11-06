@@ -515,7 +515,7 @@ class Importatore:
             l = self.lessemi[k] = {'chiave': k, 'lingua': lingua, 'lemma': lemma, 'omografo': omografo, 'ricostruito': ric,
                                    'ident': ident if ric else None,
                                    'translit': translit, 'pos': pos or ('rad.' if lemma.endswith('-') and ric else None),
-                                   'pronuncia': None,
+                                   'pronuncia': None, 'sensi': None,
                                    'glosse': Counter()}
         if glossa:
             l['glosse'][glossa] += 1
@@ -564,6 +564,8 @@ class Importatore:
                           translit=v.get('r') or None)
         if v.get('pr') and not self.lessemi[k0].get('pronuncia'):
             self.lessemi[k0]['pronuncia'] = v['pr']
+        if v.get('se') and not self.lessemi[k0].get('sensi'):
+            self.lessemi[k0]['sensi'] = v['se']
         if glossa:
             self.lessemi[k0].setdefault('propria', glossa[:200])   # la glossa della sua voce, non di una menzione
         if k0 in self.ipotesi:          # stessa etimologia, altra parte del discorso
@@ -950,7 +952,7 @@ class Importatore:
             if not percorso or not os.path.exists(percorso):
                 continue
             for riga in open(percorso, encoding='utf-8'):
-                c = riga.rstrip('\n').split('\t') + ['', '', '', '', '', '', '']
+                c = riga.rstrip('\n').split('\t') + ['', '', '', '', '', '', '', '']
                 parola, etimn, pos, glossa, ricostruita = c[0], c[1], c[2], c[3], c[5]
                 if not parola or ricostruita == '1' or parola.startswith('*'):
                     continue
@@ -964,6 +966,8 @@ class Importatore:
                     self.lessemi[kl].setdefault('propria', glossa[:200])
                 if c[6] and not self.lessemi[kl].get('pronuncia'):
                     self.lessemi[kl]['pronuncia'] = json.loads(c[6])
+                if c[7] and not self.lessemi[kl].get('sensi'):
+                    self.lessemi[kl]['sensi'] = json.loads(c[7])
                 self.stat[f'lemmi_interi_{lingua}'] += 1
 
     def collega_participi(self):
@@ -1253,6 +1257,12 @@ class Importatore:
                 if l.get('pronuncia'):
                     f.write(l['chiave'] + '\t' + esc(json.dumps(l['pronuncia'], ensure_ascii=False)) + '\n')   # COPY legge le \\
                     self.stat['pronunce'] += 1
+        # la riga delle forme e le accezioni, per la scheda della voce
+        with open(os.path.join(cartella, 'sensi.tsv'), 'w', encoding='utf-8') as f:
+            for l in self.lessemi.values():
+                if l.get('sensi'):
+                    f.write(l['chiave'] + '\t' + esc(json.dumps(l['sensi'], ensure_ascii=False)) + '\n')
+                    self.stat['sensi'] += 1
         with open(os.path.join(cartella, 'ipotesi.tsv'), 'w', encoding='utf-8') as f:
             for h in self.ipotesi.values():
                 f.write('\t'.join(esc(x) for x in (h['chiave'], h['esito'], h['etichetta'], h['stato'], h['confidenza'], h['origine'], h['nota'])) + '\n')
@@ -1280,9 +1290,9 @@ def completa_glosse(imp, percorso, lingua=None):
     lingua = lingua or LINGUA
     """Glosse e parti del discorso dei lemmi senza etimologia: servono alle basi delle derivazioni (virus in
     retrovirus), e una parte del discorso dice che Haus, in tedesco, è un nome comune e non un nome proprio."""
-    gl, cat, pr = {}, {}, {}
+    gl, cat, pr, se = {}, {}, {}, {}
     for riga in open(percorso, encoding='utf-8'):
-        c = riga.rstrip('\n').split('\t') + [''] * 7
+        c = riga.rstrip('\n').split('\t') + [''] * 8
         parola, etimn, pos, g = c[:4]
         omo = int(etimn) if etimn.isdigit() else 1
         k = chiave(lingua, nome_pagina(lingua, parola), omo)
@@ -1292,6 +1302,8 @@ def completa_glosse(imp, percorso, lingua=None):
             cat.setdefault(k, POS.get(pos) or ('s.' if pos == 'noun' else None))
         if c[6]:
             pr.setdefault(k, c[6])
+        if c[7]:
+            se.setdefault(k, c[7])
     n = np_ = 0
     for k, l in imp.lessemi.items():
         if l['lingua'] != lingua:
@@ -1304,6 +1316,8 @@ def completa_glosse(imp, percorso, lingua=None):
             np_ += 1
         if not l.get('pronuncia') and k in pr:
             l['pronuncia'] = json.loads(pr[k])
+        if not l.get('sensi') and k in se:
+            l['sensi'] = json.loads(se[k])
     imp.stat[f'glosse_completate_{lingua}'] = n
     imp.stat[f'categorie_completate_{lingua}'] = np_
 

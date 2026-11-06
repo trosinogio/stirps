@@ -434,4 +434,16 @@ select pg_temp.verifica((select (r->>'tolte')::int from esito_pronunce) = 1
                         and not exists (select 1 from pronuncia where lessema_id = lx('la/caro')),
   'una pronuncia che Wiktionary non dà più si toglie');
 
+
+\echo '— sensi'
+truncate stg_sensi;
+insert into stg_sensi
+select id_esterno, '{"t": "carō f (genitive carnis); third declension", "s": [["flesh, meat", ""], ["the body", "figuratively"]]}'
+  from lessema where slug = 'la/caro';
+select importa_sensi();
+select pg_temp.verifica((select testa || '|' || (sensi->1->>1) from sensi where lessema_id = lx('la/caro')) = 'carō f (genitive carnis); third declension|figuratively',
+  'la riga delle forme e le accezioni con le etichette d''uso entrano');
+select pg_temp.verifica((select (r->>'nuove')::int + (r->>'cambiate')::int from (select importa_sensi() as r) x) = 0,
+  'accezioni uguali non si riscrivono');
+
 \echo '— collaudo dell’import completato'

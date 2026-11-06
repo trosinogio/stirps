@@ -2,13 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { isLang, TESTI, type Lang, type Testi } from '@/lib/i18n';
-import { lingueGeo, pronuncia, scheda, periodiLingue } from '@/lib/dati';
+import { lingueGeo, pronuncia, scheda, sensi, periodiLingue } from '@/lib/dati';
 import { classeRamo, datazione, fmt, G, nodiUnici, perLingua, tx } from '@/lib/forme';
 import { Fiducia, intercala, VoceLink } from '@/components/comuni';
 import Mappa from '@/components/Mappa';
 import Automatica from '@/components/Automatica';
 import Definizione from '@/components/Definizione';
 import Pronuncia from '@/components/Pronuncia';
+import InBreve from '@/components/InBreve';
 import LineaTempo, { type NodoTempo } from '@/components/LineaTempo';
 import type { Attestazione, NodoCatena, Relazione, Rimando, Scheda } from '@/lib/tipi';
 
@@ -140,7 +141,7 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
   if (!isLang(lang)) notFound();
   const t = TESTI[lang];
   const s = slug.map(decodeURIComponent).join('/');
-  const [sc, pr] = await Promise.all([scheda(s, lang), pronuncia(s)]);
+  const [sc, pr, se] = await Promise.all([scheda(s, lang), pronuncia(s), sensi(s)]);
   if (!sc) notFound();
   const L = sc.lessema;
   const strato = sc.strati.find((x) => x.codice === L.provenienza);
@@ -188,6 +189,7 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
         <h1 className={`voce-titolo ${classeRamo(L.ramo)}`}><span className="lemma">{fmt(L)}</span></h1>
         {L.translit && <p className="translit">{L.translit}</p>}
         <Pronuncia pr={pr} lang={lang} />
+        {se?.testa && <p className="forme-testa" lang={L.lingua}>{t.scheda.grammatica(se.testa)}</p>}
         <p className={`meta ${classeRamo(L.ramo)}`}>
           <Link className="lingua-b lingua-n" href={`/${lang}/l/${L.lingua}`}>{L.lingua_nome}</Link>
           {L.pos && <span>{t.pos[L.pos] ?? L.pos}</span>}
@@ -205,6 +207,8 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
         <Definizione L={L} lang={lang} />
         {L.nota && <p className="origine"><Nota testo={L.nota} sc={sc} t={t} /></p>}
       </header>
+
+      <InBreve sc={sc} t={t} lang={lang} />
 
       <Origine sc={sc} t={t} lang={lang} />
 
@@ -243,6 +247,17 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
               </li>
             ))}
           </ol>
+        </Sezione>
+      )}
+
+      {sc.accezioni.length <= 1 && (se?.sensi.length ?? 0) > 1 && (
+        <Sezione titolo={t.sezioni.significati}>
+          <ol className="accezioni sensi-w" lang="en">
+            {se!.sensi.map(([testo, et], k) => (
+              <li key={k}>{et && <span className="et" lang={lang}>{t.scheda.etichette(et)} </span>}{testo}</li>
+            ))}
+          </ol>
+          <p className="nota-fonte">{t.scheda.sensiWiktionary}</p>
         </Sezione>
       )}
 

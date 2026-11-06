@@ -6,6 +6,23 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 rm -rf esempio/tsv
+# il ciclo completo del filtro su due voci in stile Kaikki: un lemma con etimologia, pronuncia e accezioni, e una forma
+PROVA=$(mktemp -d)
+cat > "$PROVA/kaikki.jsonl" <<'JSON'
+{"word": "caro", "lang_code": "la", "pos": "noun", "etymology_templates": [{"name": "inh", "args": {"1": "la", "2": "itc-pro", "3": "*karō"}, "expansion": "*karō"}], "etymology_text": "From *karō.", "head_templates": [{"name": "la-noun", "args": {}, "expansion": "carō f (genitive carnis); third declension"}], "sounds": [{"ipa": "/ˈka.roː/", "tags": ["Classical-Latin"]}, {"audio": "a \"b\".ogg"}], "senses": [{"glosses": ["flesh"]}, {"glosses": ["the body"], "tags": ["figuratively"]}]}
+{"word": "carnis", "lang_code": "la", "pos": "noun", "senses": [{"glosses": ["genitive singular of carō"], "form_of": [{"word": "carō"}]}]}
+JSON
+LINGUA=la python3 filtra.py "$PROVA/lemmi.jsonl" "$PROVA/glosse.tsv" < "$PROVA/kaikki.jsonl" 2> /dev/null
+python3 - "$PROVA" <<'PY'
+import json, sys
+d = sys.argv[1]
+lemmi = [json.loads(r) for r in open(f'{d}/lemmi.jsonl', encoding='utf-8')]
+glosse = [r.rstrip('\n').split('\t') for r in open(f'{d}/glosse.tsv', encoding='utf-8')]
+assert [l['w'] for l in lemmi] == ['caro'] and [g[0] for g in glosse] == ['caro'], 'la forma flessa resta fuori'
+assert lemmi[0]['pr']['a'] == 'a "b".ogg' and lemmi[0]['se']['t'].startswith('carō f'), lemmi[0]
+assert json.loads(glosse[0][6])['i'][0][1] == 'Classical-Latin' and json.loads(glosse[0][7])['s'][1] == ['the body', 'figuratively']
+PY
+rm -rf "$PROVA"
 # le etimologie scritte solo nel testo: la prima menzione diventa un der («From the verb {{m|it|segare}}»)
 python3 - <<'PY'
 from filtra import menzione_come_der as f
@@ -90,6 +107,12 @@ assert lemma_valido('en', 'hound') and lemma_valido('ang', 'þing') and lemma_va
 assert not lemma_valido('en', '4x4') and not lemma_valido('en', 'A'), 'cifre e lettere isolate non sono parole'
 assert ff(s('simple past tense and past participle of hound')) and ff(s('third-person singular simple present indicative form of hound'))
 assert not ff(s('a dog used for hunting')), 'un senso lessicale resta'
+# le forme italiane con pronomi attaccati non sono lemmi: dirvela, dandola; il lemma è l'infinito
+assert ff(s('compound of the infinitive dire with ve (the conjunctive variant of vi) and la'))
+assert lf(s('compound of the infinitive dire with ve (the conjunctive variant of vi) and la'))[0] == 'dire'
+assert lf(s('compound of dando, the gerund of dare, with la'))[0] == 'dare'
+assert lf(s('compound of fa\', the second-person singular imperative form of fare, with le'))[0] == 'fare'
+assert not ff(s('A compound of mercury and another metal.')), 'una definizione che contiene «compound of» resta'
 from filtra import non_parola
 assert non_parola({'word': 'NASA', 'pos': 'name'}) and non_parola({'word': '&', 'pos': 'symbol'}) and non_parola({'word': 'lol', 'pos': 'abbrev'})
 assert not non_parola({'word': 'laser', 'pos': 'noun'}) and not non_parola({'word': 'I', 'pos': 'pron'})
@@ -124,6 +147,13 @@ pv = {'sounds': [{'ipa': '/ˈka.roː/', 'tags': ['Classical-Latin']}, {'ipa': '[
       'hyphenations': [{'parts': ['ca', 'ro']}]}
 assert pronuncia(pv) == {'i': [['/ˈka.roː/', 'Classical-Latin'], ['[ˈkaː.ro]', 'Ecclesiastical-Latin']], 's': 'ca‧ro', 'a': 'LL-Q397 (lat)-caro.wav'}, pronuncia(pv)
 assert pronuncia({'sounds': [{'rhymes': '-aro'}]}) is None
+# i dati della scheda: la riga delle forme e le accezioni con le etichette d'uso, senza i sensi che sono forme
+from filtra import dati_scheda as sensi
+sv = {'word': 'caro', 'head_templates': [{'expansion': 'carō f (genitive carnis); third declension'}],
+      'senses': [{'glosses': ['flesh, meat']}, {'glosses': ['the body'], 'tags': ['figuratively', 'feminine']},
+                 {'glosses': ['pulp of fruit'], 'topics': ['botany']}, {'glosses': ['dative of x'], 'form_of': [{'word': 'x'}]}]}
+assert sensi(sv) == {'t': 'carō f (genitive carnis); third declension', 's': [['flesh, meat', ''], ['the body', 'figuratively'], ['pulp of fruit', 'botany']]}, sensi(sv)
+assert sensi({'word': 'x', 'senses': []}) is None
 assert pronuncia({'sounds': [{'ipa': '[ˈkaː.ro]', 'raw_tags': ['Ecclesiastical']}]})['i'] == [['[ˈkaː.ro]', 'Ecclesiastical']]
 imp.voce({'w': 'caro', 'p': 'noun', 'en': None, 't': '', 'g': ['flesh'], 'h': [], 'c': None, 'rec': False, 'tpl': [], 'pr': pronuncia(pv)}, lingua_voce='la')
 assert imp.lessemi[imp.lessema('la', 'caro')]['pronuncia']['s'] == 'ca‧ro'
@@ -207,7 +237,7 @@ LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.t
 cd esempio/tsv
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
 truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_radice, stg_attestazione, stg_wikizionario,
-         stg_glossa_wikidata, stg_glossa_tradotta, stg_dizionario, stg_autore, stg_stima, stg_definizione, stg_pronuncia;
+         stg_glossa_wikidata, stg_glossa_tradotta, stg_dizionario, stg_autore, stg_stima, stg_definizione, stg_pronuncia, stg_sensi;
 \copy stg_lingua from 'lingue.tsv'
 \copy stg_lessema from 'lessemi.tsv'
 \copy stg_ipotesi from 'ipotesi.tsv'
@@ -222,6 +252,7 @@ truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_
 \copy stg_autore from '../autori.tsv'
 \copy stg_stima from '../stime.tsv'
 \copy stg_pronuncia from 'pronunce.tsv'
+\copy stg_sensi from 'sensi.tsv'
 select importa_wiktionary();
 select importa_dizionari();
 select importa_stime();
@@ -229,6 +260,7 @@ select importa_glosse_wikizionario();
 select importa_glosse_aggiuntive();
 select importa_definizioni();
 select importa_pronunce();
+select importa_sensi();
 refresh materialized view mv_allotropi;
 refresh materialized view mv_famiglia;
 SQL

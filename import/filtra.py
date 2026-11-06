@@ -116,7 +116,8 @@ FORMA = re.compile(r'^(?:\([^)]*\)\s*)*(?:'
                    r'|(?:(?:present|perfect|future|past|aorist|imperfect)\s+)?(?:(?:active|passive|middle|mediopassive)\s+)?'
                    r'(?:infinitive|participle)\s+of\b'
                    r'|(?:comparative|superlative)(?:\s+degree)?\s+of\b'
-                   r'|(?:simple\s+)?past\s+tense\b|simple\s+past\b)', re.I)      # inglese: «simple past tense and past participle of»
+                   r'|(?:simple\s+)?past\s+tense\b|simple\s+past\b'                # inglese: «simple past tense and past participle of»
+                   r'|compound\s+of\b)', re.I)       # italiano, forme con pronomi attaccati: «compound of the infinitive dire with ve and la»
 
 # Le voci che non sono parole: sigle e abbreviazioni (NASA, BBC, SPQR), simboli, caratteri, segni d'interpunzione.
 # Le sigle diventate parole minuscole (laser, radar) restano.
@@ -143,6 +144,31 @@ def pronuncia(v):
     sill = next(('‧'.join(h['parts']) for h in (v.get('hyphenations') or []) if isinstance(h, dict) and h.get('parts')), None) \
         or next((h for h in (v.get('hyphenation') or []) if isinstance(h, str) and h), None)
     d = {k: x for k, x in (('i', ipa), ('s', sill), ('a', audio)) if x}
+    return d or None
+
+
+# le etichette d'uso dei sensi che la scheda mostra (le altre etichette di Wiktionary sono grammaticali o tecniche)
+USO = {'archaic', 'obsolete', 'dated', 'rare', 'figuratively', 'metaphorically', 'colloquial', 'informal', 'slang',
+       'vulgar', 'derogatory', 'pejorative', 'offensive', 'poetic', 'literary', 'formal', 'humorous', 'euphemistic',
+       'dialectal', 'regional', 'historical', 'transitive', 'intransitive', 'reflexive', 'pronominal', 'uncountable',
+       'countable', 'idiomatic', 'ironic', 'childish', 'nonstandard', 'proscribed', 'Late-Latin', 'Medieval-Latin',
+       'Ecclesiastical-Latin', 'New-Latin', 'Classical-Latin', 'Epic', 'Attic', 'Ionic', 'Doric', 'Koine', 'Byzantine'}
+
+
+def dati_scheda(v):
+    '''I dati della scheda da Wiktionary (CC BY-SA): la riga delle forme del modello di intestazione («carō f (genitive
+    carnis); third declension») e fino a otto accezioni, ciascuna con le etichette d'uso e l'ambito. None se non c'è nulla.'''
+    out = []
+    for s in v.get('senses') or []:
+        g = s.get('glosses') or []
+        if not g or s.get('form_of') or 'form-of' in (s.get('tags') or []):
+            continue
+        etichette = [t for t in (s.get('tags') or []) if t in USO] + list(s.get('topics') or [])[:2]
+        out.append([g[-1].replace('\t', ' ').replace('\n', ' ')[:200], ','.join(etichette)])   # un sottosenso: il più preciso
+        if len(out) == 8:
+            break
+    testa = ((v.get('head_templates') or [{}])[0].get('expansion') or '').replace('\t', ' ').replace('\n', ' ').strip()[:160]
+    d = {k: x for k, x in (('t', testa if testa and testa != v.get('word') else None), ('s', out)) if x}
     return d or None
 
 
@@ -175,6 +201,11 @@ def lemma_della_forma(v):
                 return fo['word'], s.get('tags') or []
     for s in v.get('senses') or []:
         g = (s.get('glosses') or [''])[0]
+        # forme con pronomi attaccati: il lemma è l'infinito, o quello della forma spiegata tra virgole
+        # («compound of the infinitive dire with ve and la» → dire; «compound of dando, the gerund of dare, with la» → dare)
+        c = re.match(r'compound\s+of\s+(?:the\s+infinitive\s+([^\s(),;:]+)|[^,]+,\s+the\s+[^,]*?\bof\s+([^\s(),;:]+))', g, re.I)
+        if c:
+            return c.group(1) or c.group(2), ['compound']
         m = FORMA.match(g) and re.search(r'\bof\s+([^\s(),;:]+)', g)
         if m:
             return m.group(1), [x for x in re.split(r'[\s/]+', g[:m.start()].lower()) if x]
@@ -258,7 +289,9 @@ if __name__ == '__main__':
                                  ','.join(x.replace(',', ' ') for x in distintive if x),
                                  '1' if (v.get('original_title') or '').startswith('Reconstruction:') else '',
                                  # settima colonna: la pronuncia, in JSON (IPA con la varietà, sillabazione, audio)
-                                 json.dumps(pronuncia(v), ensure_ascii=False) if pronuncia(v) else '')) + '\n')
+                                 json.dumps(pronuncia(v), ensure_ascii=False) if pronuncia(v) else '',
+                                 # ottava colonna: la riga delle forme e le accezioni, in JSON
+                                 json.dumps(dati_scheda(v), ensure_ascii=False) if dati_scheda(v) else '')) + '\n')
         tpl = [{**t, 'name': ALIAS.get(t.get('name'), t.get('name'))} for t in tpl]
         classici = [t for t in tpl if t.get('name') in UTILI]
         if not any(porta_etimo(t) for t in classici):
@@ -289,6 +322,7 @@ if __name__ == '__main__':
                               # la traslitterazione della voce (дом → dom), per la ricerca in caratteri latini
                               'r': next((f['form'] for f in (v.get('forms') or []) if 'romanization' in (f.get('tags') or [])), None),
                               'pr': pronuncia(v),
+                              'se': dati_scheda(v),
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
     print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, da {{{{ety}}}} {dalla_ety}), forme flesse {flesse} '
