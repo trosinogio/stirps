@@ -136,7 +136,8 @@ def pronuncia(v):
     for s in v.get('sounds') or []:
         if s.get('ipa'):
             if len(ipa) < 4 and s['ipa'] not in (x[0] for x in ipa):
-                ipa.append([s['ipa'], ','.join(s.get('tags') or [])])
+                # la varietà: tags se wiktextract la riconosce, raw_tags se no («Ecclesiastical»)
+                ipa.append([s['ipa'], ','.join((s.get('tags') or []) + (s.get('raw_tags') or []))])
         elif not audio and (s.get('audio') or s.get('ogg_url') or s.get('mp3_url')):
             audio = s.get('audio') or (s.get('ogg_url') or s.get('mp3_url')).rsplit('/', 1)[-1]
     sill = next(('‧'.join(h['parts']) for h in (v.get('hyphenations') or []) if isinstance(h, dict) and h.get('parts')), None) \

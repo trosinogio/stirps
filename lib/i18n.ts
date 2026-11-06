@@ -62,6 +62,7 @@ export interface Testi {
   mappaAria: string;
   formaRicostruita: string;
   formaAntiquata: string;
+  pronuncia: { titolo: string; sillabazione: string; ascolta: string; audio: string; varieta: (etichette: string) => string };
   dati: (nome: string, licenza: string) => string;
   sezioni: {
     origine: string; ipotesi: string; ipotesiFonti: string; significati: string; mito: string; sorelle: string;
@@ -178,6 +179,23 @@ export interface Testi {
   dalleVoci: string;
 }
 
+// le varietà delle trascrizioni di Wiktionary («Classical-Latin», «Received-Pronunciation»): le più frequenti in italiano,
+// le altre come le scrive Wiktionary, senza trattini
+const VARIETA_IT: Record<string, string> = {
+  'Classical-Latin': 'latino classico', 'Ecclesiastical-Latin': 'latino ecclesiastico', 'Vulgar-Latin': 'latino volgare',
+  'Received-Pronunciation': 'britannico', 'General-American': 'americano', UK: 'Regno Unito', US: 'Stati Uniti',
+  Canada: 'Canada', Australia: 'Australia', Ireland: 'Irlanda', Scotland: 'Scozia', 'New-Zealand': 'Nuova Zelanda',
+  'Standard-German': 'tedesco standard', Germany: 'Germania', Austria: 'Austria', Switzerland: 'Svizzera',
+  France: 'Francia', Quebec: 'Québec', Belgium: 'Belgio', Paris: 'Parigi', Attic: 'attico', Koine: 'koinè',
+  Byzantine: 'bizantino', Epic: 'epico', Doric: 'dorico', Ionic: 'ionico', Aeolic: 'eolico', Egyptian: 'egiziano',
+  Classical: 'classico', Ecclesiastical: 'ecclesiastico', Italy: 'Italia', Rome: 'Roma', Tuscany: 'Toscana',
+  Northern: 'settentrionale', Southern: 'meridionale', Moscow: 'Mosca', phoneme: 'fonematica', phonetic: 'fonetica',
+  '5th-BCE': 'V sec. a.C.', '4th-BCE': 'IV sec. a.C.', '1st-CE': 'I sec. d.C.', '4th-CE': 'IV sec. d.C.', '10th-CE': 'X sec. d.C.',
+  '15th-CE': 'XV sec. d.C.',
+};
+const varieta = (mappa: Record<string, string> | null) => (etichette: string) =>
+  etichette.split(',').filter(Boolean).map((e) => mappa?.[e] ?? e.replace(/-/g, ' ')).join(', ');
+
 export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
   it: {
     nomeInterfaccia: 'Italiano',
@@ -234,6 +252,8 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     mappaAria: 'Mappa dei passaggi tra le lingue',
     formaRicostruita: 'forma ricostruita',
     formaAntiquata: 'forma antiquata',
+    pronuncia: { titolo: 'Pronuncia', sillabazione: 'sillabazione', ascolta: 'Ascolta la pronuncia',
+                 audio: 'audio: Wikimedia Commons', varieta: varieta(VARIETA_IT) },
     dati: (n, l) => `dati ${n}, ${l}`,
     sezioni: {
       origine: 'Da dove viene', ipotesi: 'Ipotesi', ipotesiFonti: 'Ipotesi e fonti', significati: 'Significati', mito: 'Falso mito',
@@ -430,6 +450,8 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     mappaAria: 'Map of the transfers between languages',
     formaRicostruita: 'reconstructed form',
     formaAntiquata: 'archaic form',
+    pronuncia: { titolo: 'Pronunciation', sillabazione: 'hyphenation', ascolta: 'Listen to the pronunciation',
+                 audio: 'audio: Wikimedia Commons', varieta: varieta(null) },
     dati: (n, l) => `${n} data, ${l}`,
     sezioni: {
       origine: 'Where it comes from', ipotesi: 'Hypotheses', ipotesiFonti: 'Hypothesis and sources', significati: 'Meanings',

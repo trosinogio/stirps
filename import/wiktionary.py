@@ -1239,7 +1239,7 @@ class Importatore:
         with open(os.path.join(cartella, 'pronunce.tsv'), 'w', encoding='utf-8') as f:
             for l in self.lessemi.values():
                 if l.get('pronuncia'):
-                    f.write(l['chiave'] + '\t' + json.dumps(l['pronuncia'], ensure_ascii=False) + '\n')
+                    f.write(l['chiave'] + '\t' + esc(json.dumps(l['pronuncia'], ensure_ascii=False)) + '\n')   # COPY legge le \\
                     self.stat['pronunce'] += 1
         with open(os.path.join(cartella, 'ipotesi.tsv'), 'w', encoding='utf-8') as f:
             for h in self.ipotesi.values():

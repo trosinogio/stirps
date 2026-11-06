@@ -27,7 +27,7 @@ const APPOGGIO = [
   ['stg_attestazione', 'attestazioni'], ['stg_wikizionario', 'glosse_it'],
   ['stg_glossa_wikidata', 'glosse_wikidata'], ['stg_glossa_tradotta', 'glosse_tradotte'],
   ['stg_dizionario', 'dizionari'], ['stg_autore', 'autori'], ['stg_stima', 'stime'],
-  ['stg_definizione', 'definizioni'],
+  ['stg_definizione', 'definizioni'], ['stg_pronuncia', 'pronunce'],
 ];
 const BLOCCO = 5000;
 // impronta del pacchetto dati: se cambia, al deploy si rifà l'import
@@ -70,6 +70,8 @@ async function importa(client, pulisci) {
     console.log('[db] glosse aggiuntive:', JSON.stringify(ga.g), `(${secondi()} s)`);
     const { rows: [df] } = await client.query('select importa_definizioni() as d');
     console.log('[db] definizioni:', JSON.stringify(df.d), `(${secondi()} s)`);
+    const { rows: [pr] } = await client.query('select importa_pronunce() as p');
+    console.log('[db] pronunce:', JSON.stringify(pr.p), `(${secondi()} s)`);
     await client.query('refresh materialized view mv_allotropi');
     console.log(`[db] mv_allotropi (${secondi()} s)`);
     await client.query('refresh materialized view mv_famiglia');
@@ -114,7 +116,7 @@ const campo = (x) => (x === '\\N' ? null : x.replace(/\\\\/g, '\\'));
 
 async function carica(client, tabella, file) {
   // i dizionari possono mancare in un pacchetto vecchio: la tabella resta vuota e importa_dizionari() non fa nulla
-  if (['dizionari', 'autori', 'stime', 'definizioni'].includes(file) && !existsSync(`dati/${file}.tsv.gz`)) return 0;
+  if (['dizionari', 'autori', 'stime', 'definizioni', 'pronunce'].includes(file) && !existsSync(`dati/${file}.tsv.gz`)) return 0;
   const { rows: colonne } = await client.query(
     `select attname as nome, format_type(atttypid, atttypmod) as tipo from pg_attribute
       where attrelid = $1::regclass and attnum > 0 and not attisdropped order by attnum`, [tabella]);
