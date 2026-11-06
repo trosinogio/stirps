@@ -81,6 +81,34 @@ if __name__ == '__main__':
     print(f'  lingua della cima delle {len(con)} catene:', dict(cime.most_common(12)))
     lunghezze = Counter(min(len(catena(k)) - 1, 6) for k in con)
     print('  passaggi per catena (6 = sei o più):', dict(sorted(lunghezze.items())))
+    # gli ambiti possibili: quante voci della lingua e quanto spazio, togliendo nomi propri, locuzioni, formazioni interne
+    # (il primo etimo è una parola della stessa lingua: doghouse < dog + house). Le voci nuove delle altre lingue (le
+    # chiusure: inglese medio e antico, protogermanico…) servono a tutti gli ambiti e si contano a parte.
+    n_ip, n_rel, etimo1 = Counter(), Counter(), {}
+    for h in leggi(dopo_d, 'ipotesi'):
+        n_ip[h[1]] += 1
+    for r in leggi(dopo_d, 'relazioni'):
+        n_rel[r[2]] += 1
+    for k, (e, _) in primo.items():
+        etimo1[k] = (d_less.get(e) or ['', '?'])[1]
+    gia = {k for k in p_less}
+    proprie = [r for r in voci if r[0] not in gia]
+    def costo(rr):
+        return mb(sum(BYTE['lessema'] + n_ip[r[0]] * BYTE['ipotesi'] + n_rel[r[0]] * (BYTE['relazione'] + BYTE['mv_famiglia'])
+                      for r in rr))
+    ambiti = [('tutte', proprie),
+              ('senza nomi propri', [r for r in proprie if r[6] != 'np']),
+              ('senza nomi propri né locuzioni', [r for r in proprie if r[6] != 'np' and ' ' not in r[2]]),
+              ('solo con l\'etimo fuori dalla lingua', [r for r in proprie if etimo1.get(r[0], lingua) != lingua]),
+              ('etimo fuori, senza nomi propri né locuzioni',
+               [r for r in proprie if etimo1.get(r[0], lingua) != lingua and r[6] != 'np' and ' ' not in r[2]])]
+    altre = [k for k in nuove if d_less[k][1] != lingua]
+    print(f'\nambiti per {lingua} (voci nuove; più {len(altre)} voci nuove di altre lingue, circa '
+          f'{mb(len(altre) * (BYTE["lessema"] + BYTE["ipotesi"] + BYTE["relazione"] + BYTE["mv_famiglia"])):.0f} MB):')
+    for nome_a, rr in ambiti:
+        print(f'  {nome_a}: {len(rr)} voci, {costo(rr):.0f} MB')
+    print('  lingua del primo etimo:', dict(Counter(etimo1.get(r[0], '—') for r in proprie).most_common(10)))
+
     print('\ncampione di catene (da guardare a mano prima di pubblicare):')
     for k in random.Random(1).sample(con, min(40, len(con))):
         print('  ' + ' < '.join(nome(x) for x in catena(k)))
