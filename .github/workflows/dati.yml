@@ -18,6 +18,17 @@ jobs:
   dati:
     runs-on: ubuntu-latest
     timeout-minutes: 150
+    env:
+      # le lingue di chiusura (import/importa.sh): l'inglese entra con tutte le voci che hanno un'etimologia
+      # (CON_ETIMOLOGIA), con l'inglese medio e antico e il norreno (l'anglonormanno su Kaikki non c'è) per chiudere le sue catene
+      CHIUSURA: 'la:Latin fro:Old French grc:Ancient Greek en:English enm:Middle English ang:Old English non:Old Norse'
+      INTERE: la,grc
+      CON_ETIMOLOGIA: en
+      # dell'inglese, il lessico comune (i lemmi tra le 50 mila forme più frequenti) e le parole con l'etimo fuori
+      # dall'inglese (ESTERNI), senza nomi propri né locuzioni
+      ELENCHI: en=../dati/frequenze_en.tsv.gz
+      ESTERNI: en
+      GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -27,9 +38,11 @@ jobs:
       - name: Dump di Kaikki ed etimologie
         run: |
           cd import
-          SOLO_ANALISI=1 WIKIZIONARIO=0 INTERE=la,grc ./importa.sh
+          # le glosse già pubblicate (il pacchetto di main) restano, se sono ancora tra le candidate
+          git fetch -q --depth 1 origin main && git show FETCH_HEAD:dati/lessemi.tsv.gz > /tmp/precedenti.tsv.gz
+          PRECEDENTI=/tmp/precedenti.tsv.gz SOLO_ANALISI=1 WIKIZIONARIO=0 ./importa.sh
           jq -c . dati/it/rapporto_parser.json
-          echo "::notice title=Parser::$(jq -c '{lessemi, ipotesi, relazioni, voci, intere_la, intere_grc, lemmi_interi_la, lemmi_interi_grc}' dati/it/rapporto_parser.json)"
+          echo "::notice title=Parser::$(jq -c '{lessemi, ipotesi, relazioni, voci, intere_la, intere_grc, intere_en, lemmi_interi_la, lemmi_interi_grc}' dati/it/rapporto_parser.json)"
           echo "::notice title=Perseus::$(tail -1 dati/it/rapporto_perseus.txt)"
 
       - name: Diagnosi delle etimologie mancanti
@@ -82,6 +95,10 @@ jobs:
                   out.write(c[0] + '\n'); n += 1
           print(f'voci da tradurre: {n}')
           PY
+          if [ "$GLOSSE_TRADOTTE" = 0 ]; then
+            echo "::notice title=Glosse tradotte::non tradotte (GLOSSE_TRADOTTE=0): $(wc -l < chiavi.txt) voci da tradurre"
+            exit 0
+          fi
           for p in 1 2 3 4; do
             python3 traduci_glosse.py voci.tsv "$andata" "tradotte_$p.tsv" --ritorno "$ritorno" --chiavi chiavi.txt \
               --parte "$p/4" --vocabolario ../dati/frequenze_it.tsv.gz,dati/it/tsv/lessemi.tsv &
@@ -130,6 +147,17 @@ jobs:
         run: |
           python3 import/controlla_radici.py dati | tee /tmp/radici.txt
           echo "::notice title=Radici::$(head -6 /tmp/radici.txt | tr '\n' ' ')"
+
+      - name: Stima dell'import
+        continue-on-error: true
+        timeout-minutes: 15
+        run: |
+          mkdir -p /tmp/prima
+          # rispetto al pacchetto pubblicato, quello di main
+          git fetch -q --depth 1 origin main
+          for f in lessemi ipotesi relazioni attestazioni; do git show FETCH_HEAD:dati/$f.tsv.gz > /tmp/prima/$f.tsv.gz; done
+          python3 import/stima_import.py /tmp/prima dati en --attuale 349 | tee /tmp/stima.txt
+          echo "::notice title=Stima::$(head -4 /tmp/stima.txt | tr '\n' ' ')"
 
       - name: Commit sul ramo
         run: |

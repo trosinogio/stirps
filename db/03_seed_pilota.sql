@@ -159,7 +159,9 @@ insert into opera (sigla, autore, titolo, edizione, anno, editore, url, pubblico
 ('Kroonen', 'Guus Kroonen', 'Etymological Dictionary of Proto-Germanic', null, 2013, 'Brill', null, false, 'germanico', '{gem-pro}', null, 'etimologico', null),
 ('Kluge', 'Friedrich Kluge, Elmar Seebold', 'Etymologisches Wörterbuch der deutschen Sprache', '25ª ed.', 2011, 'De Gruyter', null, false, 'germanico', '{de,gmh,goh}', null, 'etimologico', null),
 ('Pfeifer', 'Wolfgang Pfeifer e altri', 'Etymologisches Wörterbuch des Deutschen', null, 1989, 'Akademie-Verlag', 'https://www.dwds.de', false, 'germanico', '{de}', 'https://www.dwds.de/wb/etymwb/{lemma}', 'etimologico', 'nel Digitales Wörterbuch der deutschen Sprache (DWDS)'),
-('OED', null, 'Oxford English Dictionary', '3ª ed. in rete', null, 'Oxford University Press', 'https://www.oed.com', false, 'germanico', '{en,enm,ang}', null, 'storico', 'in corso; su abbonamento'),
+('OED', null, 'Oxford English Dictionary', '3ª ed. in rete', null, 'Oxford University Press', 'https://www.oed.com', false, 'germanico', '{en,enm,ang}', 'https://www.oed.com/search/dictionary/?scope=Entries&q={lemma}', 'storico', 'in corso; su abbonamento'),
+('AHD', null, 'The American Heritage Dictionary of the English Language', '5ª ed.', 2011, 'Houghton Mifflin Harcourt', 'https://www.ahdictionary.com', false, 'germanico', '{en}', 'https://www.ahdictionary.com/word/search.html?q={lemma}', 'lessico', 'con le radici indoeuropee di Calvert Watkins in appendice'),
+('Watkins', 'Calvert Watkins', 'The American Heritage Dictionary of Indo-European Roots', '3ª ed.', 2011, 'Houghton Mifflin Harcourt', null, false, 'indoeuropeo', '{ine-pro}', null, 'etimologico', null),
 -- lingue slave
 ('Vasmer', 'Max Vasmer', 'Russisches etymologisches Wörterbuch', null, 1950, 'Winter', null, false, 'slavo', '{ru,orv,sla-pro}', null, 'etimologico', '3 volumi, 1950–1958; traduzione russa di O. N. Trubačëv, 1964–1973'),
 ('Derksen', 'Rick Derksen', 'Etymological Dictionary of the Slavic Inherited Lexicon', null, 2008, 'Brill', null, false, 'slavo', '{sla-pro}', null, 'etimologico', null),
