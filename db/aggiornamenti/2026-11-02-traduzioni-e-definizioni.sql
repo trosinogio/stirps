@@ -21,7 +21,7 @@ create or replace trigger definizione_tocca before update on definizione for eac
 create or replace trigger definizione_storico after insert or update or delete on definizione
   for each row execute function registra_storico();
 
-create table if not exists stg_definizione (chiave text, originale text, traduzione text, definizione text, modello text);
+create unlogged table if not exists stg_definizione (chiave text, originale text, traduzione text, definizione text, modello text);
 
 -- ===== Traduzioni e definizioni di Claude (novembre 2026) =====
 insert into strato (codice, nome, licenza, share_alike, attribuzione, url) values
@@ -71,7 +71,7 @@ begin
       from (select l.id, btrim(d.traduzione) as testo, 'claude' as provenienza, 1 as rango
               from stg_definizione d join lessema l on l.id_esterno = d.chiave
              where coalesce(l.glossa_lingua, '') <> 'it' and btrim(coalesce(d.traduzione, '')) <> ''
-               and coalesce(d.originale, '') = coalesce(l.glossa, '') and l.stato_editoriale <> 'superato'
+               and (coalesce(d.originale, '') in ('', coalesce(l.glossa, ''))) and l.stato_editoriale <> 'superato'
                -- per una parola italiana una «traduzione» uguale al lemma non dice nulla (limnofilo → «limnofilo»)
                and not (l.lingua = 'it' and norm(btrim(d.traduzione)) = norm(l.lemma))
             union all
@@ -117,7 +117,7 @@ begin
   create temp table cand_def on commit drop as
     select distinct on (l.id) l.id, btrim(d.definizione) as testo, nullif(d.modello, '') as modello
       from stg_definizione d join lessema l on l.id_esterno = d.chiave
-     where btrim(coalesce(d.definizione, '')) <> '' and coalesce(d.originale, '') = coalesce(l.glossa, '')
+     where btrim(coalesce(d.definizione, '')) <> '' and (coalesce(d.originale, '') in ('', coalesce(l.glossa, '')))
        and l.stato_editoriale <> 'superato'
      order by l.id, d.modello;
   create index on cand_def (id);
@@ -133,7 +133,7 @@ begin
   select count(*) into n from definizione where provenienza = 'claude';
   return jsonb_build_object('claude', n, 'nuove', nuove, 'tolte', tolte);
 end $$;
-comment on function importa_definizioni() is 'Definizioni italiane scritte da Claude, per differenza: solo per la glossa da cui sono nate, e mai sopra quelle della redazione o rivedute.';
+comment on function importa_definizioni() is 'Definizioni italiane scritte da Claude, per differenza: solo per la glossa da cui sono nate (o per la voce, se nate senza glossa), e mai sopra quelle della redazione o rivedute.';
 
 create or replace function nodo_json(p_id bigint, p_lingua text default 'it', p_anteprima boolean default false) returns jsonb
 language sql stable as $$

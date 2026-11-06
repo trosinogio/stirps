@@ -131,6 +131,27 @@ imp.carica_chiusura('en', f'{d}/en_lemmi.jsonl', None, f'{d}/en_glosse.tsv')
 imp.chiudi(2)
 lemmi = {l['lemma'] for l in imp.lessemi.values() if l['lingua'] == 'en'}
 assert lemmi == {'hound', 'dog', 'houndfish', 'kennel'}, lemmi
+# la glossa: quella della voce stessa prima delle menzioni (t=bee); senza voce propria, quella già pubblicata
+imp = Importatore()
+for _ in range(3):
+    api = imp.lessema('la', 'apis', glossa='bee')
+imp.voce({'w': 'apis', 'p': 'noun', 'en': None, 't': '', 'g': ['bee (insect of the clade Anthophila)'], 'h': [], 'c': None, 'rec': False, 'tpl': []}, lingua_voce='la')
+assert imp.scegli_glossa(imp.lessemi[api]) == 'bee (insect of the clade Anthophila)', imp.lessemi[api]
+es = imp.lessema('ine-pro', '*h₁es-', glossa='to be')
+imp.lessema('ine-pro', '*h₁es-', glossa='to be'); imp.lessema('ine-pro', '*h₁es-', glossa='to be, exist')
+assert imp.scegli_glossa(imp.lessemi[es]) == 'to be', 'senza glossa precedente vince la più citata'
+imp.glosse_precedenti = {es: 'to be, exist'}
+assert imp.scegli_glossa(imp.lessemi[es]) == 'to be, exist', 'la glossa pubblicata resta, se è ancora tra le candidate'
+imp.glosse_precedenti = {es: 'to exist'}
+assert imp.scegli_glossa(imp.lessemi[es]) == 'to be', 'una glossa pubblicata che non è più tra le candidate non resta'
+# un suffisso scritto senza trattino non è una base: forty < four + -y, non forty < «y»
+imp = Importatore()
+imp.chiusura['en'] = {'voci': [], 'lemmi': {'-y', 'forty', 'four'}, 'omografi': {}, 'forme': {}, 'participi': {}, 'flesse': {}, 'file_glosse': None}
+forty, y, four = imp.lessema('en', 'forty'), imp.lessema('en', 'y'), imp.lessema('en', 'four')
+arco(imp, forty, four)
+imp.relazioni.append({**imp.relazioni[-1], 'chiave': forty + '#wikt#1', 'etimo': y, 'ordine': 2})
+imp.togli_archi_impossibili()
+assert [r['etimo'] for r in imp.relazioni if r['esito'] == forty] == [four], imp.relazioni
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \

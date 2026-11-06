@@ -20,6 +20,7 @@ INTERE=${INTERE-la,grc}   # lingue di chiusura importate intere: anche le voci c
 CON_ETIMOLOGIA=${CON_ETIMOLOGIA-}   # lingue di chiusura di cui entrano tutte le voci con un'etimologia (en), senza i lemmi vuoti
 ELENCHI=${ELENCHI-}   # per quelle lingue, i soli lemmi ammessi: ELENCHI="en=../dati/frequenze_en.tsv.gz" (il lessico comune)
 ESTERNI=${ESTERNI-}   # e con l'elenco, anche le voci con l'etimo in un'altra lingua: ESTERNI=en
+PRECEDENTI=${PRECEDENTI-}   # il lessemi.tsv.gz pubblicato: le glosse non cambiano se sono ancora tra le candidate
 SOLO_ANALISI=${SOLO_ANALISI:-0}
 DIZIONARI=${DIZIONARI:-1}   # i lemmi del Lewis & Short e dell'LSJ che Wiktionary non ha (Perseus, CC BY-SA 4.0)
 PERSEUS=${PERSEUS:-1c34cdf756c63cf37db61bd366d733431dbd7aa0}   # commit di PerseusDL/lexica
@@ -51,7 +52,8 @@ fi
 echo "2/4  leggo le etimologie"
 python3 wiktionary.py "$DATI/lemmi.jsonl" "$DATI/tsv" "$DATI/glosse.tsv" ${ARGOMENTI[@]+"${ARGOMENTI[@]}"} --passi "$PASSI" \
   ${INTERE:+--intere "$INTERE"} ${CON_ETIMOLOGIA:+--con-etimologia "$CON_ETIMOLOGIA"} \
-  $(for e in $ELENCHI; do printf -- "--elenco %s " "$e"; done) ${ESTERNI:+--esterni "$ESTERNI"} > "$DATI/rapporto_parser.json"
+  $(for e in $ELENCHI; do printf -- "--elenco %s " "$e"; done) ${ESTERNI:+--esterni "$ESTERNI"} \
+  ${PRECEDENTI:+--glosse-precedenti "$PRECEDENTI"} > "$DATI/rapporto_parser.json"
 if [ "$DIZIONARI" = 1 ]; then
   echo "     dizionari del Perseus: Lewis & Short e Liddell–Scott–Jones"
   mkdir -p dati/perseus

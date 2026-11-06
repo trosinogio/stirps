@@ -38,7 +38,9 @@ jobs:
       - name: Dump di Kaikki ed etimologie
         run: |
           cd import
-          SOLO_ANALISI=1 WIKIZIONARIO=0 ./importa.sh
+          # le glosse già pubblicate (il pacchetto di main) restano, se sono ancora tra le candidate
+          git fetch -q --depth 1 origin main && git show FETCH_HEAD:dati/lessemi.tsv.gz > /tmp/precedenti.tsv.gz
+          PRECEDENTI=/tmp/precedenti.tsv.gz SOLO_ANALISI=1 WIKIZIONARIO=0 ./importa.sh
           jq -c . dati/it/rapporto_parser.json
           echo "::notice title=Parser::$(jq -c '{lessemi, ipotesi, relazioni, voci, intere_la, intere_grc, intere_en, lemmi_interi_la, lemmi_interi_grc}' dati/it/rapporto_parser.json)"
           echo "::notice title=Perseus::$(tail -1 dati/it/rapporto_perseus.txt)"
@@ -151,7 +153,9 @@ jobs:
         timeout-minutes: 15
         run: |
           mkdir -p /tmp/prima
-          for f in lessemi ipotesi relazioni attestazioni; do git show HEAD:dati/$f.tsv.gz > /tmp/prima/$f.tsv.gz; done
+          # rispetto al pacchetto pubblicato, quello di main
+          git fetch -q --depth 1 origin main
+          for f in lessemi ipotesi relazioni attestazioni; do git show FETCH_HEAD:dati/$f.tsv.gz > /tmp/prima/$f.tsv.gz; done
           python3 import/stima_import.py /tmp/prima dati en --attuale 349 | tee /tmp/stima.txt
           echo "::notice title=Stima::$(head -4 /tmp/stima.txt | tr '\n' ' ')"
 

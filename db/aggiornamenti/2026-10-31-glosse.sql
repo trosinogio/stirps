@@ -8,8 +8,8 @@ insert into strato (codice, nome, licenza, share_alike, attribuzione, url) value
  'Glosse italiane tradotte automaticamente dalle glosse inglesi di Wiktionary (modello OPUS-MT di Argos Translate), verificate con la traduzione di ritorno e con un dizionario rovesciato.', null)
 on conflict (codice) do nothing;
 
-create table if not exists stg_glossa_wikidata (lid text, lemma text, categoria text, glossa text, sensi int);
-create table if not exists stg_glossa_tradotta (chiave text, originale text, testo text);
+create unlogged table if not exists stg_glossa_wikidata (lid text, lemma text, categoria text, glossa text, sensi int);
+create unlogged table if not exists stg_glossa_tradotta (chiave text, originale text, testo text);
 
 -- Dopo il Wikizionario: definizioni di Wikidata per le parole italiane che non ne hanno (stessa parte del discorso,
 -- niente omografi), poi traduzioni automatiche per gli etimi che non hanno una glossa italiana

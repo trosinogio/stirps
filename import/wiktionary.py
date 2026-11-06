@@ -476,6 +476,7 @@ class Importatore:
         self.elenco = {}             # per una lingua con etimologia, i soli lemmi ammessi (--elenco en=frequenze.tsv.gz):
                                      # il lessico comune, senza nomi propri né locuzioni; le voci raggiunte entrano sempre
         self.esterni = set()         # con l'elenco, anche le voci con l'etimo in un'altra lingua (--esterni en): hound < enm
+        self.glosse_precedenti = {}  # chiave → glossa del pacchetto pubblicato (--glosse-precedenti dati/lessemi.tsv.gz)
         self.con_etimologia = set()  # lingue di chiusura di cui entrano tutte le voci con un'etimologia, ma non i lemmi
                                      # senza (--con-etimologia en): l'inglese ha centinaia di migliaia di lemmi vuoti
         self.stat = Counter()
@@ -543,6 +544,8 @@ class Importatore:
             pos = 's.m.' if g.startswith('m') and 'f' not in g else 's.f.' if g.startswith('f') and 'm' not in g else 's.'
         glossa = (v.get('g') or [None])[0]
         k0 = self.lessema(lingua_voce, parola, glossa=glossa[:200] if glossa else None, pos=pos, omografo=omo)
+        if glossa:
+            self.lessemi[k0].setdefault('propria', glossa[:200])   # la glossa della sua voce, non di una menzione
         if k0 in self.ipotesi:          # stessa etimologia, altra parte del discorso
             self.stat['voci_duplicate'] += 1
             return
@@ -828,6 +831,20 @@ class Importatore:
                 self.stat[f'omografi_distinti_{lingua}'] += 1
         return lingua, pagina, omo, forma_extra
 
+    def scegli_glossa(self, l):
+        """La glossa di una voce: quella della sua voce di Wiktionary (apis, «bee (insect of the clade Anthophila)»), non
+        quella delle menzioni nelle catene altrui (t=bee); senza voce propria, la glossa già pubblicata se è ancora tra
+        le candidate (--glosse-precedenti), così una lingua nuova non la cambia (*h₁es-, «to be, exist», non «to be»):
+        le definizioni e le traduzioni di Claude restano legate alla glossa da cui sono nate. Altrimenti la più citata."""
+        if l.get('propria') and l['glosse'].get(l['propria']):
+            return l['propria']
+        if not l['glosse']:
+            return None
+        prima = self.glosse_precedenti.get(l['chiave'])
+        if prima and prima in l['glosse']:
+            return prima
+        return l['glosse'].most_common(1)[0][0]
+
     def ammessa(self, lingua, v):
         """Una voce entra da sola, senza che una catena la raggiunga, solo se la sua lingua non ha un elenco o se è
         nell'elenco (le forme più frequenti) o, con --esterni, ha l'etimo in un'altra lingua; e mai un nome proprio o
@@ -911,8 +928,10 @@ class Importatore:
                 pagina = nome_pagina(lingua, parola)
                 if chiave(lingua, pagina, omo) in self.lessemi:
                     continue
-                self.lessema(lingua, pagina, glossa=glossa[:200] if glossa else None,
-                             pos=POS.get(pos) or ('s.' if pos == 'noun' else None), omografo=omo)
+                kl = self.lessema(lingua, pagina, glossa=glossa[:200] if glossa else None,
+                                  pos=POS.get(pos) or ('s.' if pos == 'noun' else None), omografo=omo)
+                if glossa:
+                    self.lessemi[kl].setdefault('propria', glossa[:200])
                 self.stat[f'lemmi_interi_{lingua}'] += 1
 
     def collega_participi(self):
@@ -952,7 +971,7 @@ class Importatore:
     def arco_impossibile(self, etimo, esito):
         """Il motivo per cui un arco etimo → esito non può stare, o None. Una radice ricostruita è la cima della sua
         famiglia: non ha etimi automatici (*steh₂- < *stnéh₂ti mette la radice sotto un suo derivato). Una parola non
-        deriva da una lingua che discende dalla sua (*bʰoln- < longobardo *palla)."""
+        deriva da una lingua che discende dalla sua (*bʰoln- < longobardo *palla). Un affisso non è una base."""
         le, lx = self.lessemi.get(etimo), self.lessemi.get(esito)
         if not le or not lx:
             return None
@@ -962,6 +981,12 @@ class Importatore:
             return 'tema_da_una_non_radice'      # *meh₂-tu- viene da *meh₂-, non da una parola o da un altro tema
         if discende_da(le['lingua'], lx['lingua']):
             return 'etimo_in_una_lingua_figlia'
+        # un suffisso o un prefisso scritto senza trattino non è una base: forty < y, mellite < ite, urbane < ane.
+        # Lo è una «parola» che non è un lemma della sua lingua mentre -y, -ite, -ane lo sono
+        idx = self.chiusura.get(le['lingua'])
+        if idx and not le['ricostruito'] and le['lemma'] not in idx['lemmi'] \
+                and ('-' + le['lemma'] in idx['lemmi'] or le['lemma'] + '-' in idx['lemmi']):
+            return 'affisso_come_base'
         return None
 
     def risolvi_intermedi(self):
@@ -1183,7 +1208,7 @@ class Importatore:
                 l['glosse'].clear()                   # nodo generico di radici omografe: nessuna glossa indovinata
         with open(os.path.join(cartella, 'lessemi.tsv'), 'w', encoding='utf-8') as f:
             for l in self.lessemi.values():
-                g = l['glosse'].most_common(1)[0][0] if l['glosse'] else None
+                g = self.scegli_glossa(l)
                 tr = l['translit']
                 if not tr and base_lingua(l['lingua']) == 'grc' and GRECO.search(l['lemma']):
                     tr = translit_grc(l['lemma'])     # senza tr= di Wiktionary: lo schema di Wiktionary, calcolato qui
@@ -1233,7 +1258,8 @@ def completa_glosse(imp, percorso, lingua=None):
 if __name__ == '__main__':
     # wiktionary.py lemmi.jsonl uscita/ [glosse.tsv] [--chiudi la=lemmi.jsonl,glosse.tsv,forme.tsv]… [--passi N]
     #               [--intere la,grc] [--con-etimologia en] [--elenco en=../dati/frequenze_en.tsv.gz] [--esterni en]
-    args, chiusure, passi, intere, con_etimologia, elenchi, esterni = [], [], 1, set(), set(), {}, set()
+    #               [--glosse-precedenti ../dati/lessemi.tsv.gz]
+    args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti = [], [], 1, set(), set(), {}, set(), {}
     it_ = iter(sys.argv[1:])
     for x in it_:
         if x == '--chiudi':
@@ -1247,6 +1273,12 @@ if __name__ == '__main__':
             with (gzip.open(percorso_e, 'rt', encoding='utf-8') if percorso_e.endswith('.gz') else open(percorso_e, encoding='utf-8')) as f:
                 # le colonne di dati/frequenze_*.tsv.gz: lingua, forma, rango, conteggio, fonte
                 elenchi[lingua_e] = {r.split('\t')[1].lower() for r in f if r.count('\t') >= 1}
+        elif x == '--glosse-precedenti':
+            with gzip.open(next(it_), 'rt', encoding='utf-8') as f:
+                for r in f:
+                    c = r.rstrip('\n').split('\t')
+                    if len(c) > 7 and c[7] != '\\N':
+                        precedenti[c[0]] = c[7].replace('\\\\', '\\')
         elif x == '--esterni':
             esterni = {c for c in next(it_).split(',') if c}
         elif x == '--con-etimologia':
@@ -1258,6 +1290,7 @@ if __name__ == '__main__':
     imp.con_etimologia = con_etimologia
     imp.elenco = elenchi
     imp.esterni = esterni
+    imp.glosse_precedenti = precedenti
     for c in chiusure:
         lingua, percorsi = c.split('=', 1)
         p = percorsi.split(',') + ['', '']
