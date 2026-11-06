@@ -119,6 +119,18 @@ imp.lessema('en', 'dog')
 imp.chiudi(2)
 lemmi = {l['lemma'] for l in imp.lessemi.values() if l['lingua'] == 'en'}
 assert lemmi == {'hound', 'dog'}, lemmi
+# con --esterni entrano anche le voci fuori elenco con l'etimo in un'altra lingua (kennel < anglonormanno), non i composti
+with open(f'{d}/en_lemmi.jsonl', 'a') as f:
+    f.write(json.dumps({'w': 'kennel', 'p': 'noun', 'en': None, 't': '', 'g': [], 'h': [], 'c': None, 'rec': False,
+                        'tpl': [{'n': 'bor', 'a': {'1': 'en', '2': 'xno', '3': 'kenil'}, 'e': 'kenil'}]}) + '\n')
+    f.write(json.dumps({'w': 'houndlike', 'p': 'adj', 'en': None, 't': '', 'g': [], 'h': [], 'c': None, 'rec': False,
+                        'tpl': [{'n': 'suffix', 'a': {'1': 'en', '2': 'hound', '3': 'like'}, 'e': ''}]}) + '\n')
+imp = Importatore()
+imp.con_etimologia, imp.elenco, imp.esterni = {'en'}, {'en': {'hound'}}, {'en'}
+imp.carica_chiusura('en', f'{d}/en_lemmi.jsonl', None, f'{d}/en_glosse.tsv')
+imp.chiudi(2)
+lemmi = {l['lemma'] for l in imp.lessemi.values() if l['lingua'] == 'en'}
+assert lemmi == {'hound', 'dog', 'houndfish', 'kennel'}, lemmi
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \

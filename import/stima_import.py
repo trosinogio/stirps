@@ -12,7 +12,7 @@ import gzip, os, random, sys
 from collections import Counter
 
 BYTE = {'lessema': 510, 'ipotesi': 425, 'relazione': 355, 'mv_famiglia': 100, 'glossa': 340, 'attestazione': 336}
-LIMITE_MB = 512          # il piano gratuito di Neon
+LIMITE_MB = 1024         # il piano gratuito di Neon (1 GB; era 0,5)
 
 
 def leggi(d, nome):

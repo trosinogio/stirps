@@ -86,7 +86,7 @@ Come cambia il database:
 - **Da una sandbox la porta 5432 di Neon può essere chiusa:** gli script ricadono sul driver WebSocket `@neondatabase/serverless`.
 - **Wiktionary scrive l’incertezza nel testo** («possibly», «uncertain»): il parser la legge senza le glosse tra virgolette, perché «obscure» in una glossa non è un dubbio.
 - **Il Postgres locale della sandbox si ferma spesso:** se una query dice «connection refused», riavvialo.
-- **Lo spazio su Neon (0,5 GB nel piano gratuito):** l’import scrive solo ciò che cambia, perché ogni riga riscritta lascia una copia morta fino al vacuum; un test controlla lo `xmin` delle righe. Prima di un import grande misura in locale (`[db] spazio occupato` nel registro della build).
+- **Lo spazio su Neon (1 GB nel piano gratuito, dato di Giovanni del 6 novembre 2026; prima era 0,5):** l’import scrive solo ciò che cambia, perché ogni riga riscritta lascia una copia morta fino al vacuum; un test controlla lo `xmin` delle righe. Prima di un import grande misura in locale (`[db] spazio occupato` nel registro della build).
 - **Una sottoquery correlata per riga su un import grande** (`importa_stime()`, 108 mila stime) costava dieci minuti: join con tabelle temporanee piccole e indicizzate, e `analyze`. I secondi di ogni passo sono nel registro della build.
 - **Un confronto per forma normalizzata su molte righe** (`lemma_norm = norm(x)`) usa l’indice a trigrammi una riga alla volta e diventa lentissimo: confronta con un insieme piccolo e precalcolato (vedi `importa_dizionari()`).
 

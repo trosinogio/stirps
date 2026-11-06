@@ -332,6 +332,18 @@ LETTERE.update(dict.fromkeys(('en', 'enm', 'ang', 'sco'), set('abcdefghijklmnopq
 NON_LEMMA = re.compile(r'[()\[\]{}<>“”"=|]')
 
 
+def etimo_esterno(lingua, v):
+    """Il primo etimo è in un'altra lingua (hound < inglese medio hound, court < francese antico cort), non una
+    formazione interna: composti, affissi, retroformazioni, accorciamenti (doghouse < dog + house)."""
+    for t in v.get('tpl') or []:
+        if t.get('n') in AFFISSI or t.get('n') in LOCALI:
+            return False
+        fonte = (t.get('a') or {}).get('2')
+        if fonte:
+            return fonte != lingua
+    return False
+
+
 def lemma_valido(lingua, lemma, ricostruito=False):
     if not (lemma or '').strip('*- '):
         return False                    # un lemma vuoto («itc-pro:» da un termine senza parola) non è una voce
@@ -463,6 +475,7 @@ class Importatore:
         self.intere = set()          # lingue di chiusura importate intere (--intere la,grc), non solo dove le catene arrivano
         self.elenco = {}             # per una lingua con etimologia, i soli lemmi ammessi (--elenco en=frequenze.tsv.gz):
                                      # il lessico comune, senza nomi propri né locuzioni; le voci raggiunte entrano sempre
+        self.esterni = set()         # con l'elenco, anche le voci con l'etimo in un'altra lingua (--esterni en): hound < enm
         self.con_etimologia = set()  # lingue di chiusura di cui entrano tutte le voci con un'etimologia, ma non i lemmi
                                      # senza (--con-etimologia en): l'inglese ha centinaia di migliaia di lemmi vuoti
         self.stat = Counter()
@@ -817,9 +830,14 @@ class Importatore:
 
     def ammessa(self, lingua, v):
         """Una voce entra da sola, senza che una catena la raggiunga, solo se la sua lingua non ha un elenco o se è
-        nell'elenco (le forme più frequenti), non è un nome proprio e non è una locuzione."""
+        nell'elenco (le forme più frequenti) o, con --esterni, ha l'etimo in un'altra lingua; e mai un nome proprio o
+        una locuzione."""
         elenco = self.elenco.get(lingua)
-        return elenco is None or (v['w'].lower() in elenco and v.get('p') != 'name' and ' ' not in v['w'].strip())
+        if elenco is None:
+            return True
+        if v.get('p') == 'name' or ' ' in v['w'].strip():
+            return False
+        return v['w'].lower() in elenco or (lingua in self.esterni and etimo_esterno(lingua, v))
 
     def chiudi(self, passi=1):
         """Importa le etimologie delle voci intermedie già presenti nel dizionario. Nelle lingue intere (--intere)
@@ -1214,8 +1232,8 @@ def completa_glosse(imp, percorso, lingua=None):
 
 if __name__ == '__main__':
     # wiktionary.py lemmi.jsonl uscita/ [glosse.tsv] [--chiudi la=lemmi.jsonl,glosse.tsv,forme.tsv]… [--passi N]
-    #               [--intere la,grc] [--con-etimologia en] [--elenco en=../dati/frequenze_en.tsv.gz]
-    args, chiusure, passi, intere, con_etimologia, elenchi = [], [], 1, set(), set(), {}
+    #               [--intere la,grc] [--con-etimologia en] [--elenco en=../dati/frequenze_en.tsv.gz] [--esterni en]
+    args, chiusure, passi, intere, con_etimologia, elenchi, esterni = [], [], 1, set(), set(), {}, set()
     it_ = iter(sys.argv[1:])
     for x in it_:
         if x == '--chiudi':
@@ -1229,6 +1247,8 @@ if __name__ == '__main__':
             with (gzip.open(percorso_e, 'rt', encoding='utf-8') if percorso_e.endswith('.gz') else open(percorso_e, encoding='utf-8')) as f:
                 # le colonne di dati/frequenze_*.tsv.gz: lingua, forma, rango, conteggio, fonte
                 elenchi[lingua_e] = {r.split('\t')[1].lower() for r in f if r.count('\t') >= 1}
+        elif x == '--esterni':
+            esterni = {c for c in next(it_).split(',') if c}
         elif x == '--con-etimologia':
             con_etimologia = {c for c in next(it_).split(',') if c}
         else:
@@ -1237,6 +1257,7 @@ if __name__ == '__main__':
     imp.intere = intere
     imp.con_etimologia = con_etimologia
     imp.elenco = elenchi
+    imp.esterni = esterni
     for c in chiusure:
         lingua, percorsi = c.split('=', 1)
         p = percorsi.split(',') + ['', '']
