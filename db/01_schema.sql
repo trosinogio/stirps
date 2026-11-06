@@ -373,6 +373,16 @@ create table if not exists pronuncia (
 );
 comment on table pronuncia is 'Pronuncia della voce da Wiktionary (CC BY-SA): IPA con la varietà, sillabazione, audio di Wikimedia Commons.';
 
+-- La riga delle forme e le accezioni della voce, da Wiktionary: l'espansione del modello di intestazione («carō f
+-- (genitive carnis); third declension») e fino a otto accezioni con le etichette d'uso e l'ambito. Una riga per voce.
+create table if not exists sensi (
+  lessema_id        bigint primary key references lessema on delete cascade,
+  testa             text,                                  -- carō f (genitive carnis); third declension
+  sensi             jsonb not null default '[]',           -- [["flesh, meat", ""], ["the body", "figuratively"], …]
+  provenienza       text not null default 'wiktionary'
+);
+comment on table sensi is 'Riga delle forme e accezioni della voce da Wiktionary (CC BY-SA), con le etichette d''uso.';
+
 -- Frequenze d'uso: ordinano la ricerca e la coda di verifica (si parte dalle parole più usate)
 create table frequenza (
   lingua      text not null references lingua,
