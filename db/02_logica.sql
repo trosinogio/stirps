@@ -925,3 +925,159 @@ begin
   returning id into v_rel;
   return v_rel;
 end $$;
+
+-- ===== Analisi di un testo (8 novembre 2026) =====
+-- Le parole di un testo per lingua d'origine, come la «distribuzione etimologica» di Teodorescu, Bolea e Teodorescu
+-- (IEEE HPEC 2025). Ogni forma va ai suoi lemmi (forma_lemma, o la forma stessa se è un lemma); per ogni lemma si risale
+-- la catena accolta finché resta nella lingua del testo (o in una sua varietà: l'italiano antico è italiano), e la prima
+-- lingua diversa è l'origine, raggruppata per lingua madre (il latino volgare sotto il latino). La via d'ingresso viene
+-- dal tipo di quel passaggio: popolare (eredità), dotta (prestito dotto, semidotto), prestito, altro. Una forma con più
+-- lemmi possibili conta per ciascuno in parti uguali; un lemma senza un'origine nota va a parte.
+create function analizza_testo(p_lingua text, p_forme text[], p_conteggi int[], p_lang text default 'it',
+                               p_anteprima boolean default false)
+returns jsonb language sql stable as $$
+with recursive
+forme as (
+  select lower(f) as forma, sum(coalesce(c, 1))::numeric as n
+    from unnest(p_forme, p_conteggi) as u(f, c)
+   where f is not null and btrim(f) <> ''
+   group by 1),
+lemmi as (
+  select f.forma, fl.lemma from forme f join forma_lemma fl on fl.lingua = p_lingua and fl.forma = f.forma
+  union
+  select f.forma, f.forma from forme f),
+voci as (
+  select x.forma, l.id, l.lemma, l.slug
+    from lemmi x
+    join lessema l on l.lingua = p_lingua and l.lemma = x.lemma and not l.ricostruito
+                  and visibile(l.stato_editoriale, p_anteprima)),
+pesi as (
+  select v.id, v.lemma, v.slug, sum(f.n / (select count(*) from voci w where w.forma = v.forma)) as peso
+    from voci v join forme f on f.forma = v.forma
+   group by v.id, v.lemma, v.slug),
+salita (voce, id, prof, lingua, tipo) as (
+  select p.id, p.id, 0, p_lingua, null::text from pesi p
+  union all
+  select s.voce, x.etimo_id, s.prof + 1, coalesce(g.varieta_di, g.codice), x.tipo
+    from salita s
+    join ipotesi h on h.esito_id = s.id and h.stato = 'accolta' and visibile(h.stato_editoriale, p_anteprima)
+    join relazione x on x.ipotesi_id = h.id and x.ordine = 1
+    join lessema e on e.id = x.etimo_id
+    join lingua g on g.codice = e.lingua
+   where s.lingua = p_lingua and s.prof < 12),
+uscita as (
+  select distinct on (voce) voce, lingua, tipo from salita where lingua <> p_lingua order by voce, prof),
+classi as (
+  select p.id, p.lemma, p.slug, p.peso, u.lingua,
+         case when u.tipo = 'eredita' then 'popolare'
+              when u.tipo in ('prestito_dotto', 'semidotto') then 'dotta'
+              when u.tipo in ('prestito', 'calco') then 'prestito'
+              when u.tipo is not null then 'altro' end as via
+    from pesi p left join uscita u on u.voce = p.id),
+per_lingua as (
+  select c.lingua, sum(c.peso) as peso, count(*) as lemmi,
+         jsonb_build_object('popolare', round(coalesce(sum(c.peso) filter (where c.via = 'popolare'), 0), 2),
+                            'dotta', round(coalesce(sum(c.peso) filter (where c.via = 'dotta'), 0), 2),
+                            'prestito', round(coalesce(sum(c.peso) filter (where c.via = 'prestito'), 0), 2),
+                            'altro', round(coalesce(sum(c.peso) filter (where c.via = 'altro'), 0), 2)) as vie,
+         (select jsonb_agg(jsonb_build_object('lemma', e.lemma, 'slug', e.slug, 'peso', round(e.peso, 2)) order by e.peso desc, e.lemma)
+            from (select * from classi d where d.lingua is not distinct from c.lingua order by d.peso desc, d.lemma limit 8) e) as esempi
+    from classi c
+   group by c.lingua)
+select jsonb_build_object(
+  'occorrenze', (select coalesce(sum(n), 0) from forme),
+  'forme', (select count(*) from forme),
+  'riconosciute', (select coalesce(sum(f.n), 0) from forme f where exists (select 1 from voci v where v.forma = f.forma)),
+  'lemmi', (select count(*) from pesi),
+  'origini', coalesce((
+     select jsonb_agg(jsonb_build_object('codice', p.lingua, 'nome', coalesce(etichetta_in('lingua', p.lingua, p_lang), g.nome),
+                                         'ramo', g.ramo, 'peso', round(p.peso, 2), 'lemmi', p.lemmi, 'vie', p.vie,
+                                         'esempi', p.esempi) order by p.peso desc)
+       from per_lingua p join lingua g on g.codice = p.lingua), '[]'::jsonb),
+  'senza_origine', coalesce((
+     select jsonb_build_object('peso', round(p.peso, 2), 'lemmi', p.lemmi, 'esempi', p.esempi)
+       from per_lingua p where p.lingua is null), jsonb_build_object('peso', 0, 'lemmi', 0, 'esempi', '[]'::jsonb)),
+  'sconosciute', coalesce((
+     select jsonb_agg(x.forma order by x.n desc, x.forma)
+       from (select f.forma, f.n from forme f where not exists (select 1 from voci v where v.forma = f.forma)
+              order by f.n desc, f.forma limit 40) x), '[]'::jsonb));
+$$;
+comment on function analizza_testo(text, text[], int[], text, boolean) is
+  'Le parole di un testo per lingua d''origine e via d''ingresso, risalendo le catene accolte (pagina «Analizza un testo»).';
+
+-- L'indice delle radici per area di significato (8 novembre 2026): le forme ricostruite in cima a una famiglia, di una
+-- protolingua. Senza area: per ogni area le radici con più discendenti (p_in_vista), e quante sono. Con un'area: tutte le
+-- sue radici in ordine alfabetico, a pagine, con le iniziali. Per ogni radice fino a quattro parole della lingua del
+-- lettore che ne discendono, come in elenco_radici().
+create or replace function indice_radici(p_lingua text default 'it', p_anteprima boolean default false,
+                                         p_capo_lingua text default 'ine-pro', p_area text default null,
+                                         p_pagina int default 1, p_per_pagina int default 200, p_in_vista int default 8)
+returns jsonb language sql stable as $$
+with
+capi as (
+  select f.capo as id, count(*) as discendenti, count(distinct x.lingua) as lingue
+    from mv_famiglia f join lessema c on c.id = f.capo join lessema x on x.id = f.id
+   where c.ricostruito and (p_anteprima or f.pubblico)
+     and visibile(c.stato_editoriale, p_anteprima) and visibile(x.stato_editoriale, p_anteprima)
+   group by f.capo),
+tutti as (
+  select k.*, l.lemma, l.lingua, coalesce(a.area, '') as area, lower(left(nullif(l.lemma_norm, ''), 1)) as iniziale,
+         coalesce(l.lemma_norm, l.lemma) as ordine
+    from capi k join lessema l on l.id = k.id left join area_radice a on a.lessema_id = k.id),
+scelte as (select * from tutti where lingua = p_capo_lingua),
+vista as (
+  select * from (
+    select s.*, row_number() over (partition by s.area order by s.discendenti desc, s.ordine) as pos
+      from scelte s where p_area is null) v
+   where pos <= p_in_vista
+  union all
+  select s.*, 0 from scelte s where s.area = p_area
+   order by 1 offset 0),
+pagina as (
+  select * from vista where p_area is null
+  union all
+  select * from (select * from vista where p_area is not null order by ordine, lemma
+                  offset (greatest(p_pagina, 1) - 1) * p_per_pagina limit p_per_pagina) x),
+esempi as (
+  select pg.id, (
+    select jsonb_agg(e.lemma order by e.rango nulls last, e.prof, e.lemma) from (
+      select x.lemma, min(case when x.omografo = 1 then q.rango end) as rango, min(f.profondita) as prof
+        from mv_famiglia f join lessema x on x.id = f.id
+        left join frequenza q on q.lingua = x.lingua and q.forma = x.lemma
+       where f.capo = pg.id and x.id <> pg.id and x.lingua = p_lingua and not x.nome_proprio and x.nome_indice is not true
+         and (p_anteprima or f.pubblico) and visibile(x.stato_editoriale, p_anteprima)
+       group by x.lemma
+       order by rango nulls last, prof, x.lemma limit 4) e) as esempi
+    from pagina pg),
+voce as (
+  select pg.area, pg.id, pg.discendenti, pg.ordine, pg.lemma,
+         nodo_json(pg.id, p_lingua, p_anteprima) || jsonb_build_object('discendenti', pg.discendenti, 'lingue', pg.lingue,
+           'esempi', coalesce(e.esempi, '[]'::jsonb), 'area', nullif(pg.area, ''), 'iniziale', pg.iniziale) as j
+    from pagina pg join esempi e on e.id = pg.id)
+select jsonb_build_object(
+  'capo_lingua', p_capo_lingua, 'area', p_area, 'pagina', greatest(p_pagina, 1), 'per_pagina', p_per_pagina,
+  'totale', (select count(*) from scelte),
+  'gruppi', coalesce((select jsonb_agg(jsonb_build_object('lingua', g.lingua, 'n', g.n,
+                        'nome', coalesce(etichetta_in('lingua', g.lingua, p_lingua), l.nome)) order by g.n desc, g.lingua)
+                      from (select lingua, count(*) as n from tutti group by lingua) g join lingua l on l.codice = g.lingua), '[]'::jsonb),
+  'aree', coalesce((select jsonb_agg(jsonb_build_object('area', x.area, 'n', x.n,
+                       'nome', case when p_lingua = 'it' then a.it else a.en end) order by coalesce(a.ordine, 99))
+                    from (select area, count(*) as n from scelte group by area) x
+                    left join area_semantica a on a.codice = x.area), '[]'::jsonb),
+  'iniziali', case when p_area is null then '[]'::jsonb else coalesce((
+      select jsonb_agg(jsonb_build_object('iniziale', i.iniziale, 'n', i.n, 'pagina', i.pagina) order by i.iniziale)
+        from (select iniziale, count(*) as n,
+                     min((rn - 1) / p_per_pagina + 1) as pagina
+                from (select iniziale, row_number() over (order by ordine, lemma) as rn from scelte where area = p_area) r
+               group by iniziale) i), '[]'::jsonb) end,
+  'sezioni', case when p_area is not null then '[]'::jsonb else coalesce((
+      select jsonb_agg(jsonb_build_object('area', x.area, 'n', x.n,
+                         'nome', case when p_lingua = 'it' then a.it else a.en end,
+                         'radici', (select jsonb_agg(v.j order by v.discendenti desc, v.ordine) from voce v where v.area = x.area))
+                       order by coalesce(a.ordine, 99))
+        from (select area, count(*) as n from scelte group by area) x left join area_semantica a on a.codice = x.area), '[]'::jsonb) end,
+  'radici', case when p_area is null then '[]'::jsonb
+                 else coalesce((select jsonb_agg(v.j order by v.ordine, v.lemma) from voce v), '[]'::jsonb) end)
+$$;
+comment on function indice_radici(text, boolean, text, text, int, int, int) is
+  'L''indice delle radici ricostruite di una protolingua, per area di significato e, dentro un''area, in ordine alfabetico.';

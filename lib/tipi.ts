@@ -112,3 +112,25 @@ export interface Sensi {
   testa: string | null;
   sensi: [string, string][];
 }
+
+// L'analisi di un testo (analizza_testo()): le parole per lingua d'origine e via d'ingresso
+export type EsempioAnalisi = { lemma: string; slug: string; peso: number };
+export type OrigineAnalisi = {
+  codice: string; nome: string; ramo: string | null; peso: number; lemmi: number;
+  vie: { popolare: number; dotta: number; prestito: number; altro: number }; esempi: EsempioAnalisi[];
+};
+export type AnalisiTesto = {
+  occorrenze: number; forme: number; riconosciute: number; lemmi: number; origini: OrigineAnalisi[];
+  senza_origine: { peso: number; lemmi: number; esempi: EsempioAnalisi[] }; sconosciute: string[];
+};
+
+// L'indice delle radici per area di significato (indice_radici())
+export type RadiceArea = Nodo & { discendenti: number; lingue: number; esempi: string[]; area: string | null; iniziale: string | null };
+export interface IndiceRadici {
+  capo_lingua: string; area: string | null; pagina: number; per_pagina: number; totale: number;
+  gruppi: { lingua: string; nome: string; n: number }[];
+  aree: { area: string; nome: string | null; n: number }[];
+  iniziali: { iniziale: string; n: number; pagina: number }[];
+  sezioni: { area: string; nome: string | null; n: number; radici: RadiceArea[] }[];
+  radici: RadiceArea[];
+}

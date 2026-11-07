@@ -34,10 +34,14 @@ jobs:
           fi
           cd import
           mkdir -p claude/esiti
+          # l'impronta degli esiti prima della corsa: nel registro entrano solo quelli che questa corsa ha cambiato
+          # (rifondere quelli vecchi riscriverebbe le definizioni aggiunte dopo)
+          for f in claude/esiti/*.tsv.gz; do [ -f "$f" ] && sha1sum "$f"; done > /tmp/esiti_prima.txt
           pid=()
           while read -r lotto modello sforzo destinazione; do
             case "$lotto" in ''|'#'*) continue ;; esac
             registro=(); [ "$destinazione" = registro ] && registro=(--registro ../dati/definizioni.tsv.gz)
+            [ "$destinazione" = aree ] && registro=(--registro ../dati/aree_radici.tsv.gz)
             python3 definisci.py esegui "claude/$lotto.jsonl.gz" "$modello" "claude/esiti/$lotto.$modello.tsv.gz" \
               --sforzo "$sforzo" "${registro[@]}" &
             pid+=($!)
@@ -46,9 +50,11 @@ jobs:
           # i lotti per il dizionario entrano nel registro del pacchetto
           while read -r lotto modello sforzo destinazione; do
             case "$lotto" in ''|'#'*) continue ;; esac
-            if [ "$destinazione" = registro ] && [ -f "claude/esiti/$lotto.$modello.tsv.gz" ]; then
-              python3 definisci.py unisci ../dati/definizioni.tsv.gz "claude/esiti/$lotto.$modello.tsv.gz"
-            fi
+            esito_f="claude/esiti/$lotto.$modello.tsv.gz"
+            [ -f "$esito_f" ] || continue
+            if grep -qxF "$(sha1sum "$esito_f")" /tmp/esiti_prima.txt; then continue; fi   # non è cambiato
+            [ "$destinazione" = registro ] && python3 definisci.py unisci ../dati/definizioni.tsv.gz "$esito_f"
+            [ "$destinazione" = aree ] && python3 definisci.py unisci ../dati/aree_radici.tsv.gz "$esito_f"
           done < claude/lotti.conf
           exit $esito
 
@@ -57,7 +63,7 @@ jobs:
         run: |
           git config user.name "stirps-definizioni"
           git config user.email "stirps-definizioni@users.noreply.github.com"
-          for f in dati/definizioni.tsv.gz import/claude/esiti; do [ -e "$f" ] && git add "$f"; done
+          for f in dati/definizioni.tsv.gz dati/aree_radici.tsv.gz import/claude/esiti; do [ -e "$f" ] && git add "$f"; done
           if git diff --cached --quiet; then echo "nessun risultato nuovo"; exit 0; fi
           git commit -q -m "Definizioni di Claude: $(ls import/claude/esiti/*.tsv.gz 2> /dev/null | wc -l) esiti ($(date -u +%F))"
           for i in 1 2 3 4; do git pull -q --rebase && git push -q && break; sleep $((2 ** i)); done

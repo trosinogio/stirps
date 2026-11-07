@@ -492,4 +492,28 @@ begin
   end;
 end $$;
 
+\echo '— analisi di un testo'
+insert into forma_lemma values ('it', 'notti', 'notte'), ('it', 'piedi', 'piede');
+select pg_temp.verifica(
+  (select (r->'origini'->0->>'codice') = 'la' and (r->'origini'->0->>'peso')::numeric = 4
+          and (r->'origini'->0->'vie'->>'popolare')::numeric = 4 and (r->>'occorrenze')::numeric = 7
+          and (r->>'riconosciute')::numeric = 4 and r->'sconosciute' = '["zzzq"]'::jsonb
+     from (select analizza_testo('it', array['Notti', 'piedi', 'madre', 'zzzq'], array[2, 1, 1, 3], 'it', true) as r) x),
+  'le forme vanno al lemma (notti → notte), le maiuscole non contano, e l''origine è la prima lingua fuori dall''italiano');
+delete from forma_lemma where lingua = 'it' and forma in ('notti', 'piedi');
+
+\echo '— indice delle radici per area'
+insert into area_radice (lessema_id, area, provenienza) values (lx('ine-pro/ped'), 'corpo', 'redazione'),
+  (lx('ine-pro/meh2ter'), 'parentela', 'redazione'), (lx('ine-pro/gwem'), 'movimento', 'redazione');
+select pg_temp.verifica(
+  (select (r->'sezioni'->0->>'area') = 'corpo' and (r->'sezioni'->0->'radici'->0->>'slug') = 'ine-pro/ped'
+          and exists (select 1 from jsonb_array_elements(r->'aree') a where a->>'area' = 'parentela' and (a->>'n')::int = 1)
+          and exists (select 1 from jsonb_array_elements(r->'aree') a where a->>'area' = '' and (a->>'n')::int >= 2)
+     from (select indice_radici('it', true, 'ine-pro', null) as r) x)
+  and (select jsonb_array_length(r->'radici') = 1 and r->'radici'->0->>'slug' = 'ine-pro/meh2ter' and jsonb_array_length(r->'iniziali') = 1
+         from (select indice_radici('it', true, 'ine-pro', 'parentela') as r) x)
+  and (select jsonb_array_length(r->'radici') >= 2 from (select indice_radici('it', true, 'ine-pro', '') as r) x),
+  'l''indice delle radici le divide per area, nell''ordine delle aree; un''area si legge in ordine alfabetico; le radici senza area stanno a parte');
+delete from area_radice where lessema_id in (lx('ine-pro/ped'), lx('ine-pro/meh2ter'), lx('ine-pro/gwem'));
+
 \echo '— collaudo completato'

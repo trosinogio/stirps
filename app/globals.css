@@ -676,3 +676,49 @@ footer.piede{max-width:none;margin:48px 0 0;padding:0;border-top:1px solid var(-
 .conto-radici{font:13.5px var(--sans);color:var(--ink-2);margin:0 0 6px}
 .rad-esempi{grid-column:1 / -1;font:italic 15.5px/1.4 var(--serif);color:var(--ink-2)}
 .rad-provvisorie{margin-top:26px}
+
+/* Analizza un testo */
+.analisi textarea{width:100%;box-sizing:border-box;font:16px/1.5 var(--serif,inherit);padding:12px;border:1px solid var(--rule,#ccc);border-radius:4px;background:var(--paper,#fff);color:var(--ink);resize:vertical}
+.analisi-azioni{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 24px}
+.analisi-azioni button{font:15px var(--sans);padding:8px 18px;border-radius:4px;border:1px solid var(--ink);background:var(--ink);color:var(--paper,#fff);cursor:pointer}
+.analisi-azioni button:disabled{opacity:.5;cursor:default}
+.analisi-origini{list-style:none;padding:0;margin:16px 0}
+.analisi-origini li{margin:0 0 18px}
+.analisi-riga{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font:15px var(--sans)}
+.analisi-numeri{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.analisi-barra{display:flex;gap:1px;height:10px;margin:6px 0 4px;min-width:4px}
+.analisi-barra span{display:block;height:100%;background:var(--pig,var(--ink-2))}
+.analisi-barra .via-dotta{opacity:.65}.analisi-barra .via-prestito{opacity:.4}.analisi-barra .via-altro{opacity:.25}
+.analisi-vie,.analisi-esempi{margin:2px 0;font:13.5px var(--sans);color:var(--ink-2)}
+.analisi-sconosciute{font:14px var(--sans);color:var(--ink-2)}
+.analisi-metodo{margin-top:28px}
+
+/* Lingue: l'albero genealogico */
+.indice-famiglie{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 28px;font:14px var(--sans)}
+.famiglia-albero{margin:0 0 36px;padding-top:6px;border-top:1px solid var(--filo)}
+.famiglia-albero h2{font:600 22px var(--serif,inherit);margin:10px 0 10px}
+.famiglia-albero .conta-l{font:13px var(--sans);color:var(--ink-3);font-weight:400;margin-left:8px}
+.ramo-albero{margin:14px 0 0 0}
+.ramo-albero h3{font:600 15px var(--sans);color:var(--pig,var(--ink-2));margin:0 0 6px}
+.albero-l{list-style:none;margin:0;padding:0}
+.albero-l .albero-l{margin-left:9px;padding-left:16px;border-left:1px solid color-mix(in srgb,var(--pig,var(--ink-3)) 45%,transparent)}
+.albero-l li{margin:3px 0}
+.albero-l .lingua-b span{margin-left:6px}
+.varieta-l{display:block;margin-left:2px;font:13px var(--sans);color:var(--ink-3)}
+.varieta-l a{color:var(--ink-2)}
+.altre-l summary{cursor:pointer;font:13.5px var(--sans);color:var(--ink-2)}
+.senza-rami .albero-l{display:flex;flex-wrap:wrap;gap:2px 16px}
+.famiglie-piccole{display:grid;grid-template-columns:200px 1fr;gap:6px 16px;margin:0}
+.famiglie-piccole div{display:contents}
+.famiglie-piccole dt{font:600 14px var(--sans);color:var(--ink-2)}
+.famiglie-piccole dd{margin:0;font:14px var(--sans)}
+@media (max-width:520px){.famiglie-piccole{grid-template-columns:1fr}}
+.albero-famiglia{font:600 12.5px var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);margin:10px 0 2px 22px}
+
+/* Radici per area di significato */
+.aree-radici{margin-top:-6px}
+.area-sezione{margin:26px 0 8px}
+.area-sezione h2{font:600 20px var(--serif,inherit);margin:0 0 4px}
+.area-sezione .conta-l{font:13px var(--sans);color:var(--ink-3);font-weight:400;margin-left:6px}
+.area-tutte{display:inline-block;margin:6px 0 0;font:14px var(--sans)}
+.iniziali-radici{display:flex;flex-wrap:wrap;gap:4px 10px;margin:4px 0 12px;font:14px var(--sans)}

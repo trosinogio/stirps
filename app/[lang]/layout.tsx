@@ -56,6 +56,7 @@ export default async function Layout({ children, params }: { children: React.Rea
               <Link href={`/${lang}/radici`}>{t.nav.radici}</Link>
               <Link href={`/${lang}/lingue`}>{t.nav.lingue}</Link>
               <Link href={`/${lang}/storie`}>{t.nav.storie}</Link>
+              <Link href={`/${lang}/analisi`}>{t.nav.analisi}</Link>
             </nav>
             <nav aria-label={t.piede.progetto}>
               <h2>{t.piede.progetto}</h2>
