@@ -29,7 +29,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 - `npm run dev`: sviluppo (con un `DATABASE_URL` locale).
 - `npx tsc --noEmit`: controllo dei tipi.
-- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, i 96 del seme (`db/04_test.sql`) e i 102 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
+- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, i 97 del seme (`db/04_test.sql`) e i 102 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
 - `node scripts/applica-sql.mjs file.sql`: applica un file SQL in una transazione.
 - `node scripts/esporta-redazione.mjs cartella`: copia del lavoro della redazione in JSON; ogni notte la fa `.github/workflows/copia-redazione.yml` nel ramo `copia-redazione`.
 - Import completo da Wiktionary: `import/importa.sh` (scarica i dump di Kaikki; latino e greco entrano interi, `INTERE=la,grc`, con i lemmi del Lewis & Short e dell’LSJ che Wiktionary non ha, dal Perseus: `DIZIONARI=1`; l’inglese con il lessico comune e le parole di etimo esterno, senza nomi propri né locuzioni: `CON_ETIMOLOGIA=en`, `ELENCHI`, `ESTERNI`, e le glosse già pubblicate stabili con `PRECEDENTI`); collaudo del parser: `import/collauda.sh`. Prima di un import grande, la stima: `import/stima_import.py` (righe, spazio, ambiti, campione di catene). Vedi `import/LEGGIMI.md`.
@@ -39,7 +39,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 ## Mappa
 
-- `app/[lang]/`: le pagine (`w/` voce, `r/` famiglia, `l/` lingua, `radici`, `lingue`, `storie`, `metodo`, `chi-siamo`, `bibliografia`) e `redazione/` (accesso, cruscotto, editor, `azioni.ts`).
+- `app/[lang]/`: le pagine (`w/` voce, `r/` famiglia, `l/` lingua, `radici`, `lingue`, `storie`, `analisi` (analizza un testo), `metodo`, `chi-siamo`, `bibliografia`) e `redazione/` (accesso, cruscotto, editor, `azioni.ts`).
 - `components/`: `LineaTempo`, `StoriaCarta`, `Indovinello`, `StemmaAdattivo`, `Mappa`, `Ricerca`, `Automatica` (il segno ≈)…
 - `lib/`: `dati.ts` (letture), `redazione.ts` (letture della redazione), `storie.ts`, `db.ts` (`query`, `transazione`), `auth/` (Neon Auth), testi in `i18n.ts`, `testi-redazione.ts`, `testi-storie.ts`.
 - `db/`: `01_schema.sql`, `02_logica.sql`, `03_seed_pilota.sql`, `05_import_wiktionary.sql`, i test `04` e `06`, e `aggiornamenti/` (file datati).
@@ -49,7 +49,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 ## Il database
 
-Tabelle principali: `lessema` (le voci, con `slug` generato), `ipotesi` (una sola `accolta` per voce), `relazione` (i passaggi), `attestazione`, `glossa`, `definizione` (della redazione o di Claude), `rimando` (le fonti, con posizione), `opera`, `strato` (provenienze e licenze), `frequenza`, `lista_lavoro`, `storico` (firmato), `meta`. Viste materializzate: `mv_famiglia`, `mv_allotropi`, `mv_storie`. Funzioni principali: `scheda()`, `nodo_json()`, `storie()`, `indovinello()`, `importa_wiktionary()`, `pulisci_wiktionary()`, `importa_dizionari()`, `importa_etimi_dizionari()` (le etimologie del Lewis & Short, dell’LSJ e del Wikizionario per le voci che non ne hanno, e l’analisi della forma, certezza 2), `importa_glosse_wikizionario()`, `importa_glosse_aggiuntive()`, `importa_definizioni()`, `importa_stime()`.
+Tabelle principali: `lessema` (le voci, con `slug` generato), `ipotesi` (una sola `accolta` per voce), `relazione` (i passaggi), `attestazione`, `glossa`, `definizione` (della redazione o di Claude), `rimando` (le fonti, con posizione), `opera`, `strato` (provenienze e licenze), `frequenza`, `lista_lavoro`, `storico` (firmato), `meta`. Viste materializzate: `mv_famiglia`, `mv_allotropi`, `mv_storie`. Funzioni principali: `scheda()`, `nodo_json()`, `storie()`, `indovinello()`, `importa_wiktionary()`, `pulisci_wiktionary()`, `importa_dizionari()`, `importa_etimi_dizionari()` (le etimologie del Lewis & Short, dell’LSJ e del Wikizionario per le voci che non ne hanno, e l’analisi della forma, certezza 2), `importa_glosse_wikizionario()`, `importa_glosse_aggiuntive()`, `importa_definizioni()`, `importa_stime()`, `importa_forme()` e `analizza_testo()` (le parole di un testo per lingua d’origine e via d’ingresso: si risale la catena accolta finché esce dall’italiano; le forme flesse frequenti vanno al lemma con `forma_lemma`, da `dati/forme_it.tsv.gz`, che il workflow Dati ricava dalle forme flesse di Wiktionary con `import/forme_frequenti.py`).
 
 Come cambia il database:
 

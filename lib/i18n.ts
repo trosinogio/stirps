@@ -158,7 +158,13 @@ export interface Testi {
   datiTitolo: string;
   datiTesto: (parole: number, lingue: number, radici: number) => string;
   sottotitolo: string;
-  nav: { radici: string; lingue: string; storie: string; metodo: string; chiSiamo: string };
+  nav: { radici: string; lingue: string; storie: string; metodo: string; chiSiamo: string; analisi: string };
+  analisi: {
+    titolo: string; intro: string; segnaposto: string; pulsante: string; inCorso: string; limite: (n: number) => string;
+    errore: string; vuoto: string; riepilogo: (riconosciute: number, occorrenze: number, lemmi: number) => string;
+    occorrenze: (n: number) => string; lemmi: (n: number) => string; vie: { popolare: string; dotta: string; prestito: string; altro: string };
+    senzaOrigine: string; sconosciute: string; metodo: string;
+  };
   navAria: string;
   cercaGrande: string;
   heroLead: string;
@@ -421,7 +427,24 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     tutteLeLingue: (n) => `Tutte le lingue (${n})`,
     datiTitolo: 'Da dove vengono i dati',
     sottotitolo: 'Dizionario etimologico per radici',
-    nav: { radici: 'Radici', lingue: 'Lingue', storie: 'Storie', metodo: 'Metodo', chiSiamo: 'Chi siamo' },
+    nav: { radici: 'Radici', lingue: 'Lingue', storie: 'Storie', metodo: 'Metodo', chiSiamo: 'Chi siamo', analisi: 'Analizza un testo' },
+    analisi: {
+      titolo: 'Analizza un testo',
+      intro: 'Incolla un testo italiano: Stirps riconosce le parole, le riconduce al loro lemma e mostra da quali lingue vengono, risalendo le catene del dizionario.',
+      segnaposto: 'Incolla qui un testo italiano…',
+      pulsante: 'Analizza',
+      inCorso: 'Analizzo…',
+      limite: (n) => `Al massimo ${n.toLocaleString('it')} caratteri.`,
+      errore: 'L’analisi non è riuscita. Riprova tra poco.',
+      vuoto: 'Nessuna parola riconosciuta.',
+      riepilogo: (r, o, l) => `${r.toLocaleString('it')} parole riconosciute su ${o.toLocaleString('it')}, ${l.toLocaleString('it')} lemmi distinti.`,
+      occorrenze: (n) => `${n.toLocaleString('it')} ${n === 1 ? 'occorrenza' : 'occorrenze'}`,
+      lemmi: (n) => `${n.toLocaleString('it')} ${n === 1 ? 'lemma' : 'lemmi'}`,
+      vie: { popolare: 'per tradizione popolare', dotta: 'per via dotta', prestito: 'prestito', altro: 'altra via' },
+      senzaOrigine: 'Senza un’origine nel dizionario',
+      sconosciute: 'Parole non riconosciute',
+      metodo: 'Per ogni parola si risale la catena del dizionario finché esce dall’italiano: la prima lingua diversa è l’origine, e il tipo di quel passaggio dice la via d’ingresso. Una forma con più lemmi possibili (era: il sostantivo o il verbo essere) conta per ciascuno in parti uguali. Le catene non ancora verificate dalla redazione possono contenere errori.',
+    },
     navAria: 'Navigazione principale',
     cercaGrande: 'Cerca una parola in qualunque lingua',
     heroLead: 'Stirps ricostruisce le famiglie di parole che discendono da una stessa radice, in tutte le lingue: passaggio per passaggio, con le fonti e il grado di certezza di ogni ipotesi.',
@@ -636,7 +659,24 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     tutteLeLingue: (n) => `All languages (${n})`,
     datiTitolo: 'Where the data comes from',
     sottotitolo: 'An etymological dictionary by roots',
-    nav: { radici: 'Roots', lingue: 'Languages', storie: 'Stories', metodo: 'Method', chiSiamo: 'About' },
+    nav: { radici: 'Roots', lingue: 'Languages', storie: 'Stories', metodo: 'Method', chiSiamo: 'About', analisi: 'Analyse a text' },
+    analisi: {
+      titolo: 'Analyse a text',
+      intro: 'Paste an Italian text: Stirps recognises the words, brings them back to their lemma and shows which languages they come from, following the chains in the dictionary.',
+      segnaposto: 'Paste an Italian text here…',
+      pulsante: 'Analyse',
+      inCorso: 'Analysing…',
+      limite: (n) => `At most ${n.toLocaleString('en')} characters.`,
+      errore: 'The analysis failed. Please try again shortly.',
+      vuoto: 'No words recognised.',
+      riepilogo: (r, o, l) => `${r.toLocaleString('en')} words recognised out of ${o.toLocaleString('en')}, ${l.toLocaleString('en')} distinct lemmas.`,
+      occorrenze: (n) => `${n.toLocaleString('en')} ${n === 1 ? 'occurrence' : 'occurrences'}`,
+      lemmi: (n) => `${n.toLocaleString('en')} ${n === 1 ? 'lemma' : 'lemmas'}`,
+      vie: { popolare: 'by popular descent', dotta: 'by learned borrowing', prestito: 'loanword', altro: 'other route' },
+      senzaOrigine: 'No origin in the dictionary',
+      sconosciute: 'Words not recognised',
+      metodo: 'For each word the dictionary chain is followed until it leaves Italian: the first different language is the origin, and the type of that step gives the route. A form with several possible lemmas (era: the noun or the verb essere) counts for each in equal parts. Chains not yet verified by the editors may contain errors.',
+    },
     navAria: 'Main navigation',
     cercaGrande: 'Search a word in any language',
     heroLead: 'Stirps reconstructs the families of words that descend from a common root, in every language: step by step, with the sources and the degree of certainty of every hypothesis.',

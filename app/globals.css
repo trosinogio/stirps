@@ -676,3 +676,19 @@ footer.piede{max-width:none;margin:48px 0 0;padding:0;border-top:1px solid var(-
 .conto-radici{font:13.5px var(--sans);color:var(--ink-2);margin:0 0 6px}
 .rad-esempi{grid-column:1 / -1;font:italic 15.5px/1.4 var(--serif);color:var(--ink-2)}
 .rad-provvisorie{margin-top:26px}
+
+/* Analizza un testo */
+.analisi textarea{width:100%;box-sizing:border-box;font:16px/1.5 var(--serif,inherit);padding:12px;border:1px solid var(--rule,#ccc);border-radius:4px;background:var(--paper,#fff);color:var(--ink);resize:vertical}
+.analisi-azioni{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 24px}
+.analisi-azioni button{font:15px var(--sans);padding:8px 18px;border-radius:4px;border:1px solid var(--ink);background:var(--ink);color:var(--paper,#fff);cursor:pointer}
+.analisi-azioni button:disabled{opacity:.5;cursor:default}
+.analisi-origini{list-style:none;padding:0;margin:16px 0}
+.analisi-origini li{margin:0 0 18px}
+.analisi-riga{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font:15px var(--sans)}
+.analisi-numeri{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.analisi-barra{display:flex;gap:1px;height:10px;margin:6px 0 4px;min-width:4px}
+.analisi-barra span{display:block;height:100%;background:var(--pig,var(--ink-2))}
+.analisi-barra .via-dotta{opacity:.65}.analisi-barra .via-prestito{opacity:.4}.analisi-barra .via-altro{opacity:.25}
+.analisi-vie,.analisi-esempi{margin:2px 0;font:13.5px var(--sans);color:var(--ink-2)}
+.analisi-sconosciute{font:14px var(--sans);color:var(--ink-2)}
+.analisi-metodo{margin-top:28px}

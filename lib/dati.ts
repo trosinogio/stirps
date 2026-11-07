@@ -2,7 +2,7 @@ import { cache } from 'react';
 // Accesso ai dati: ogni pagina chiama una funzione SQL e riceve JSON pronto.
 import { query } from './db';
 import type { Lang } from './i18n';
-import type { ElencoRadici, Indice, LinguaGeo, LinguaInfo, Nodo, Opera, ParoleLingua, Pronuncia, RisultatoRicerca, Scheda, Sensi } from './tipi';
+import type { AnalisiTesto, ElencoRadici, Indice, LinguaGeo, LinguaInfo, Nodo, Opera, ParoleLingua, Pronuncia, RisultatoRicerca, Scheda, Sensi } from './tipi';
 
 // ANTEPRIMA=1 mostra anche le bozze (il seme pilota è tutto in bozza)
 export const ANTEPRIMA = process.env.ANTEPRIMA === '1';
@@ -115,4 +115,10 @@ export async function radiciELingueMappa(): Promise<{ radici: string[]; lingue: 
     query<{ codice: string }>(`select distinct lingua as codice from lessema where visibile(stato_editoriale, $1) order by 1`, [ANTEPRIMA]),
   ]);
   return { radici: r.map((x) => x.slug), lingue: l.map((x) => x.codice) };
+}
+
+// L'analisi di un testo italiano: forme distinte e quante volte compaiono (la pagina «Analizza un testo»)
+export async function analizzaTesto(forme: string[], conteggi: number[], lang: Lang): Promise<AnalisiTesto> {
+  const r = await query<{ r: AnalisiTesto }>('select analizza_testo($1, $2, $3, $4, $5) as r', ['it', forme, conteggi, lang, ANTEPRIMA]);
+  return r[0].r;
 }

@@ -112,3 +112,14 @@ export interface Sensi {
   testa: string | null;
   sensi: [string, string][];
 }
+
+// L'analisi di un testo (analizza_testo()): le parole per lingua d'origine e via d'ingresso
+export type EsempioAnalisi = { lemma: string; slug: string; peso: number };
+export type OrigineAnalisi = {
+  codice: string; nome: string; ramo: string | null; peso: number; lemmi: number;
+  vie: { popolare: number; dotta: number; prestito: number; altro: number }; esempi: EsempioAnalisi[];
+};
+export type AnalisiTesto = {
+  occorrenze: number; forme: number; riconosciute: number; lemmi: number; origini: OrigineAnalisi[];
+  senza_origine: { peso: number; lemmi: number; esempi: EsempioAnalisi[] }; sconosciute: string[];
+};

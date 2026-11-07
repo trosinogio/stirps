@@ -492,4 +492,14 @@ begin
   end;
 end $$;
 
+\echo '— analisi di un testo'
+insert into forma_lemma values ('it', 'notti', 'notte'), ('it', 'piedi', 'piede');
+select pg_temp.verifica(
+  (select (r->'origini'->0->>'codice') = 'la' and (r->'origini'->0->>'peso')::numeric = 4
+          and (r->'origini'->0->'vie'->>'popolare')::numeric = 4 and (r->>'occorrenze')::numeric = 7
+          and (r->>'riconosciute')::numeric = 4 and r->'sconosciute' = '["zzzq"]'::jsonb
+     from (select analizza_testo('it', array['Notti', 'piedi', 'madre', 'zzzq'], array[2, 1, 1, 3], 'it', true) as r) x),
+  'le forme vanno al lemma (notti → notte), le maiuscole non contano, e l''origine è la prima lingua fuori dall''italiano');
+delete from forma_lemma where lingua = 'it' and forma in ('notti', 'piedi');
+
 \echo '— collaudo completato'

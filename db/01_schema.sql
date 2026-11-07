@@ -386,6 +386,15 @@ create table if not exists sensi (
 );
 comment on table sensi is 'Riga delle forme e accezioni della voce da Wiktionary (CC BY-SA), con le etichette d''uso.';
 
+-- Forme flesse e lemmi, per l'analisi di un testo (analizza_testo()): andava → andare, occhi → occhio. Solo le forme
+-- più frequenti (dati/forme_it.tsv.gz, dalle forme flesse di Wiktionary); una forma ambigua ha più righe (era: era, essere)
+create table forma_lemma (
+  lingua  text not null references lingua,
+  forma   text not null,
+  lemma   text not null,
+  primary key (lingua, forma, lemma)
+);
+
 -- Frequenze d'uso: ordinano la ricerca e la coda di verifica (si parte dalle parole più usate)
 create table frequenza (
   lingua      text not null references lingua,

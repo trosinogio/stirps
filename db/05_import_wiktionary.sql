@@ -515,6 +515,7 @@ create unlogged table if not exists stg_glossa_tradotta (chiave text, originale 
 create unlogged table if not exists stg_definizione (chiave text, originale text, traduzione text, definizione text, modello text);
 create unlogged table if not exists stg_pronuncia (chiave text, dati text);   -- pronunce.tsv: chiave, JSON
 create unlogged table if not exists stg_sensi (chiave text, dati text);   -- sensi.tsv: chiave, JSON
+create unlogged table if not exists stg_forma (lingua text, forma text, lemma text);   -- forme_it.tsv: forma flessa e lemma
 
 -- Dopo il Wikizionario: definizioni di Wikidata per le parole italiane che non ne hanno (stessa parte del discorso,
 -- niente omografi), poi traduzioni automatiche per gli etimi che non hanno una glossa italiana. Per differenza: le
@@ -1045,3 +1046,31 @@ begin
   return jsonb_build_object('nuove', nuove, 'cambiate', cambiate, 'tolte', tolte);
 end $$;
 comment on function importa_sensi() is 'Riga delle forme e accezioni di Wiktionary per differenza; quelle della redazione non si toccano.';
+
+-- Le forme flesse più frequenti e i loro lemmi, per l'analisi di un testo (analizza_testo()): per differenza, solo i
+-- lemmi che sono voci. Senza il file (un pacchetto vecchio) la tabella resta com'è.
+create or replace function importa_forme() returns jsonb
+language plpgsql as $$
+declare
+  nuove int;
+  tolte int;
+begin
+  if not exists (select 1 from stg_forma) then
+    return jsonb_build_object('saltato', 'tabella di appoggio vuota');
+  end if;
+  create temp table cand_fo on commit drop as
+    select distinct s.lingua, lower(s.forma) as forma, s.lemma
+      from stg_forma s
+     where s.forma <> '' and s.lemma <> ''
+       and exists (select 1 from lessema l where l.lingua = s.lingua and l.lemma = s.lemma and not l.ricostruito);
+  create index on cand_fo (lingua, forma, lemma);
+  analyze cand_fo;
+  delete from forma_lemma x
+   where x.lingua in (select distinct lingua from stg_forma)
+     and not exists (select 1 from cand_fo c where c.lingua = x.lingua and c.forma = x.forma and c.lemma = x.lemma);
+  get diagnostics tolte = row_count;
+  insert into forma_lemma (lingua, forma, lemma) select lingua, forma, lemma from cand_fo on conflict do nothing;
+  get diagnostics nuove = row_count;
+  return jsonb_build_object('nuove', nuove, 'tolte', tolte, 'in_tutto', (select count(*) from forma_lemma));
+end $$;
+comment on function importa_forme() is 'Forme flesse frequenti e lemmi (forme_it.tsv), per differenza: servono all''analisi di un testo.';
