@@ -458,6 +458,10 @@ def antenato_lingua(c):
     return cur[6] if cur and cur[6] != c else None
 
 
+# una cima con almeno tante parole sotto non si lega a una radice per il voto di una parola sola (chiudi_su_radici)
+CIMA_GRANDE = 10
+
+
 def forma_ricostruita(l):
     """«radice» per una radice ricostruita (*meh₂-, *(s)ker-), «tema» per un tema con un trattino interno (*meh₂-tu-,
     *wréǵ-ye-), None per il resto. Una radice è la cima della sua famiglia; un tema deriva dalla sua radice."""
@@ -1134,12 +1138,29 @@ class Importatore:
 
     # ---- radici dichiarate: la catena si chiude in cima con un legame indeterminato ----
     def chiudi_su_radici(self):
+        """Una cima senza etimo si lega alla radice che dichiarano le parole che ci arrivano, con tre cautele:
+        la radice di una parola che sta a metà della catena non va in cima (quintal dichiara la radice araba di qinṭār,
+        non quella di centum); una forma ricostruita non deriva dalla radice di una lingua attestata (*ḱm̥tóm non viene
+        dall'arabo); una cima grande non si lega per il voto di una parola sola che le sta sotto, perché quasi sempre
+        è un composto che dichiara la radice dell'altro suo elemento (immaterial per *méh₂tēr, omicidio per *ǵʰmṓ)."""
         accolte = {h['esito']: h['chiave'] for h in self.ipotesi.values() if h['stato'] == 'accolta'}
         primo_etimo = {}
         for r in self.relazioni:
             if r['ordine'] == 1 and accolte.get(r['esito']) == r['ipotesi']:
                 primo_etimo.setdefault(r['esito'], r['etimo'])
-        voti = defaultdict(Counter)
+        memo = {}
+
+        def cima_di(k):
+            cam, x = [], k
+            while x in primo_etimo and x not in memo and x not in cam:
+                cam.append(x)
+                x = primo_etimo[x]
+            top = memo.get(x, x)
+            for y in cam:
+                memo[y] = top
+            return top
+        sotto = Counter(cima_di(k) for k in primo_etimo)     # quante parole salgono fino a ogni cima
+        voti, diretti = defaultdict(Counter), defaultdict(Counter)
         for parola, radice in self.radici:
             cima, visti = parola, {parola}
             while cima in primo_etimo and primo_etimo[cima] not in visti:
@@ -1157,7 +1178,16 @@ class Importatore:
             if forma_ricostruita(self.lessemi[cima]) == 'radice':
                 self.stat['radici_dichiarate_in_conflitto'] += 1   # una radice non discende da un'altra radice
                 continue
+            lr = self.lessemi[radice]['lingua']
+            if lr != self.lessemi[cima]['lingua'] and any(self.lessemi[x]['lingua'] == lr for x in visti if x != cima):
+                self.stat['radici_di_una_parola_intermedia'] += 1
+                continue
+            if self.lessemi[cima]['ricostruito'] and not self.lessemi[radice]['ricostruito']:
+                self.stat['radici_attestate_per_forme_ricostruite'] += 1
+                continue
             voti[cima][radice] += 1
+            if parola == cima:
+                diretti[cima][radice] += 1
         for cima, conta in voti.items():
             # *leǵ- e *leǵ-@gather sono la stessa radice: la forma generica conta per l'unica variante precisa
             for r in [r for r in conta if '@' in r]:
@@ -1169,6 +1199,9 @@ class Importatore:
             (radice, n1), *resto = conta.most_common()
             if resto and n1 < 2 * resto[0][1]:
                 self.stat['radici_dichiarate_senza_maggioranza'] += 1
+                continue
+            if n1 < 2 and not diretti[cima][radice] and sotto[cima] >= CIMA_GRANDE:
+                self.stat['radici_con_un_solo_voto_lontano'] += 1
                 continue
             kh = cima + '#wikt-radice'
             self.ipotesi[kh] = {'chiave': kh, 'esito': cima, 'etichetta': 'Wiktionary (radice dichiarata)', 'stato': 'accolta',

@@ -109,6 +109,45 @@ arco(imp, audience, aud)
 imp.radici = {(audience, h2ew), (audience, dheh1)}
 imp.chiudi_su_radici()
 assert not ha(imp, aud), 'due radici dichiarate alla pari: nessun legame'
+# quintal dichiara la radice araba di qinṭār, che sta a metà della sua catena: centum, in cima, non ci si lega
+imp = Importatore()
+quintal, qintar, centum = imp.lessema('en', 'quintal'), imp.lessema('ar', 'قنطار'), imp.lessema('la', 'centum')
+qntr = imp.lessema('ar', 'ق ن ط ر')
+arco(imp, quintal, qintar); arco(imp, qintar, centum)
+imp.radici = {(quintal, qntr)}
+imp.chiudi_su_radici()
+assert not ha(imp, centum), 'la radice di una parola a metà della catena non va in cima'
+# una forma ricostruita non deriva dalla radice di una lingua attestata
+imp = Importatore()
+km, cento, qntr = imp.lessema('ine-pro', '*ḱm̥tóm'), imp.lessema('it', 'cento'), imp.lessema('ar', 'ق ن ط ر')
+arco(imp, cento, km)
+imp.radici = {(cento, qntr)}
+imp.chiudi_su_radici()
+assert not ha(imp, km), '*ḱm̥tóm non viene da una radice araba'
+# una cima grande non si lega per il voto di una sola parola che le sta sotto (immaterial e *méh₂tēr); una piccola sì,
+# e la cima che dichiara da sé la sua radice si lega comunque
+imp = Importatore()
+mater, h2el = imp.lessema('ine-pro', '*méh₂tēr'), imp.lessema('ine-pro', '*h₂el-')
+figli = [imp.lessema('la', f'parola{i}') for i in range(12)]
+for f in figli:
+    arco(imp, f, mater)
+imp.radici = {(figli[0], h2el)}
+imp.chiudi_su_radici()
+assert not ha(imp, mater), 'una cima con dieci parole sotto non si lega per un voto solo'
+imp = Importatore()
+olens, olente, h3ed = imp.lessema('la', 'olens'), imp.lessema('it', 'olente'), imp.lessema('ine-pro', '*h₃ed-')
+arco(imp, olente, olens)
+imp.radici = {(olente, h3ed)}
+imp.chiudi_su_radici()
+assert ha(imp, olens), 'una cima piccola si lega anche per un voto solo'
+imp = Importatore()
+mater, h2el = imp.lessema('ine-pro', '*méh₂tēr'), imp.lessema('ine-pro', '*meh₂-')
+figli = [imp.lessema('la', f'parola{i}') for i in range(12)]
+for f in figli:
+    arco(imp, f, mater)
+imp.radici = {(mater, h2el)}
+imp.chiudi_su_radici()
+assert ha(imp, mater), 'una cima che dichiara da sé la sua radice si lega anche se è grande'
 # l'inglese: il suo alfabeto, le sue forme verbali, niente sigle; entrano solo le voci con un'etimologia (--con-etimologia)
 assert lemma_valido('en', 'hound') and lemma_valido('ang', 'þing') and lemma_valido('en', 'café') and lemma_valido('en', 'I')
 assert not lemma_valido('en', '4x4') and not lemma_valido('en', 'A'), 'cifre e lettere isolate non sono parole'

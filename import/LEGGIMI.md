@@ -264,6 +264,15 @@ Le regole (`arco_impossibile()`, `precisa_omografe()`, `chiudi_su_radici()`), co
 
 Dopo: 86% giuste, 0 radici sotto un loro derivato, 0,4% su un nodo generico. Il resto è soprattutto incompletezza: composti con due radici, catene che si fermano a una parola di una lingua che non leggiamo (inglese), voci latine con l'etimologia nel nuovo modello `{{ety}}`, che il filtro non legge ancora (21.527).
 
+## Il ripiego sulla radice dichiarata, più cauto (7 novembre 2026)
+
+Gli esempi sotto le radici nell'indice hanno mostrato catene false nate dal ripiego (`chiudi_su_radici()`), che lega una cima senza etimo alla radice dichiarata dalle parole che le stanno sotto: *madre* sotto \*h₂el- «crescere», *uomo* sotto \*kh₂eyd- «tagliare», *in* sotto \*steh₂-, *tuo* sotto \*ten-, *cento* sotto la radice araba ق ن ط ر. Contando i voti dal pacchetto: 2.899 delle 4.722 cime legate così si reggevano su un solo voto indiretto, e per le cime grandi quel voto viene quasi sempre da un composto che dichiara la radice dell'altro suo elemento (*immaterial* per \*méh₂tēr, *omicidio* per \*ǵʰmṓ, *island* per \*h₂ékʷeh₂, *enhypostasia* per \*h₁én). Tre cautele, con le prove in `collauda.sh`:
+- **la radice di una parola a metà della catena non va in cima:** *quintal* dichiara la radice araba di *qinṭār*, che sta nella sua catena tra *quintal* e *centum*; se la lingua della radice compare sotto la cima, il voto non conta;
+- **una forma ricostruita non deriva dalla radice di una lingua attestata** (\*ḱm̥tóm non viene dall'arabo, il protosemitico non viene dall'arabo);
+- **una cima grande (almeno 10 parole sotto, `CIMA_GRANDE`) non si lega per un voto solo,** se non è la cima stessa a dichiarare la radice. Nel campione metà di questi legami era sbagliata; l'altra metà era giusta, ma la catena si ferma un passo prima, alla cima, e una catena più corta è meglio di una falsa. Le cime piccole si legano anche con un voto (*olens* sotto \*h₃ed-, una parola araba sotto la sua radice), perché lì il voto viene quasi sempre da una parola vicina.
+
+Il registro del parser conta i voti scartati: `radici_di_una_parola_intermedia`, `radici_attestate_per_forme_ricostruite`, `radici_con_un_solo_voto_lontano`.
+
 ## Il sistema nuovo di Wiktionary: {{ety}} e {{etymon}} (novembre 2026)
 
 Nel dump latino 21.527 voci scrivono l'etimologia con `{{ety}}` o `{{etymon}}`, che il filtro non leggeva: restavano senza catena. Il modello ha come argomento 1 la lingua della voce, poi parole chiave con i due punti seguite dai loro termini: `{{ety|la|:af|fābula<id:discourse>|-lus<alt:-la>}}`, `{{ety|it|:inh|la:aquila}}`. Un termine senza prefisso è della stessa lingua; senza parola chiave vale `:from`. Dice solo il primo livello: gli etimi hanno le loro voci.
