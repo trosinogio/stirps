@@ -486,11 +486,27 @@ select pg_temp.verifica(
      from ipotesi h where h.esito_id = lx('it/oscuro'))
   and (select h.confidenza from ipotesi h where h.esito_id = lx('it/torto') and h.provenienza = 'wikizionario') = 2,
   'una voce italiana senza etimologia riceve quella del Wikizionario, citato come fonte; un rimando «vedi» vale certezza 2');
+select pg_temp.verifica(
+  exists (select 1 from rimando m join opera o on o.id = m.opera_id join ipotesi h on h.id = m.ipotesi_id
+           where h.esito_id = lx('it/carne') and h.stato = 'accolta' and h.provenienza = 'wiktionary'
+             and o.sigla = 'Wikizionario' and m.posizione = 'accoglie' and m.nota = 'concorda con Wiktionary')
+  and not exists (select 1 from ipotesi h where h.esito_id = lx('it/carne') and h.provenienza = 'wikizionario'),
+  'dove i due Wiktionary concordano (carne < caro), l''etimologia di Wiktionary cita anche il Wikizionario');
+select pg_temp.verifica(
+  (select h.stato = 'alternativa' and h.confidenza = 2
+          and (select x.etimo_id from relazione x where x.ipotesi_id = h.id) = lx('la/illi')
+     from ipotesi h where h.esito_id = lx('it/loro') and h.provenienza = 'wikizionario')
+  and (select h.provenienza from ipotesi h where h.esito_id = lx('it/loro') and h.stato = 'accolta') = 'wiktionary'
+  and not exists (select 1 from ipotesi h where h.esito_id = lx('it/disastro') and h.provenienza = 'wikizionario'),
+  'dove discordano, il Wikizionario entra come alternativa con certezza 2 (loro < illi); mai sulle voci della redazione (disastro)');
 create temp table ed_prima as select id, xmin::text as v from ipotesi where provenienza in ('perseus', 'wikizionario');
+create temp table rim_prima as select id, xmin::text as v from rimando where nota = 'concorda con Wiktionary';
 select pg_temp.verifica(
   (select (r->>'etimologie_nuove')::int + (r->>'etimologie_tolte')::int from (select importa_etimi_dizionari() as r) x) = 0
-  and not exists (select 1 from ipotesi h join ed_prima p on p.id = h.id where h.xmin::text <> p.v),
-  'un nuovo import delle etimologie dei dizionari non riscrive niente');
+  and not exists (select 1 from ipotesi h join ed_prima p on p.id = h.id where h.xmin::text <> p.v)
+  and (select count(*) from rimando m join rim_prima p on p.id = m.id and p.v = m.xmin::text)
+      = (select count(*) from rimando where nota = 'concorda con Wiktionary'),
+  'un nuovo import delle etimologie dei dizionari non riscrive niente, nemmeno i rimandi dei due Wiktionary');
 do $$
 begin
   insert into ipotesi (esito_id, etichetta, stato, confidenza, origine, provenienza, stato_editoriale, id_esterno)

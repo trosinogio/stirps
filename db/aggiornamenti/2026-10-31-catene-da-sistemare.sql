@@ -88,3 +88,30 @@ select 'catene-da-sistemare', coalesce((select max(posizione) from lista_lavoro 
    and not exists (select 1 from su s2 join dich d3 on d3.lessema_id = s2.parola and d3.rid = s2.id where s2.parola = k.parola)
  group by k.parola
 on conflict do nothing;
+
+-- 7 novembre 2026: quarto gruppo, «Wiktionary e Wikizionario discordano» (la regola dei due Wiktionary). Le parole italiane
+-- la cui etimologia di Wiktionary inglese, accolta e intatta, ha accanto un'alternativa del Wikizionario che dà un'altra
+-- origine (import/confronta_wikizionario.py): destinatario dal latino destinatarius o dal francese destinataire.
+insert into lista_lavoro (lista, posizione, lessema_id, gruppo, suggerimento)
+select 'catene-da-sistemare', coalesce((select max(posizione) from lista_lavoro where lista = 'catene-da-sistemare'), 0)
+         + row_number() over (order by y.rango nulls last, y.lemma), y.id, 'Wiktionary e Wikizionario discordano',
+       'Wiktionary: ' || coalesce(y.wikt, '?') || '; Wikizionario: ' || coalesce(y.wiz, '?')
+         || '. Controllare sulle fonti quale origine accogliere.'
+  from (
+    select distinct on (l.id) l.id, l.lemma,
+           (select min(f.rango) from frequenza f where f.lingua = 'it' and f.forma = l.lemma) as rango,
+           (select string_agg(g.nome || ' ' || e.lemma, ' + ' order by x.ordine)
+              from relazione x join lessema e on e.id = x.etimo_id join lingua g on g.codice = e.lingua
+             where x.ipotesi_id = a.id) as wikt,
+           (select string_agg(g.nome || ' ' || e.lemma, ' + ' order by x.ordine)
+              from relazione x join lessema e on e.id = x.etimo_id join lingua g on g.codice = e.lingua
+             where x.ipotesi_id = w.id) as wiz
+      from lessema l
+      join ipotesi a on a.esito_id = l.id and a.stato = 'accolta' and a.provenienza = 'wiktionary'
+                    and a.stato_editoriale = 'importato'
+      join ipotesi w on w.esito_id = l.id and w.stato = 'alternativa' and w.provenienza = 'wikizionario'
+                    and w.stato_editoriale = 'importato'
+     where l.lingua = 'it'
+     order by l.id, w.id
+  ) y
+on conflict do nothing;

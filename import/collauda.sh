@@ -230,6 +230,15 @@ assert lw('dal latino contra passum', 'contrappasso') == [] and lw("dall'inglese
 assert lw('dal greco anecumène', 'anecumene') == [] and lw('dal greco παλαiός', 'paleo') == [], 'scrittura sbagliata'
 assert lw('dal greco ϕωνητικός', 'fonetico') == [(1, 'grc', 'φωνητικός', 'generico', 3)]
 assert lw('forse dal latino X', 'x') == [] and lw('composto da ago e puntura', 'agopuntura')[1][2] == 'puntura'
+# i due Wiktionary: concordano anche con un'altra forma di citazione o più in alto nella catena; due analisi italiane
+# diverse non sono un disaccordo; un'altra lingua d'origine sì
+from confronta_wikizionario import classifica as cw
+assert cw([('la', 'ascendĕre')], {('la', 'ascendo'), ('ine', 'skend')}) == 'concorda'
+assert cw([('la', 'papam')], {('la', 'papa')}) == 'concorda' and cw([('la', 'cycnus')], {('la', 'cygnus')}) == 'concorda'
+assert cw([('it', 'poli-'), ('it', 'centro')], {('it', 'poli'), ('it', 'centrico')}) == 'concorda'
+assert cw([('it', 'tavola')], {('la', 'tabula')}) == 'analisi', 'tavolo da tavola o dal latino: due analisi'
+assert cw([('fr', 'destinataire')], {('la', 'destinatarius')}) == 'discorda'
+assert cw([('la', 'casa')], {('la', 'caso')}) == 'discorda', 'parole corte: una lettera è un\'altra parola'
 # greco: le regole che una coppia nota insegna (apprendi_greco.py), e una regola appresa che scatta solo su una base unica
 from apprendi_greco import regole_della_coppia as rc, Modello
 assert rc('σκοτιζω', ['σκοτοσ']) == [('S', 'ιζω', 'οσ')] and rc('καταβαινω', ['βαινω']) == [('P', 'κατα')]

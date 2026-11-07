@@ -76,6 +76,11 @@ jobs:
             (git show FETCH_HEAD:dati/etimi_dizionari.tsv.gz 2> /dev/null | zcat | grep -P '\tWikizionario(-vedi)?$' || true) \
               >> dati/it/tsv/etimi_dizionari.tsv
           fi
+          # i due Wiktionary a confronto: dove c'è già un'etimologia inglese, la riga del Wikizionario concorda o discorda
+          python3 confronta_wikizionario.py dati/it/tsv/etimi_dizionari.tsv dati/it/tsv/lessemi.tsv dati/it/tsv/ipotesi.tsv \
+            dati/it/tsv/relazioni.tsv 2> /tmp/confronto.txt
+          cat /tmp/confronto.txt
+          echo "::notice title=Due Wiktionary::$(head -1 /tmp/confronto.txt)"
 
       - name: Voci vere per il banco di prova
         run: |

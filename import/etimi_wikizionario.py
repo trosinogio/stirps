@@ -44,6 +44,9 @@ SCRITTURA = {'grc': re.compile(r'^[\u0370-\u03ff\u1f00-\u1fff]+$'), 'gkm': re.co
              'ar': re.compile(r'^[\u0600-\u06ff]+$'), 'fa': re.compile(r'^[\u0600-\u06ff]+$'),
              'he': re.compile(r'^[\u0590-\u05ff]+$')}
 LATINA = re.compile(r"^[A-Za-zÀ-ɏḀ-ỿ'’-]+$")
+# parole italiane che stanno dove dovrebbe stare l'etimo: «dall'inglese composto da soft e ware», «dal latino del …»
+NON_ETIMI = {'composto', 'composta', 'derivato', 'derivata', 'parola', 'termine', 'voce', 'nome', 'forma', 'verbo',
+             'del', 'della', 'dello', 'dei', 'degli', 'delle', 'il', 'lo', 'gli', 'un', 'una', 'uno'}
 _LINGUA = '|'.join(sorted(map(re.escape, LINGUE), key=len, reverse=True))
 _PAROLA = r"([^\W\d_][\w'’-]*)"
 DALLA_LINGUA = re.compile(r"^(?:dal|dallo|dalla|dall['’]|deriva dal|deriva dallo|deriva dall['’])\s*(" + _LINGUA + r")\s+" + _PAROLA, re.I)
@@ -66,7 +69,7 @@ def leggi(testo, parola):
     if m:
         lingua = LINGUE[' '.join(m.group(1).lower().split())]
         etimo = m.group(2).strip("'’-")
-        if not etimo or not DOPO_ETIMO.match(t[m.end():]):
+        if not etimo or len(etimo) < 2 or etimo.lower() in NON_ETIMI or not DOPO_ETIMO.match(t[m.end():]):
             return []
         # l'etimo nella scrittura della sua lingua: ϕωνητικός sì, «anecumène» come greco o παλαiός (lettere miste) no
         if not (SCRITTURA[lingua].match(etimo) if lingua in SCRITTURA else LATINA.match(etimo)):
