@@ -38,6 +38,8 @@ jobs:
       ELENCHI: en=../dati/frequenze_en.tsv.gz fr=../dati/frequenze_fr.tsv.gz de=../dati/frequenze_de.tsv.gz ru=../dati/frequenze_ru.tsv.gz
       ESTERNI: en,fr,de,ru
       GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
+      # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
+      DIAGNOSI_MODELLI: it-verb-obj,m-g,yesno,internationalism,from,contraction
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -136,7 +138,7 @@ jobs:
       - name: Pacchetto dati
         run: |
           t=import/dati/it/tsv
-          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni dizionari autori stime pronunce sensi; do
+          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni dizionari autori stime pronunce sensi etimi_dizionari; do
             gzip -9 -n -c "$t/$f.tsv" > "dati/$f.tsv.gz"
           done
           # voci per lingua, prima e dopo

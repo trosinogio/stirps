@@ -28,7 +28,7 @@ const APPOGGIO = [
   ['stg_glossa_wikidata', 'glosse_wikidata'], ['stg_glossa_tradotta', 'glosse_tradotte'],
   ['stg_dizionario', 'dizionari'], ['stg_autore', 'autori'], ['stg_stima', 'stime'],
   ['stg_definizione', 'definizioni'], ['stg_pronuncia', 'pronunce'],
-  ['stg_sensi', 'sensi'],
+  ['stg_sensi', 'sensi'], ['stg_etimo_dizionario', 'etimi_dizionari'],
 ];
 const BLOCCO = 5000;
 // impronta del pacchetto dati: se cambia, al deploy si rifà l'import
@@ -65,6 +65,8 @@ async function importa(client, pulisci) {
     console.log('[db] dizionari:', JSON.stringify(d.d), `(${secondi()} s)`);
     const { rows: [stm] } = await client.query('select importa_stime() as s');
     console.log('[db] stime:', JSON.stringify(stm.s), `(${secondi()} s)`);
+    const { rows: [ed] } = await client.query('select importa_etimi_dizionari() as e');
+    console.log('[db] etimologie dei dizionari:', JSON.stringify(ed.e), `(${secondi()} s)`);
     const { rows: [g] } = await client.query('select importa_glosse_wikizionario() as g');
     console.log('[db] glosse italiane:', JSON.stringify(g.g), `(${secondi()} s)`);
     const { rows: [ga] } = await client.query('select importa_glosse_aggiuntive() as g');
@@ -119,7 +121,7 @@ const campo = (x) => (x === '\\N' ? null : x.replace(/\\\\/g, '\\'));
 
 async function carica(client, tabella, file) {
   // i dizionari possono mancare in un pacchetto vecchio: la tabella resta vuota e importa_dizionari() non fa nulla
-  if (['dizionari', 'autori', 'stime', 'definizioni', 'pronunce', 'sensi'].includes(file) && !existsSync(`dati/${file}.tsv.gz`)) return 0;
+  if (['dizionari', 'autori', 'stime', 'definizioni', 'pronunce', 'sensi', 'etimi_dizionari'].includes(file) && !existsSync(`dati/${file}.tsv.gz`)) return 0;
   const { rows: colonne } = await client.query(
     `select attname as nome, format_type(atttypid, atttypmod) as tipo from pg_attribute
       where attrelid = $1::regclass and attnum > 0 and not attisdropped order by attnum`, [tabella]);

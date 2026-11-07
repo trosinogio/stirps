@@ -30,11 +30,13 @@ mkdir -p "$DATI"
 scarica() {   # scarica <nome inglese della lingua> : stampa il dump di Kaikki
   local pagina file
   pagina=$(printf '%s' "$1" | sed 's/ /%20/g'); file=$(printf '%s' "$1" | tr -d ' ')
-  curl -sf "https://kaikki.org/dictionary/$pagina/kaikki.org-dictionary-$file.jsonl"
+  # Kaikki toglie dal nome del file gli spazi e, per le proto-lingue, anche i trattini (ProtoGermanic)
+  curl -sf "https://kaikki.org/dictionary/$pagina/kaikki.org-dictionary-$file.jsonl" \
+    || curl -sf "https://kaikki.org/dictionary/$pagina/kaikki.org-dictionary-$(printf '%s' "$file" | tr -d '-').jsonl"
 }
 
 echo "1/4  scarico e filtro il dump di Kaikki ($NOME)"
-scarica "$NOME" | SENZA="$DATI/senza_etimologia.tsv" python3 filtra.py "$DATI/lemmi.jsonl" "$DATI/glosse.tsv"
+scarica "$NOME" | SENZA="$DATI/senza_etimologia.tsv" FORME="$DATI/forme.tsv" python3 filtra.py "$DATI/lemmi.jsonl" "$DATI/glosse.tsv"
 ARGOMENTI=()
 for voce in $(printf '%s' "$CHIUSURA" | sed 's/ \([a-z][a-z-]*:\)/\n\1/g' | tr ' ' '~'); do
   codice=${voce%%:*}; nome=$(printf '%s' "${voce#*:}" | tr '~' ' ')
@@ -55,6 +57,7 @@ fi
 
 echo "2/4  leggo le etimologie"
 python3 wiktionary.py "$DATI/lemmi.jsonl" "$DATI/tsv" "$DATI/glosse.tsv" ${ARGOMENTI[@]+"${ARGOMENTI[@]}"} --passi "$PASSI" \
+  --forme-base "$LINGUA=$DATI/forme.tsv" \
   ${INTERE:+--intere "$INTERE"} ${CON_ETIMOLOGIA:+--con-etimologia "$CON_ETIMOLOGIA"} \
   $(for e in $ELENCHI; do printf -- "--elenco %s " "$e"; done) ${ESTERNI:+--esterni "$ESTERNI"} \
   ${PRECEDENTI:+--glosse-precedenti "$PRECEDENTI"} > "$DATI/rapporto_parser.json"
@@ -69,10 +72,13 @@ if [ "$DIZIONARI" = 1 ]; then
     [ -s "$locale" ] || curl -sfL --retry 3 -o "$locale" \
       "https://raw.githubusercontent.com/PerseusDL/lexica/$PERSEUS/CTS_XML_TEI/perseus/pdllex/$f"
   done
-  if ! python3 filtra_perseus.py "$DATI/tsv/dizionari.tsv" --escludi "$DATI/tsv/lessemi.tsv" "${locali[@]}" 2> "$DATI/rapporto_perseus.txt"; then
+  if ! python3 filtra_perseus.py "$DATI/tsv/dizionari.tsv" --escludi "$DATI/tsv/lessemi.tsv" --etimi "$DATI/tsv/etimi_dizionari.tsv" \
+       "${locali[@]}" 2> "$DATI/rapporto_perseus.txt"; then
     cat "$DATI/rapporto_perseus.txt" >&2; exit 1
   fi
   cat "$DATI/rapporto_perseus.txt"
+  # le voci di latino e greco ancora senza etimologia che sono un prefisso e una parola nota (analisi della forma)
+  python3 analisi_composti.py "$DATI/tsv/etimi_dizionari.tsv" "$DATI/tsv/lessemi.tsv" "$DATI/tsv/dizionari.tsv" "$DATI/tsv/ipotesi.tsv"
   # stime della prima attestazione: l'autore datato più antico citato nella voce (DATAZIONI.md, passo 1)
   python3 datatore_dizionari.py autori "$DATI/tsv/autori.tsv"
   python3 datatore_dizionari.py stime "$DATI/tsv/autori.tsv" "$DATI/tsv/stime.tsv" "${locali[@]}"
@@ -101,12 +107,16 @@ fi
 if [ "$DIZIONARI" = 1 ] && [ -f dizionari.tsv ]; then
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "\\copy stg_dizionario from 'dizionari.tsv'" \
     -c "truncate stg_autore, stg_stima" -c "\\copy stg_autore from 'autori.tsv'" -c "\\copy stg_stima from 'stime.tsv'"
+  if [ -f etimi_dizionari.tsv ]; then
+    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "truncate stg_etimo_dizionario" -c "\\copy stg_etimo_dizionario from 'etimi_dizionari.tsv'"
+  fi
 fi
 
 echo "4/4  fondo nel dizionario e ricalcolo allotropi e famiglie"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -At -c "select jsonb_pretty(importa_wiktionary())"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -At -c "select jsonb_pretty(importa_dizionari())"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -At -c "select jsonb_pretty(importa_stime())"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -At -c "select jsonb_pretty(importa_etimi_dizionari())"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -At -c "select jsonb_pretty(importa_glosse_wikizionario())"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "refresh materialized view mv_allotropi" -c "refresh materialized view mv_famiglia" -c "analyze"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "select * from v_validazione_wiktionary"

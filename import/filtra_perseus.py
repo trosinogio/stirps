@@ -6,13 +6,23 @@ per il greco antico, dai file TEI del repository PerseusDL/lexica. Una riga per 
 
 come lessemi.tsv del parser di Wiktionary, così servono gli stessi strumenti (la traduzione delle glosse).
 
+Con --etimi, anche le etimologie che i dizionari scrivono nel tag <etym>, per tutte le voci (anche quelle che Wiktionary
+ha già, ma magari senza etimologia), una riga per etimo (stg_etimo_dizionario):
+
+    chiave, lingua, lemma, ordine, lingua dell'etimo, etimo, tipo, affisso, opera
+
+Il Lewis & Short scrive la base (anguinus: «anguis»), il composto (anguicomus: «anguis-coma»; abduco: «ab-duco», un
+prefisso e la base) o «id.» per l'etimo della voce precedente.
+L'LSJ scrive la base in Beta Code (ἀγυρτάζω: ἀγύρτης). Il resto («root ten; v. teneo», «Sanscr. tris; Gr. τρίς;
+cf. tres», una parola greca da sola: aratrum, ἄροτρον) sono radici e confronti tra parole affini, non etimi, e resta fuori.
+
 La chiave è l'identificativo della voce nel file TEI (perseus:ls:n12345, perseus:lsj:n6789). Il lemma è scritto come
 il titolo di Wiktionary (senza quantità; per il latino i al posto di j, come in Wiktionary), così le voci che Wiktionary
 ha già si riconoscono: con --escludi lessemi.tsv restano fuori. Il greco dell'LSJ è in Beta Code e diventa Unicode, con
 la traslitterazione di Wiktionary (serve all'indirizzo). Restano fuori le voci spurie del Lewis & Short.
 Solo libreria standard.
 
-    python3 filtra_perseus.py uscita.tsv [--escludi lessemi.tsv] lat.ls.perseus-eng2.xml grc.lsj.perseus-eng1.xml …
+    python3 filtra_perseus.py uscita.tsv [--escludi lessemi.tsv] [--etimi etimi.tsv] lat.ls.perseus-eng2.xml grc.lsj.perseus-eng1.xml …
 """
 import itertools, re, sys, unicodedata, xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
@@ -185,8 +195,52 @@ def pos_lsj(lemma):
     return None
 
 
-def leggi(percorso, voci, conta):
+# i prefissi latini che il Lewis & Short scrive come primo elemento di un composto (ab-duco, con-fero): la catena va
+# alla base, e il prefisso resta un affisso
+PREFISSI_LA = set('a ab abs ad am amb an ante circum co com con contra de di dis e ex extra in inter intro ne ob per por '
+                  'post prae praeter pro re red retro se sed sub subter super supra trans tra ve'.split())
+PAROLA_LA = re.compile(r"[A-Za-zĀĒĪŌŪȲāēīōūȳăĕĭŏŭÄËÏÖÜäëïöüÿæœÆŒ]+")
+BETA = re.compile(r"[a-z()/\\=+|*'_^]+")
+
+
+def pagina_la(w):
+    w = w.replace('j', 'i').replace('J', 'I').replace('æ', 'ae').replace('œ', 'oe').replace('Æ', 'Ae').replace('Œ', 'Oe')
+    return nome_pagina('la', unicodedata.normalize('NFC', w))
+
+
+def etimo_ls(et):
+    """Gli etimi di una voce del Lewis & Short: [(lingua, lemma, tipo, affisso)], o None se non è un etimo che sappiamo
+    leggere. «id.» lo risolve chi chiama."""
+    t = testo(et).strip(' ,;.')
+    # una parola greca da sola (aratrum: ἄροτρον) è spesso un confronto tra parole affini, non l'origine: resta fuori
+    parti = [p for p in re.split(r'\s*-\s*', t)]
+    if not parti or not all(PAROLA_LA.fullmatch(p) for p in parti):
+        return None
+    parti = [pagina_la(p) for p in parti]
+    if len(parti) == 1:
+        return [('la', parti[0], 'derivazione', None)]
+    if len(parti) == 2 and parti[0].lower() in PREFISSI_LA:
+        return [('la', parti[1], 'derivazione', parti[0].lower() + '-')]
+    return [('la', p, 'composizione', None) for p in parti]
+
+
+def etimo_lsj(et):
+    """L'etimo di una voce dell'LSJ: la prima parola greca del tag (in Beta Code); con più parole («ἄγχι, αὔριον», o
+    due forme della stessa, «γαῖα, γῆ») un legame indeterminato con la prima."""
+    if et.get('lang') != 'greek':
+        return None
+    parole = [w.strip(' .;:') for w in (et.text or '').split(',')]
+    if not parole or not BETA.fullmatch(parole[0] or '-') or parole[0].endswith('-'):
+        return None
+    g = nome_pagina('grc', unicodedata.normalize('NFC', da_beta(parole[0]).strip(' ,.:;')))
+    if not GRECO.match(g or '-'):
+        return None
+    return [('grc', g, 'derivazione' if len([w for w in parole if BETA.fullmatch(w or '-')]) == 1 else 'generico', None)]
+
+
+def leggi(percorso, voci, conta, etimi=None):
     lsj = '.lsj.' in percorso
+    precedente = None                     # l'etimo della voce prima, per «id.»
     for _, el in ET.iterparse(percorso, events=('end',)):
         if el.tag != 'entryFree':
             continue
@@ -216,7 +270,22 @@ def leggi(percorso, voci, conta):
             conta[f'non_valide_{lingua}'] += 1
             el.clear()
             continue
-        voci.append([f"perseus:{'lsj' if lsj else 'ls'}:{ident}", lingua, lemma, pos, glossa])
+        chiave_voce = f"perseus:{'lsj' if lsj else 'ls'}:{ident}"
+        voci.append([chiave_voce, lingua, lemma, pos, glossa])
+        et = el.find('etym')
+        if etimi is not None and et is not None:
+            if not lsj and testo(et).strip(' ,;.') in ('id', 'idem'):
+                e = precedente
+                conta['etimi_ls_id'] += bool(e)
+            else:
+                e = etimo_lsj(et) if lsj else etimo_ls(et)
+                precedente = e
+            conta[f"etimi_{'lsj' if lsj else 'ls'}_{'letti' if e else 'non_letti'}"] += 1
+            for i, (le, x, tp, aff) in enumerate(e or [], 1):
+                if (le, x) != (lingua, lemma):
+                    etimi.append((chiave_voce, lingua, lemma, i, le, x, tp, aff, 'LSJ' if lsj else 'Lewis–Short'))
+        elif et is None and not lsj:
+            precedente = None
         el.clear()
 
 
@@ -236,15 +305,24 @@ def gia_presenti(percorso):
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    escludi = set()
+    escludi, etimi_out = set(), None
     if '--escludi' in args:
         i = args.index('--escludi')
         escludi = gia_presenti(args[i + 1])
         del args[i:i + 2]
+    if '--etimi' in args:
+        i = args.index('--etimi')
+        etimi_out = args[i + 1]
+        del args[i:i + 2]
     uscita, file = args[0], args[1:]
-    voci, conta = [], Counter()
+    voci, conta, etimi = [], Counter(), ([] if etimi_out else None)
     for f in file:
-        leggi(f, voci, conta)
+        leggi(f, voci, conta, etimi)
+    if etimi_out:
+        with open(etimi_out, 'w', encoding='utf-8') as out:
+            for riga in etimi:
+                out.write('\t'.join(esc(x) for x in riga) + '\n')
+        conta['etimi_righe'] = len(etimi)
     # omografi: numerati per lingua e lemma, nell'ordine del dizionario (liber¹ «libero», liber² «libro»)
     numero = defaultdict(int)
     with open(uscita, 'w', encoding='utf-8') as out:

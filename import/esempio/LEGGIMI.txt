@@ -10,3 +10,7 @@ e Liddell–Scott–Jones, github.com/PerseusDL/lexica, CC BY-SA 4.0, http://www
 stime.tsv: righe vere dell'uscita di datatore_dizionari.py stime per carus, caro (due voci del Lewis & Short) e ἄκρις,
 ἀκρίς; autori.tsv: quattro autori con la datazione scritta a mano per la prova (Plauto 184 a.C., Cicerone 43 a.C.,
 Omero VIII sec. a.C., Platone 347 a.C.), nel formato di datatore_dizionari.py autori.
+etimi_dizionari.tsv: due righe vere dell'uscita di filtra_perseus.py --etimi (abactus ← abigo, ἄκρις ← ἄκρος, con
+l'etimo che il banco di prova non ha) e quattro scritte a mano per la prova di importa_etimi_dizionari(): Carus ← carus
+(Lewis & Short) e Carus ← caro (analisi della forma, che deve cedere al dizionario), mobilis ← moveo (mobilis ha già
+l'etimologia di Wiktionary), moveo ← carus (una riga finta, solo per provare l'analisi della forma: certezza 2).

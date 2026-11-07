@@ -25,7 +25,7 @@ CATENA = {'inh': 'eredita', 'inh+': 'eredita', 'bor': 'prestito', 'bor+': 'prest
           'lbor': 'prestito_dotto', 'slbor': 'semidotto', 'der': 'generico', 'der+': 'generico', 'uder': 'generico',
           'cal': 'calco', 'calque': 'calco', 'sl': 'calco_semantico', 'psm': 'calco'}
 LOCALI = {'bf': 'retroformazione', 'back-form': 'retroformazione', 'clipping': 'accorciamento', 'ellipsis': 'accorciamento',
-          'named-after': 'deonimico'}
+          'named-after': 'deonimico', 'deverbal': 'derivazione'}
 AFFISSI = {'af', 'affix', 'suffix', 'prefix', 'confix', 'compound', 'blend'}
 POS = {'verb': 'v.', 'adj': 'agg.', 'adv': 'avv.', 'name': 'np', 'prep': 'prep.', 'pron': 'pron.', 'conj': 'cong.',
        'intj': 'inter.', 'num': 'num.', 'det': 'det.', 'phrase': 'loc.', 'suffix': 'suff.', 'prefix': 'pref.'}
@@ -791,8 +791,10 @@ class Importatore:
             self.relazioni.append(x)
 
     # ---- chiusura delle catene: le voci delle lingue intermedie ----
-    def carica_chiusura(self, lingua, lemmi, forme=None, glosse=None):
-        """Indici di una lingua di chiusura, da caricare prima delle voci principali."""
+    def carica_chiusura(self, lingua, lemmi, forme=None, glosse=None, base=False):
+        """Indici di una lingua di chiusura, da caricare prima delle voci principali. Con base=True è la lingua di
+        partenza (--forme-base): servono solo i lemmi e le forme, e una forma flessa citata dentro la lingua va al suo
+        lemma, conservata come forma citata (quattrocchi < occhio, «occhi»), non resta una voce a sé."""
         voci = [json.loads(r) for r in open(lemmi, encoding='utf-8')]
         idx = {'voci': voci, 'lemmi': set(), 'omografi': defaultdict(list), 'forme': {}, 'participi': {}, 'flesse': {},
                'file_glosse': glosse}
@@ -841,7 +843,7 @@ class Importatore:
                 if pf not in migliori or rango < migliori[pf][0]:
                     migliori[pf] = (rango, l)
             for pf, (rango, l) in migliori.items():
-                dove = 'forme' if rango <= 2 else 'participi' if rango == 3 else 'flesse'
+                dove = 'forme' if rango <= 2 or (base and rango == 4) else 'participi' if rango == 3 else 'flesse'
                 idx[dove][pf] = l                        # il lemma conserva i macron (ēdūcō)
         self.chiusura[lingua] = idx
         self.stat[f'chiusura_{lingua}_voci_disponibili'] = len(voci)
@@ -1379,9 +1381,11 @@ def completa_glosse(imp, percorso, lingua=None):
 
 if __name__ == '__main__':
     # wiktionary.py lemmi.jsonl uscita/ [glosse.tsv] [--chiudi la=lemmi.jsonl,glosse.tsv,forme.tsv]… [--passi N]
+    #               [--forme-base it=forme.tsv]
     #               [--intere la,grc] [--con-etimologia en] [--elenco en=../dati/frequenze_en.tsv.gz] [--esterni en]
     #               [--glosse-precedenti ../dati/lessemi.tsv.gz]
     args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti = [], [], 1, set(), set(), {}, set(), {}
+    forme_base = None   # --forme-base it=forme.tsv: le forme flesse della lingua di partenza (filtra.py con FORME)
     it_ = iter(sys.argv[1:])
     for x in it_:
         if x == '--chiudi':
@@ -1403,6 +1407,8 @@ if __name__ == '__main__':
                         precedenti[c[0]] = c[7].replace('\\\\', '\\')
         elif x == '--esterni':
             esterni = {c for c in next(it_).split(',') if c}
+        elif x == '--forme-base':
+            forme_base = next(it_)
         elif x == '--con-etimologia':
             con_etimologia = {c for c in next(it_).split(',') if c}
         else:
@@ -1417,6 +1423,9 @@ if __name__ == '__main__':
         lingua, percorsi = c.split('=', 1)
         p = percorsi.split(',') + ['', '']
         imp.carica_chiusura(lingua, p[0], p[2] or None, p[1] or None)
+    if forme_base:
+        lingua_b, percorso_b = forme_base.split('=', 1)
+        imp.carica_chiusura(lingua_b, os.devnull, percorso_b, args[2] if len(args) > 2 else None, base=True)
     for riga in open(args[0], encoding='utf-8'):
         imp.voce(json.loads(riga))
     if len(args) > 2:

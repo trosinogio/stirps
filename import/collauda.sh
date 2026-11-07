@@ -148,6 +148,48 @@ for f in figli:
 imp.radici = {(mater, h2el)}
 imp.chiudi_su_radici()
 assert ha(imp, mater), 'una cima che dichiara da sé la sua radice si lega anche se è grande'
+# le etimologie del Lewis & Short e dell'LSJ (filtra_perseus.py --etimi): la base, il composto, il prefisso; non le radici
+# né i confronti con parole affini
+import xml.etree.ElementTree as ET
+from filtra_perseus import etimo_ls, etimo_lsj
+E = ET.fromstring
+assert etimo_ls(E('<etym>anguis</etym>')) == [('la', 'anguis', 'derivazione', None)]
+assert etimo_ls(E('<etym>anguis-coma</etym>')) == [('la', 'anguis', 'composizione', None), ('la', 'coma', 'composizione', None)]
+assert etimo_ls(E('<etym>ab-dūco</etym>')) == [('la', 'duco', 'derivazione', 'ab-')], 'il prefisso resta un affisso, la catena va alla base'
+assert etimo_ls(E('<etym>root ten; v. teneo</etym>')) is None and etimo_ls(E('<etym>Sanscr. tris; cf. tres</etym>')) is None
+assert etimo_ls(E('<etym>Gr. <foreign lang="greek">ἄροτρον</foreign></etym>')) is None, 'aratrum e ἄροτρον sono affini, non un prestito'
+assert etimo_lsj(E('<etym lang="greek">a)gei/rw</etym>')) == [('grc', 'ἀγείρω', 'derivazione', None)]
+assert etimo_lsj(E('<etym lang="greek">gai=a, gh=</etym>'))[0][1:3] == ('γαῖα', 'generico')
+assert etimo_lsj(E('<etym lang="greek">kata-</etym>')) is None
+# l'analisi della forma: prefisso e base nota, mai un nome proprio come base, ἀ- privativo solo davanti a consonante,
+# i prefissi latini assimilati solo davanti alla loro consonante; niente per le voci che hanno già un'etimologia
+from analisi_composti import analizza
+voci = [('g1', 'grc', 'καταδάπτω', 'v.'), ('g2', 'grc', 'δάπτω', 'v.'), ('g3', 'grc', 'ἐπικάρπιος', None), ('g4', 'grc', 'Κάρπιος', 'np'),
+        ('g5', 'grc', 'ἀεργός', None), ('g6', 'grc', 'ἐργός', None), ('g7', 'grc', 'ἐφίστημι', 'v.'), ('g8', 'grc', 'ἵστημι', 'v.'),
+        ('l1', 'la', 'transtollo', 'v.'), ('l2', 'la', 'tollo', 'v.'), ('l3', 'la', 'affero', 'v.'), ('l4', 'la', 'fero', 'v.'),
+        ('l5', 'la', 'acfero', 'v.'), ('l6', 'la', 'perlego', 'v.'), ('l7', 'la', 'lego', 'v.')]
+righe, _ = analizza(voci, {'l6'})
+trovate = {r[2]: (r[5], r[7]) for r in righe}
+assert trovate.get('καταδάπτω') == ('δάπτω', 'κατα-') and trovate.get('ἐφίστημι') == ('ἵστημι', 'ἐφ-'), trovate
+assert trovate.get('transtollo') == ('tollo', 'trans-') and trovate.get('affero') == ('fero', 'ad-'), trovate
+assert 'ἐπικάρπιος' not in trovate and 'ἀεργός' not in trovate and 'acfero' not in trovate and 'perlego' not in trovate, trovate
+# le etimologie scritte solo a parole, senza modelli: la prima frase, se è semplice; mai dubbi, confronti o influssi
+from filtra import testo_come_der, surf_come_af
+tc = lambda t: [(x['n'], x['a']) for x in testo_come_der({'etymology_text': t, 'lang_code': 'it'})]
+assert tc('Deverbal of domandare.') == [('der', {'1': 'it', '2': 'it', '3': 'domandare'})]
+assert tc('Past participle of trovare.') == [('der', {'1': 'it', '2': 'it', '3': 'trovare'})]
+assert tc('From Latin dominus, from domus.') == [('der', {'1': 'it', '2': 'la', '3': 'dominus'})]
+assert tc('From divertire +\u200e -ente.') == [('af', {'1': 'it', '2': 'divertire', '3': '-ente'})]
+assert tc('Possibly from Latin X.') == [] and tc('Compare French fou.') == [] and tc('From French papa, a child word.') == []
+assert surf_come_af({'etymology_templates': [{'name': 'surf', 'args': {'1': 'it', '2': 'divertire', '3': '-ente'}}]})[0]['n'] == 'af'
+# nella lingua di partenza una forma flessa citata va al suo lemma, come forma citata (quattrocchi < occhio, «occhi»)
+import os, tempfile
+cartella = tempfile.mkdtemp()
+open(cartella + '/forme.tsv', 'w').write('occhi\tocchio\tplural\ntrovato\ttrovare\tpast,participle\n')
+open(cartella + '/glosse.tsv', 'w').write('occhio\t1\tnoun\teye\t\n')
+imp = Importatore()
+imp.carica_chiusura('it', os.devnull, cartella + '/forme.tsv', cartella + '/glosse.tsv', base=True)
+assert imp.risolvi('it', 'occhi', None)[1::2] == ('occhio', 'occhi'), imp.risolvi('it', 'occhi', None)
 # l'inglese: il suo alfabeto, le sue forme verbali, niente sigle; entrano solo le voci con un'etimologia (--con-etimologia)
 assert lemma_valido('en', 'hound') and lemma_valido('ang', 'þing') and lemma_valido('en', 'café') and lemma_valido('en', 'I')
 assert not lemma_valido('en', '4x4') and not lemma_valido('en', 'A'), 'cifre e lettere isolate non sono parole'
@@ -170,7 +212,7 @@ assert npg('non', 'háls') == 'háls' and npg('fr', 'dé') == 'dé' and npg('gem
 assert lemma_valido('ru', 'водка') and lemma_valido('de', 'Straße') and lemma_valido('fr', 'cœur') and not lemma_valido('ru', 'vodka')
 # la parte del discorso dalle glosse: Haus, in tedesco, è un nome comune
 from wiktionary import completa_glosse
-import tempfile
+import os, tempfile
 td = tempfile.mkdtemp()
 imp = Importatore()
 haus = imp.lessema('de', 'Haus')
@@ -283,7 +325,8 @@ LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.t
 cd esempio/tsv
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
 truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_radice, stg_attestazione, stg_wikizionario,
-         stg_glossa_wikidata, stg_glossa_tradotta, stg_dizionario, stg_autore, stg_stima, stg_definizione, stg_pronuncia, stg_sensi;
+         stg_glossa_wikidata, stg_glossa_tradotta, stg_dizionario, stg_autore, stg_stima, stg_definizione, stg_pronuncia, stg_sensi,
+         stg_etimo_dizionario;
 \copy stg_lingua from 'lingue.tsv'
 \copy stg_lessema from 'lessemi.tsv'
 \copy stg_ipotesi from 'ipotesi.tsv'
@@ -297,11 +340,13 @@ truncate stg_lingua, stg_lessema, stg_ipotesi, stg_relazione, stg_doppione, stg_
 \copy stg_dizionario from '../dizionari.tsv'
 \copy stg_autore from '../autori.tsv'
 \copy stg_stima from '../stime.tsv'
+\copy stg_etimo_dizionario from '../etimi_dizionari.tsv'
 \copy stg_pronuncia from 'pronunce.tsv'
 \copy stg_sensi from 'sensi.tsv'
 select importa_wiktionary();
 select importa_dizionari();
 select importa_stime();
+select importa_etimi_dizionari();
 select importa_glosse_wikizionario();
 select importa_glosse_aggiuntive();
 select importa_definizioni();

@@ -26,7 +26,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 - `npm run dev`: sviluppo (con un `DATABASE_URL` locale).
 - `npx tsc --noEmit`: controllo dei tipi.
-- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, i 94 del seme (`db/04_test.sql`) e i 93 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
+- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, i 94 del seme (`db/04_test.sql`) e i 98 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
 - `node scripts/applica-sql.mjs file.sql`: applica un file SQL in una transazione.
 - `node scripts/esporta-redazione.mjs cartella`: copia del lavoro della redazione in JSON; ogni notte la fa `.github/workflows/copia-redazione.yml` nel ramo `copia-redazione`.
 - Import completo da Wiktionary: `import/importa.sh` (scarica i dump di Kaikki; latino e greco entrano interi, `INTERE=la,grc`, con i lemmi del Lewis & Short e dell’LSJ che Wiktionary non ha, dal Perseus: `DIZIONARI=1`; l’inglese con il lessico comune e le parole di etimo esterno, senza nomi propri né locuzioni: `CON_ETIMOLOGIA=en`, `ELENCHI`, `ESTERNI`, e le glosse già pubblicate stabili con `PRECEDENTI`); collaudo del parser: `import/collauda.sh`. Prima di un import grande, la stima: `import/stima_import.py` (righe, spazio, ambiti, campione di catene). Vedi `import/LEGGIMI.md`.
@@ -46,7 +46,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 ## Il database
 
-Tabelle principali: `lessema` (le voci, con `slug` generato), `ipotesi` (una sola `accolta` per voce), `relazione` (i passaggi), `attestazione`, `glossa`, `definizione` (della redazione o di Claude), `rimando` (le fonti, con posizione), `opera`, `strato` (provenienze e licenze), `frequenza`, `lista_lavoro`, `storico` (firmato), `meta`. Viste materializzate: `mv_famiglia`, `mv_allotropi`, `mv_storie`. Funzioni principali: `scheda()`, `nodo_json()`, `storie()`, `indovinello()`, `importa_wiktionary()`, `pulisci_wiktionary()`, `importa_dizionari()`, `importa_glosse_wikizionario()`, `importa_glosse_aggiuntive()`, `importa_definizioni()`, `importa_stime()`.
+Tabelle principali: `lessema` (le voci, con `slug` generato), `ipotesi` (una sola `accolta` per voce), `relazione` (i passaggi), `attestazione`, `glossa`, `definizione` (della redazione o di Claude), `rimando` (le fonti, con posizione), `opera`, `strato` (provenienze e licenze), `frequenza`, `lista_lavoro`, `storico` (firmato), `meta`. Viste materializzate: `mv_famiglia`, `mv_allotropi`, `mv_storie`. Funzioni principali: `scheda()`, `nodo_json()`, `storie()`, `indovinello()`, `importa_wiktionary()`, `pulisci_wiktionary()`, `importa_dizionari()`, `importa_etimi_dizionari()` (le etimologie del Lewis & Short e dell’LSJ, e l’analisi della forma, certezza 2), `importa_glosse_wikizionario()`, `importa_glosse_aggiuntive()`, `importa_definizioni()`, `importa_stime()`.
 
 Come cambia il database:
 
@@ -82,6 +82,7 @@ Come cambia il database:
 
 - **Wiktionary cambia i modelli etimologici:** dal 2026 molte voci (22 mila latine) usano `{{ety}}`/`{{etymon}}` (`:inh|la:aquila`, `:af|fābula|-lus`). `filtra.py` li converte nel modello classico (`da_ety()`), solo dove un modello classico non dà già un etimo (`porta_etimo()`). Il registro del filtro conta le voci lette «da {{ety}}» e le cause dei lemmi senza etimologia, con i «modelli non letti più frequenti»: se ne compare uno nuovo, si guardano esempi grezzi con `DIAGNOSI_MODELLI=nome` o `DIAGNOSI_PAROLE=parola` nel workflow Dati.
 - **Il lessico di frequenza conta forme, non lemmi,** e viene dai sottotitoli: *stia*, *sulla*, *era* sono forme di altre parole, e ci sono molte volgarità. Filtrare prima di usarlo per scegliere parole. Il rango vale solo per la prima voce di una forma, non per gli omografi (*pain*, non *pain²*, il pane). Nel database ci sono le frequenze di tutte le lingue del pacchetto (`dati/frequenze_<lingua>.tsv.gz`, 50 mila forme ciascuna, 6,6 MB per lingua).
+- **Una voce senza etimologia ha quasi sempre una causa nei dati, non in Wiktionary:** la sua lingua non è di chiusura (napoletano, spagnolo), è una forma flessa citata (*occhi*), l’etimologia è scritta solo a parole o con un modello che non leggiamo, o sta in un dizionario (`<etym>` del Lewis & Short e dell’LSJ). `stima_import.py` conta le voci senza etimologia per lingua, prima e dopo: è la misura da guardare.
 - **Ricorsioni sul grafo:** si visitano le parole, non i percorsi (`union`, non `union all` con l’array del cammino). I composti dotti (*-logia*, *-grafia*) creano migliaia di percorsi convergenti, e contarli bloccava `mv_famiglia`.
 - **Da una sandbox la porta 5432 di Neon può essere chiusa:** gli script ricadono sul driver WebSocket `@neondatabase/serverless`.
 - **Wiktionary scrive l’incertezza nel testo** («possibly», «uncertain»): il parser la legge senza le glosse tra virgolette, perché «obscure» in una glossa non è un dubbio.
