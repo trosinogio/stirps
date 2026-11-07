@@ -66,8 +66,12 @@ if __name__ == '__main__':
             k = primo[k]
             cammino.append(k)
         cima = cammino[-1]
-        if cima in radici:
-            esito = 'giusta'
+        raggiunta_tutta = raggiunte(parola)
+        if cima in radici or any('@' not in r and r == senza_id(cima) for r in radici):
+            esito = 'giusta'            # anche la radice dichiarata generica (*bʰeh₁-) con la catena sulla variante precisa
+        elif radici & raggiunta_tutta - set(cammino) or any('@' not in r and r == senza_id(x) for r in radici
+                                                            for x in raggiunta_tutta - set(cammino)):
+            esito = 'giusta per un altro elemento del composto'   # sanctify: sanctus + -fico < faciō < *dʰeh₁-
         elif radici & set(cammino):
             esito = 'sale oltre la radice'          # la attraversa e poi continua: la cima mostrata è un'altra
         elif any(senza_id(r) == senza_id(c) for r in radici for c in cammino):
@@ -88,7 +92,9 @@ if __name__ == '__main__':
         per_lingua[lessemi[parola][1]][esito] += 1
         esempi[esito].append(f"{lessemi[parola][2]} → {lessemi.get(cima, ['', '', cima])[2]} (dichiara {', '.join(sorted(r.split(':', 2)[2] for r in radici))})")
     tot = sum(esiti.values())
-    print(f'parole con una radice dichiarata: {tot}')
+    giuste = esiti['giusta'] + esiti['giusta per un altro elemento del composto']
+    print(f'parole con una radice dichiarata: {tot}; giuste in tutto (anche per un altro elemento del composto): '
+          f'{giuste} ({100 * giuste / tot:.1f}%)')
     for e, n in esiti.most_common():
         print(f'  {e}: {n} ({100 * n / tot:.1f}%)')
     print('per lingua:', {l: dict(c) for l, c in sorted(per_lingua.items(), key=lambda x: -sum(x[1].values()))[:6]})

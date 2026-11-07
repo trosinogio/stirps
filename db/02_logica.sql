@@ -35,6 +35,27 @@ begin
   return null;
 end $$;
 
+-- L'indice dei nomi propri e derivati: oltre ai nomi (nome_proprio), ogni voce con la maiuscola nelle lingue che scrivono i
+-- nomi comuni con la minuscola: aggettivi etnici e di luogo (Romanus, Danish, Παμφυλιακός), avverbi (Graece), cognomi
+-- marcati come verbi. Non il tedesco e le lingue che scrivono con la maiuscola tutti i nomi, né le sigle (né il pronome I).
+create or replace function nome_con_maiuscola(p_lingua text, p_lemma text, p_pos text) returns boolean
+language sql immutable as $$
+  select p_pos is not null and p_pos <> 'np' and p_lemma ~ '^-?[[:upper:]]' and p_lemma ~ '[[:lower:]]'   -- non le sigle (CD, USB)
+     and p_lingua not in ('de', 'lb', 'gsw', 'bar', 'pdc', 'nds', 'nds-de', 'sxu', 'swg', 'ksh', 'cim', 'mhn', 'vmf', 'hrx',
+                          'gmw-cfr', 'gmw-ecg', 'gmw-rfr', 'gmw-msc', 'yi')
+     and p_lingua not like 'de-%'
+$$;
+
+create or replace function segna_nome_indice() returns trigger language plpgsql as $$
+begin
+  new.nome_indice := case when nome_con_maiuscola(new.lingua, new.lemma, new.pos) then true end;
+  return new;
+end $$;
+
+drop trigger if exists lessema_nome_indice on lessema;
+create trigger lessema_nome_indice before insert or update of lingua, lemma, pos on lessema
+  for each row execute function segna_nome_indice();
+
 do $$
 declare t text;
 begin
@@ -174,7 +195,7 @@ language sql stable as $$
            'lingua_nome', coalesce(etichetta_in('lingua', x.lingua, p_lingua), g.nome),
            'lingua_sigla', coalesce(etichetta_in('lingua', x.lingua, p_lingua, 'breve'), g.sigla),
            'ramo', g.ramo, 'lemma', x.lemma, 'ricostruito', x.ricostruito, 'translit', x.translit,
-           'nome_proprio', x.nome_proprio,      -- lo stemma nasconde i nomi propri, se non si chiede di vederli
+           'nome_proprio', x.nome_proprio or coalesce(x.nome_indice, false),   -- lo stemma nasconde i nomi propri e derivati
            'glossa', coalesce(t.testo, x.glossa),
            'glossa_lingua', case when t.testo is not null then t.lingua else x.glossa_lingua end,
            'glossa_automatica', coalesce(t.provenienza in ('traduzione-automatica', 'claude') and t.stato_editoriale = 'importato', false))
@@ -518,7 +539,7 @@ esempi as (
       select x.lemma, min(case when x.omografo = 1 then q.rango end) as rango, min(f.profondita) as prof
       from mv_famiglia f join lessema x on x.id = f.id
       left join frequenza q on q.lingua = x.lingua and q.forma = x.lemma
-      where f.capo = pg.id and x.id <> pg.id and x.lingua = p_lingua and not x.nome_proprio
+      where f.capo = pg.id and x.id <> pg.id and x.lingua = p_lingua and not x.nome_proprio and x.nome_indice is not true
         and (p_anteprima or f.pubblico) and visibile(x.stato_editoriale, p_anteprima)
       group by x.lemma
       order by rango nulls last, prof, x.lemma limit 4) e) as esempi
@@ -540,12 +561,20 @@ create function parole_lingua(p_codice text, p_lingua text default 'it', p_antep
                               p_nomi boolean default false, p_pagina int default 1)
 returns jsonb language sql stable as $$
 -- l'indice per lettere: chiave_indice (le prime due lettere secondo l'alfabeto: 23 latine con J sotto I e U sotto V,
--- 24 greche) e nome_proprio sono colonne generate di lessema, indicizzate; i nomi propri hanno un indice a parte
+-- 24 greche) e nome_proprio sono colonne generate di lessema, indicizzate; i nomi propri e derivati hanno un indice a parte:
+-- i nomi (nome_proprio) e le altre voci con la maiuscola (nome_indice, un indice parziale piccolo)
 with
-ix as (select chiave_indice as ini2, left(chiave_indice, 1) as ini, count(*) as n
-         from lessema where lingua = p_codice and nome_proprio = p_nomi and chiave_indice is not null
-                        and visibile(stato_editoriale, p_anteprima)
-        group by chiave_indice),
+ix as (select ini2, left(ini2, 1) as ini, sum(n) as n from (
+         select chiave_indice as ini2, count(*) as n
+           from lessema where lingua = p_codice and nome_proprio = p_nomi and chiave_indice is not null
+                          and visibile(stato_editoriale, p_anteprima)
+          group by chiave_indice
+         union all
+         select chiave_indice, (case when p_nomi then 1 else -1 end) * count(*)
+           from lessema where lingua = p_codice and nome_indice and chiave_indice is not null
+                          and visibile(stato_editoriale, p_anteprima)
+          group by chiave_indice) x
+        group by ini2 having sum(n) > 0),
 ini as (select ini, sum(n) as n, (ini !~ '^[[:alpha:]]') as simbolo from ix group by ini),
 scelta as (select coalesce(upper(left(p_iniziale, 1)), case when (select sum(n) from ini) <= 400 then null
                                          -- si apre sulla prima iniziale vera: non su una I con una sola parola greca
@@ -560,13 +589,15 @@ scelta2 as (select case when (select sum(n) from sotto) > 2000
 gruppo as (select l.id, l.slug, l.lingua, l.lemma, l.ricostruito, l.translit, l.glossa, l.glossa_lingua,
                   row_number() over (order by l.lemma_norm, l.lemma, l.id) as rn
              from lessema l, scelta sc, scelta2 s2
-            where l.lingua = p_codice and l.nome_proprio = p_nomi and l.chiave_indice is not null
+            where l.lingua = p_codice and l.chiave_indice is not null
+              and ((l.nome_proprio = p_nomi and l.nome_indice is not true) or (p_nomi and l.nome_indice))
               and visibile(l.stato_editoriale, p_anteprima)
               and (sc.v is null or left(l.chiave_indice, 1) = sc.v) and (s2.v is null or l.chiave_indice = s2.v)),
 pagine as (select (rn - 1) / 500 + 1 as n, (array_agg(lemma order by rn))[1] as da, (array_agg(lemma order by rn desc))[1] as a
              from gruppo group by 1),
 pg as (select least(greatest(coalesce(p_pagina, 1), 1), greatest((select max(n) from pagine), 1)) as n),
-tot as (select count(*) filter (where not nome_proprio) as parole, count(*) filter (where nome_proprio) as nomi
+tot as (select count(*) filter (where not nome_proprio and nome_indice is not true) as parole,
+               count(*) filter (where nome_proprio or nome_indice) as nomi
           from lessema where lingua = p_codice and visibile(stato_editoriale, p_anteprima))
 select jsonb_build_object(
   'totale', (select case when p_nomi then nomi else parole end from tot),

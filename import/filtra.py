@@ -190,6 +190,29 @@ def dati_scheda(v):
     return d or None
 
 
+def ricostruzioni_alternative(v):
+    '''Le coppie (variante, principale, fonte) di una pagina ricostruita: un senso «alternative reconstruction of *X»
+    (alt_of: questa forma è la variante di X) e le «Alternative reconstructions» della pagina (forms con il tag
+    alternative: sono varianti di questa forma). Senza l'asterisco, come il titolo della voce in Kaikki.'''
+    parola = (v.get('word') or '').lstrip('*')
+    if not parola:
+        return []
+    coppie = []
+    for s in v.get('senses') or []:
+        for a in s.get('alt_of') or []:
+            w = (a.get('word') or '').lstrip('*').strip()
+            if w and w != parola and PAROLA_RICOSTRUITA.match(w):
+                coppie.append((parola, w, 'alt_of'))
+    for f in v.get('forms') or []:
+        w = (f.get('form') or '').lstrip('*').strip()
+        if 'alternative' in (f.get('tags') or []) and w and w != parola and PAROLA_RICOSTRUITA.match(w):
+            coppie.append((w, parola, 'alternative'))
+    return list(dict.fromkeys(coppie))
+
+
+PAROLA_RICOSTRUITA = re.compile(r'^[^\s,;()]+$')      # una forma sola, non «*gʰebʰ- (Kortlandt)» né un elenco
+
+
 def marcata(v):
     '''Forma flessa marcata da Wiktionary: il modello nonlemma, o tutti i sensi con form_of o il tag form-of.'''
     if any(t.get('name') == 'nonlemma' for t in v.get('etymology_templates') or []):
@@ -330,6 +353,9 @@ if __name__ == '__main__':
     out = open(sys.argv[1], 'w', encoding='utf-8')
     glosse = open(sys.argv[2], 'w', encoding='utf-8')
     forme = open(os.environ['FORME'], 'w', encoding='utf-8') if os.environ.get('FORME') else None
+    # VARIANTI: le ricostruzioni alternative della stessa forma (*gʰeh₁bʰ- e *gʰebʰ-), una riga «variante, principale»
+    varianti_f = open(os.environ['VARIANTI'], 'w', encoding='utf-8') if os.environ.get('VARIANTI') else None
+    varianti, esempi_varianti = Counter(), 0
     # SENZA: per ogni lemma senza etimologia utile, la causa (diagnosi: perché zoo non ha una catena)
     senza_f = open(os.environ['SENZA'], 'w', encoding='utf-8') if os.environ.get('SENZA') else None
     cause, modelli_ignoti = Counter(), Counter()
@@ -358,6 +384,13 @@ if __name__ == '__main__':
         if non_parola(v):
             non_parole += 1
             continue
+        if varianti_f and (v.get('original_title') or '').startswith('Reconstruction:'):
+            for variante, principale, fonte in ricostruzioni_alternative(v):
+                varianti_f.write(f'{variante}\t{principale}\n')
+                varianti[fonte] += 1
+                if esempi_varianti < 10:
+                    esempi_varianti += 1
+                    print(f'  variante ({fonte}): *{variante} → *{principale}', file=sys.stderr)
         if forma_flessa(v):
             flesse += 1
             flesse_dalla_glossa += not marcata(v)
@@ -427,6 +460,8 @@ if __name__ == '__main__':
     print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}, sigle e simboli esclusi {non_parole}', file=sys.stderr)
+    if varianti_f:
+        print(f'  ricostruzioni alternative: {dict(varianti)}', file=sys.stderr)
     if senza:
         print(f'  senza etimologia utile, per causa: {dict(cause)}; modelli non letti più frequenti: '
               f'{modelli_ignoti.most_common(25)}', file=sys.stderr)

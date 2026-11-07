@@ -173,6 +173,16 @@ trovate = {r[2]: (r[5], r[7]) for r in righe}
 assert trovate.get('καταδάπτω') == ('δάπτω', 'κατα-') and trovate.get('ἐφίστημι') == ('ἵστημι', 'ἐφ-'), trovate
 assert trovate.get('transtollo') == ('tollo', 'trans-') and trovate.get('affero') == ('fero', 'ad-'), trovate
 assert 'ἐπικάρπιος' not in trovate and 'ἀεργός' not in trovate and 'acfero' not in trovate and 'perlego' not in trovate, trovate
+# greco: suffissi regolari e composti di due parole note con -ο-; non i composti con elisione o parole corte
+voci = [('s1', 'grc', 'σκοτίζω', 'v.'), ('s2', 'grc', 'σκότος', None), ('s3', 'grc', 'μοσχομάγειρος', None), ('s4', 'grc', 'μόσχος', None),
+        ('s5', 'grc', 'μάγειρος', None), ('s6', 'grc', 'ἄκραντος', None), ('s7', 'grc', 'ἄκρος', None), ('s8', 'grc', 'ἄντος', None)]
+righe, _ = analizza(voci, set())
+per = {}
+for r in righe:
+    per.setdefault(r[2], []).append((r[5], r[6], r[7]))
+assert per.get('σκοτίζω') == [('σκότος', 'derivazione', '-ίζω')], per
+assert per.get('μοσχομάγειρος') == [('μόσχος', 'composizione', None), ('μάγειρος', 'composizione', None)], per
+assert 'ἄκραντος' not in per, per
 # una radice ricostruita è la base del suo derivato, non un prefisso; un suffisso ricostruito resta un affisso
 from wiktionary import e_affisso
 assert e_affisso('-ente') and e_affisso('ab-') and e_affisso('*-eti') and not e_affisso('*bʰer-') and not e_affisso('casa')
@@ -197,6 +207,73 @@ assert mr('from', {'1': 'it', '2': "l'aquila"}) == [('der', {'1': 'it', '2': 'it
 assert mr('contraction', {'1': 'it', '2': 'ci', '3': 'è'}) == [('af', {'1': 'it', '2': 'ci', '3': 'è'})]
 assert mr('contraction', {'1': 'it', '2': "va' a fa' 'n culo"}) == [] and mr('contraction', {'1': 'it', '2': 'non è?'}) == []
 assert surf_come_af({'word': 'de', 'etymology_templates': [{'name': 'surf', 'args': {'1': 'it', '2': 'la', '3': 'de'}}]}) == []
+import os, tempfile
+# composti con due radici: un elemento di composizione che viene da una parola (radio- < radius) è il secondo etimo;
+# non un suffisso grammaticale (-mente < mens) né un legame sbagliato (-ulentus < frustum)
+imp = Importatore()
+radius, mens, frustum = imp.lessema('la', 'radius', pos='s.'), imp.lessema('la', 'mens', pos='s.f.'), imp.lessema('la', 'frustum', pos='s.')
+radio_, mente_, ulentus_ = imp.lessema('it', 'radio-'), imp.lessema('it', '-mente'), imp.lessema('la', '-ulentus')
+arco(imp, radio_, radius); arco(imp, mente_, mens); arco(imp, ulentus_, frustum)
+imp.voce({'w': 'radioattivo', 'tpl': [{'n': 'af', 'a': {'1': 'it', '2': 'radio-', '3': 'attivo'}, 'e': ''}]})
+imp.voce({'w': 'velocemente', 'tpl': [{'n': 'af', 'a': {'1': 'it', '2': 'veloce', '3': '-mente'}, 'e': ''}]})
+imp.voce({'w': 'vinolentus', 'tpl': [{'n': 'af', 'a': {'1': 'la', '2': 'vinum', '3': '-ulentus'}, 'e': ''}]}, lingua_voce='la', parola='vinolentus')
+imp.elementi_di_composizione()
+etimi_di = lambda k: {(r['etimo'], r['tipo']) for r in imp.relazioni if r['esito'] == k}
+assert (radio_, 'composizione') in etimi_di(imp.lessema('it', 'radioattivo')), etimi_di(imp.lessema('it', 'radioattivo'))
+assert not any(e == mente_ for e, _ in etimi_di(imp.lessema('it', 'velocemente')))
+assert not any(e == ulentus_ for e, _ in etimi_di(imp.lessema('la', 'vinolentus')))
+# le etimologie del Wikizionario: solo frasi semplici, l'etimo nella scrittura della sua lingua, mai una locuzione
+from etimi_wikizionario import leggi as lw
+assert lw('dal latino avarus, avido', 'avaro') == [(1, 'la', 'avarus', 'generico', 3)]
+assert lw('dal latino moderno psychologia', 'psicologia') == [(1, 'la', 'psychologia', 'generico', 3)], 'la varietà non è l\'etimo'
+assert lw('dal latino contra passum', 'contrappasso') == [] and lw("dall'inglese hand in cap", 'handicap') == [], 'una locuzione'
+assert lw('dal greco anecumène', 'anecumene') == [] and lw('dal greco παλαiός', 'paleo') == [], 'scrittura sbagliata'
+assert lw('dal greco ϕωνητικός', 'fonetico') == [(1, 'grc', 'φωνητικός', 'generico', 3)]
+assert lw('dal latino tardo, aciarium', 'acciaio') == [], 'l\'aggettivo della varietà non è l\'etimo'
+assert lw('forse dal latino X', 'x') == [] and lw('composto da ago e puntura', 'agopuntura')[1][2] == 'puntura'
+# i due Wiktionary: concordano anche con un'altra forma di citazione o più in alto nella catena; due analisi italiane
+# diverse non sono un disaccordo; un'altra lingua d'origine sì
+from confronta_wikizionario import classifica as cw
+assert cw([('la', 'ascendĕre')], {('la', 'ascendo'), ('ine', 'skend')}) == 'concorda'
+assert cw([('la', 'papam')], {('la', 'papa')}) == 'concorda' and cw([('la', 'cycnus')], {('la', 'cygnus')}) == 'concorda'
+assert cw([('it', 'poli-'), ('it', 'centro')], {('it', 'poli'), ('it', 'centrico')}) == 'concorda'
+assert cw([('it', 'tavola')], {('la', 'tabula')}) == 'analisi', 'tavolo da tavola o dal latino: due analisi'
+assert cw([('fr', 'destinataire')], {('la', 'destinatarius')}) == 'discorda'
+assert cw([('grc', 'ὀκτάεδρος')], {('it', 'otta'), ('it', 'edro')}, formazione_italiana=True) == 'analisi', 'dotto o formazione'
+assert cw([('fr', 'changer')], {('it', 'cangiare')}, formazione_italiana=True) == 'discorda'
+assert cw([('la', 'casa')], {('la', 'caso')}) == 'discorda', 'parole corte: una lettera è un\'altra parola'
+# greco: le regole che una coppia nota insegna (apprendi_greco.py), e una regola appresa che scatta solo su una base unica
+from apprendi_greco import regole_della_coppia as rc, Modello
+assert rc('σκοτιζω', ['σκοτοσ']) == [('S', 'ιζω', 'οσ')] and rc('καταβαινω', ['βαινω']) == [('P', 'κατα')]
+assert rc('λαμπαδηφοροσ', ['λαμπασ', 'φερω']) == [('C', 'φοροσ', 'φερω')] and rc('φιλοσοφοσ', ['φιλοσ', 'σοφοσ']) == [('C', 'σοφοσ', 'σοφοσ')]
+mg = Modello({'σκοτοσ': {'σκότος'}, 'κηρυσσω': {'κηρύσσω'}, 'ομοιοσ': {'ὅμοιος', 'ὁμοῖος'}}, {})
+mg.S['ιζω'].add('οσ'); mg.S['ξισ'].add('σσω'); mg.S['οω'].add('οσ')
+assert mg.scatti('σκοτιζω', 'σκοτίζω') == [(('S', 'ιζω', 'οσ'), ('σκότος',))]
+assert mg.scatti('κηρυξισ', 'κήρυξις') == [(('S', 'ξισ', 'σσω'), ('κηρύσσω',))]
+assert mg.scatti('ομοιοω', 'ὁμοιόω') == [], 'due basi con la stessa forma: nessuna previsione'
+# ricostruzioni alternative: *gʰeh₁bʰ- è una variante di *gʰebʰ- (Wiktionary lo dice), e habeō e give stanno in una
+# famiglia; il passaggio resta anche se la variante è una radice. *ker- e *ḱer- non si toccano
+from filtra import ricostruzioni_alternative as ra
+assert ra({'word': 'gʰeh₁bʰ-', 'senses': [{'alt_of': [{'word': '*gʰebʰ-'}]}]}) == [('gʰeh₁bʰ-', 'gʰebʰ-', 'alt_of')]
+assert ra({'word': 'gʰebʰ-', 'forms': [{'form': '*gʰeh₁bʰ-', 'tags': ['alternative']}, {'form': '*x- (Beekes)', 'tags': ['alternative']}]}) \
+    == [('gʰeh₁bʰ-', 'gʰebʰ-', 'alternative')]
+cartella_v = tempfile.mkdtemp()
+open(cartella_v + '/varianti.tsv', 'w').write('gʰeh₁bʰ-\tgʰebʰ-\ngʰebʰ-\tgʰeh₁bʰ-\nḱer-\tker-\n')
+imp = Importatore()
+imp.carica_chiusura('ine-pro', os.devnull, varianti=cartella_v + '/varianti.tsv')
+habeo, give = imp.lessema('la', 'habeō'), imp.lessema('en', 'give')
+r1, r2, r3 = imp.lessema('ine-pro', '*gʰeh₁bʰ-'), imp.lessema('ine-pro', '*gʰebʰ-'), imp.lessema('ine-pro', '*ker-')
+arco(imp, habeo, r1); arco(imp, give, r2); arco(imp, imp.lessema('en', 'gift'), r2)
+imp.unisci_varianti(); imp.togli_archi_impossibili(); imp.togli_cicli()
+v = [(r['esito'], r['etimo'], r['tipo']) for r in imp.relazioni if r['tipo'] == 'variante']
+assert v == [(r1, r2, 'variante')], v          # si citano a vicenda: principale *gʰebʰ-, con più parole sotto
+assert imp.ipotesi[r1 + '#wikt-variante']['confidenza'] == 3
+# una pagina con una radice tra gli omografi (वा: «o» e «soffiare»): l'etimo citato è la radice
+cartella_sa = tempfile.mkdtemp()
+open(cartella_sa + '/glosse.tsv', 'w').write('वा\t1\tconj\tor\t\nवा\t2\troot\tto blow\t\nदा\t1\troot\tto give\t\n')
+imp = Importatore()
+imp.carica_chiusura('sa', os.devnull, None, cartella_sa + '/glosse.tsv')
+assert imp.risolvi('sa', 'वा', None)[2] == 2 and imp.risolvi('sa', 'दा', None)[2] == 1
 # nella lingua di partenza una forma flessa citata va al suo lemma, come forma citata (quattrocchi < occhio, «occhi»)
 import os, tempfile
 cartella = tempfile.mkdtemp()

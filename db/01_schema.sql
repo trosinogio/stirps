@@ -158,6 +158,9 @@ create table lessema (
   -- l'indice per lettere della lingua (parole_lingua): calcolato una volta, non a ogni pagina
   chiave_indice     text generated always as (indice_iniziali(lingua, coalesce(nullif(norm(lemma), ''), lemma))) stored,
   nome_proprio      boolean generated always as (coalesce(pos, '') = 'np' or (pos is null and lemma ~ '^-?[[:upper:]]')) stored,
+  -- vera anche per le voci con la maiuscola che non sono marcate come nomi (Romanus, Danish, Graece): vanno nell'indice
+  -- dei nomi propri e derivati. La tiene il trigger lessema_nome_indice; null vale falso, così non si scrive per tutte
+  nome_indice       boolean,
   unique (lingua, lemma, omografo),
   unique (slug),
   check (lemma = btrim(lemma) and lemma <> ''),
@@ -541,6 +544,7 @@ comment on table wiktionary_radice is 'Radici dichiarate da Wiktionary (template
 create index glossa_testo_trgm       on glossa using gin (norm(testo) gin_trgm_ops);
 create index lessema_glossa_trgm     on lessema using gin (norm(glossa) gin_trgm_ops);
 create index lessema_indice          on lessema (lingua, nome_proprio, chiave_indice) include (stato_editoriale);
+create index lessema_nome_indice     on lessema (lingua, chiave_indice) include (stato_editoriale) where nome_indice;
 
 -- Informazioni sul database stesso: la versione del pacchetto dati importato (vedi scripts/inizializza-db.mjs)
 create table if not exists meta (

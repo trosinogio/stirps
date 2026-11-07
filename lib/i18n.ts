@@ -71,7 +71,7 @@ export interface Testi {
   formaRicostruita: string;
   formaAntiquata: string;
   pronuncia: { titolo: string; sillabazione: string; ascolta: string; audio: string; varieta: (etichette: string) => string };
-  inBreve: { titolo: string; origine: string; radice: string; attestazione: string; parenti: string; parentiN: (n: number, lingue: number) => string };
+  inBreve: { titolo: string; origine: string; radice: string; radici: string; attestazione: string; parenti: string; parentiN: (n: number, lingue: number) => string };
   scheda: { etichette: (etichette: string) => string; grammatica: (testo: string) => string; sensiWiktionary: string };
   dati: (nome: string, licenza: string) => string;
   sezioni: {
@@ -316,7 +316,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     formaAntiquata: 'forma antiquata',
     pronuncia: { titolo: 'Pronuncia', sillabazione: 'sillabazione', ascolta: 'Ascolta la pronuncia',
                  audio: 'audio: Wikimedia Commons', varieta: varieta(VARIETA_IT) },
-    inBreve: { titolo: 'In breve', origine: 'Origine', radice: 'Capostipite', attestazione: 'Prima attestazione', parenti: 'Parole imparentate',
+    inBreve: { titolo: 'In breve', origine: 'Origine', radice: 'Capostipite', radici: 'Capostipiti', attestazione: 'Prima attestazione', parenti: 'Parole imparentate',
                parentiN: (n, l) => `${n} ${n === 1 ? 'parola' : 'parole'} in ${l} ${l === 1 ? 'lingua' : 'lingue'}` },
     scheda: { etichette: etichette(ETICHETTE_IT), grammatica: grammaticaIt, sensiWiktionary: 'Accezioni di Wiktionary, in inglese.' },
     dati: (n, l) => `dati ${n}, ${l}`,
@@ -400,7 +400,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     successive: 'Successive ›',
     iniziali: 'Iniziali',
     sottoIniziali: 'Prime due lettere',
-    indiceSezioni: 'Sezioni dell’indice', indiceParole: 'Parole', indiceNomi: 'Nomi propri', pagineIndice: 'Pagine',
+    indiceSezioni: 'Sezioni dell’indice', indiceParole: 'Parole', indiceNomi: 'Nomi propri e derivati', pagineIndice: 'Pagine',
     fonteStrato: (n, l) => `Fonte: ${n} (${l})`,
     glosseAltrove: (l) => `Le glosse senza traduzione restano ${l ? 'in ' + l : 'nella lingua d’origine'}, come le ha fornite la fonte.`,
     secondo: (f) => `secondo ${f}`,
@@ -534,7 +534,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     formaAntiquata: 'archaic form',
     pronuncia: { titolo: 'Pronunciation', sillabazione: 'hyphenation', ascolta: 'Listen to the pronunciation',
                  audio: 'audio: Wikimedia Commons', varieta: varieta(null) },
-    inBreve: { titolo: 'At a glance', origine: 'Origin', radice: 'Earliest ancestor', attestazione: 'First attested', parenti: 'Related words',
+    inBreve: { titolo: 'At a glance', origine: 'Origin', radice: 'Earliest ancestor', radici: 'Earliest ancestors', attestazione: 'First attested', parenti: 'Related words',
                parentiN: (n, l) => `${n} ${n === 1 ? 'word' : 'words'} in ${l} ${l === 1 ? 'language' : 'languages'}` },
     scheda: { etichette: etichette(null), grammatica: (x) => x, sensiWiktionary: 'Senses from Wiktionary.' },
     dati: (n, l) => `${n} data, ${l}`,
@@ -615,7 +615,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     successive: 'Next ›',
     iniziali: 'Initials',
     sottoIniziali: 'First two letters',
-    indiceSezioni: 'Index sections', indiceParole: 'Words', indiceNomi: 'Proper names', pagineIndice: 'Pages',
+    indiceSezioni: 'Index sections', indiceParole: 'Words', indiceNomi: 'Proper names and derivatives', pagineIndice: 'Pages',
     fonteStrato: (n, l) => `Source: ${n} (${l})`,
     glosseAltrove: (l) => `Glosses without a translation stay ${l ? 'in ' + l : 'in the original language'}, as the source provided them.`,
     secondo: (f) => `according to ${f}`,

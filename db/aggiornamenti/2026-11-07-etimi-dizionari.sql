@@ -454,7 +454,9 @@ comment on function importa_dizionari() is 'Lemmi del Lewis & Short e dell’LSJ
 -- Il Lewis & Short e l'LSJ scrivono nel tag <etym> la base di molte voci (anguinus: anguis; ἀγυρτάζω: ἀγύρτης), i
 -- composti (anguicomus: anguis-coma) e i prefissi (abduco: ab-duco). filtra_perseus.py --etimi li legge; qui diventano
 -- ipotesi con la loro fonte, solo per le voci che non hanno altre etimologie, e solo dove esito ed etimi sono voci certe:
--- un lemma con più voci nella sua lingua (caro, tre voci) è ambiguo e resta fuori. Le righe con opera «analisi» vengono da
+-- un lemma con più voci nella sua lingua (caro, tre voci) è ambiguo e resta fuori. Le righe con opera «Wikizionario» vengono
+-- da etimi_wikizionario.py (le voci italiane: «dal latino avarus», «composto da ago e puntura»; i rimandi «vedi …» con
+-- certezza 2), con provenienza wikizionario; vengono dopo i dizionari e prima dell'analisi. Le righe con opera «analisi» vengono da
 -- analisi_composti.py (καταδάπτω = κατα- + δάπτω): «Analisi della forma», certezza 2, senza fonte, e solo dove i dizionari
 -- non dicono niente.
 create unlogged table if not exists stg_etimo_dizionario (
@@ -502,13 +504,22 @@ begin
            having bool_and(esito_id is not null and etimo_id is not null and etimo_id <> esito_id)) ok using (chiave);
   create index on ed_voluti (esito_id, etimo_id);
   analyze ed_voluti;
-  -- solo le voci di Wiktionary e dei dizionari senza altre etimologie; per una voce, una sola voce del dizionario
+  -- solo le voci di Wiktionary e dei dizionari senza altre etimologie; per una voce, una sola voce del dizionario.
+  -- Il confronto dei due Wiktionary (Wikizionario-concorda, -discorda: confronta_wikizionario.py) vale invece per le voci
+  -- con un'etimologia di Wiktionary intatta, mai per quelle che la redazione ha toccato
   delete from ed_voluti v using lessema l
    where l.id = v.esito_id
      and (l.provenienza not in ('wiktionary', 'perseus')
-          or exists (select 1 from ipotesi h where h.esito_id = v.esito_id and h.provenienza <> 'perseus'));
+          or case when v.opera in ('Wikizionario-concorda', 'Wikizionario-discorda')
+                  then not exists (select 1 from ipotesi h where h.esito_id = v.esito_id and h.provenienza = 'wiktionary'
+                                     and h.stato_editoriale = 'importato' and h.stato in ('accolta', 'alternativa'))
+                       or exists (select 1 from ipotesi h where h.esito_id = v.esito_id
+                                     and (h.stato_editoriale <> 'importato' or h.provenienza not in ('wiktionary', 'wikizionario')))
+                  else exists (select 1 from ipotesi h where h.esito_id = v.esito_id and h.provenienza not in ('perseus', 'wikizionario'))
+             end);
   delete from ed_voluti v using (
-      select distinct on (esito_id) esito_id, chiave as prima from ed_voluti order by esito_id, opera = 'analisi', chiave) m
+      select distinct on (esito_id) esito_id, chiave as prima from ed_voluti
+       order by esito_id, opera = 'analisi', opera like 'Wikizionario%', chiave) m
    where m.esito_id = v.esito_id and v.chiave <> m.prima;
   -- niente cerchi di due passi: l'etimo non deriva già dall'esito
   delete from ed_voluti v
@@ -519,6 +530,10 @@ begin
         join (select chiave, count(*) as n from ed_voluti group by 1) w using (chiave)
        where w.n < r.n) monchi
    where monchi.chiave = v.chiave;
+  -- dove i due Wiktionary concordano non entra un'ipotesi: l'etimologia di Wiktionary cita anche il Wikizionario (passo 5)
+  create temp table ed_concordi on commit drop as
+    select esito_id, min(sv) as sv from ed_voluti where opera = 'Wikizionario-concorda' group by esito_id;
+  delete from ed_voluti where opera = 'Wikizionario-concorda';
   create temp table ed_firme on commit drop as
   select chiave, min(esito_id) as esito_id, min(opera) as opera, min(sv) as sv,
          string_agg(etimo_id || ':' || tipo || ':' || ordine || ':' || coalesce(affisso, ''), ',' order by ordine, etimo_id) as firma
@@ -528,14 +543,16 @@ begin
 
   -- 3. le etimologie dei dizionari che non servono più o sono cambiate, se nessuno le ha toccate
   delete from ipotesi h
-   where h.provenienza = 'perseus' and h.stato_editoriale = 'importato'
+   where h.provenienza in ('perseus', 'wikizionario') and h.stato_editoriale = 'importato'
      and not exists (
        select 1 from ed_firme f
         where f.chiave = h.id_esterno and f.esito_id = h.esito_id
+          -- un disaccordo con Wiktionary è un'alternativa, il resto è accolto: se cambia, l'ipotesi si rifà
+          and h.stato = (case when f.opera = 'Wikizionario-discorda' then 'alternativa' else 'accolta' end)::stato_ipotesi
           and f.firma = (select string_agg(x.etimo_id || ':' || x.tipo || ':' || x.ordine || ':' || coalesce(x.affisso, ''), ','
                                            order by x.ordine, x.etimo_id) from relazione x where x.ipotesi_id = h.id))
      and not exists (select 1 from relazione x where x.ipotesi_id = h.id
-                      and (x.provenienza <> 'perseus' or x.stato_editoriale <> 'importato'));
+                      and (x.provenienza not in ('perseus', 'wikizionario') or x.stato_editoriale <> 'importato'));
   get diagnostics n = row_count;
   r := r || jsonb_build_object('etimologie_tolte', n);
 
@@ -554,27 +571,52 @@ begin
   with ins as (
     insert into ipotesi (esito_id, etichetta, stato, confidenza, origine, provenienza, stato_editoriale, id_esterno)
     select f.esito_id,
-           case f.opera when 'LSJ' then 'Liddell–Scott–Jones' when 'analisi' then 'Analisi della forma' else 'Lewis & Short' end,
-           'accolta', case when f.opera = 'analisi' then 2 else 3 end, 'etimo', 'perseus', 'importato', f.chiave
+           case when f.opera = 'LSJ' then 'Liddell–Scott–Jones' when f.opera = 'analisi' then 'Analisi della forma'
+                when f.opera like 'Wikizionario%' then 'Wikizionario' else 'Lewis & Short' end,
+           (case when f.opera = 'Wikizionario-discorda' then 'alternativa' else 'accolta' end)::stato_ipotesi,
+           case when f.opera in ('analisi', 'Wikizionario-vedi', 'Wikizionario-discorda') then 2 else 3 end, 'etimo',
+           case when f.opera like 'Wikizionario%' then 'wikizionario' else 'perseus' end, 'importato', f.chiave
       from ed_firme f
      where not exists (select 1 from ipotesi h where h.id_esterno = f.chiave)
-       and not exists (select 1 from ipotesi h where h.esito_id = f.esito_id and h.stato = 'accolta')
+       and (f.opera = 'Wikizionario-discorda' or not exists (select 1 from ipotesi h where h.esito_id = f.esito_id and h.stato = 'accolta'))
     on conflict do nothing
     returning id, id_esterno)
   insert into ed_nuove select id, id_esterno from ins;
   get diagnostics n = row_count;
   r := r || jsonb_build_object('etimologie_nuove', n);
   insert into relazione (ipotesi_id, esito_id, etimo_id, tipo, ordine, affisso, confidenza, provenienza, stato_editoriale, id_esterno)
-  select e.id, v.esito_id, v.etimo_id, v.tipo, v.ordine, v.affisso, case when v.opera = 'analisi' then 2 else 3 end,
-         'perseus', 'importato', v.chiave || '#' || v.ordine
+  select e.id, v.esito_id, v.etimo_id, v.tipo, v.ordine, v.affisso,
+         case when v.opera in ('analisi', 'Wikizionario-vedi', 'Wikizionario-discorda') then 2 else 3 end,
+         case when v.opera like 'Wikizionario%' then 'wikizionario' else 'perseus' end, 'importato', v.chiave || '#' || v.ordine
     from ed_nuove e join ed_voluti v on v.chiave = e.chiave
   on conflict do nothing;
   insert into rimando (opera_id, sv, posizione, ipotesi_id)
   select o.id, f.sv, 'propone', e.id
-    from ed_nuove e join ed_firme f on f.chiave = e.chiave join opera o on o.sigla = f.opera;
+    from ed_nuove e join ed_firme f on f.chiave = e.chiave
+    join opera o on o.sigla = case when f.opera like 'Wikizionario%' then 'Wikizionario' else f.opera end;
+
+  -- 5. dove i due Wiktionary concordano, l'etimologia accolta di Wiktionary cita anche il Wikizionario. Il rimando porta
+  --    la nota «concorda con Wiktionary», così si toglie se l'accordo cade, e non si toccano quelli della redazione
+  create temp table ed_rimandi on commit drop as
+    select h.id as ipotesi_id, c.sv
+      from ed_concordi c
+      join ipotesi h on h.esito_id = c.esito_id and h.stato = 'accolta' and h.provenienza = 'wiktionary'
+                    and h.stato_editoriale = 'importato';
+  delete from rimando m using opera o
+   where o.id = m.opera_id and o.sigla = 'Wikizionario' and m.nota = 'concorda con Wiktionary'
+     and not exists (select 1 from ed_rimandi e where e.ipotesi_id = m.ipotesi_id and e.sv is not distinct from m.sv);
+  insert into rimando (opera_id, sv, posizione, nota, ipotesi_id)
+  select o.id, e.sv, 'accoglie', 'concorda con Wiktionary', e.ipotesi_id
+    from ed_rimandi e join opera o on o.sigla = 'Wikizionario'
+   where not exists (select 1 from rimando m where m.ipotesi_id = e.ipotesi_id and m.opera_id = o.id
+                                              and m.nota = 'concorda con Wiktionary');
+  r := r || jsonb_build_object('concordanze_wikizionario', (select count(*) from rimando m join opera o on o.id = m.opera_id
+                                                            where o.sigla = 'Wikizionario' and m.nota = 'concorda con Wiktionary'),
+                               'discordanze_wikizionario', (select count(*) from ipotesi h where h.provenienza = 'wikizionario'
+                                                            and h.stato = 'alternativa'));
   r := r || jsonb_build_object('etimologie_dei_dizionari', (select jsonb_object_agg(lingua, quante) from (
            select l.lingua, count(*) as quante from ipotesi h join lessema l on l.id = h.esito_id
-            where h.provenienza = 'perseus' group by 1) t));
+            where h.provenienza in ('perseus', 'wikizionario') group by 1) t));
   return r;
 end $$;
-comment on function importa_etimi_dizionari() is 'Etimologie del Lewis & Short e dell’LSJ (tag <etym>), e l’analisi della forma (prefisso e base), per le voci di latino e greco che non ne hanno altre: scritte solo dove cambiano.';
+comment on function importa_etimi_dizionari() is 'Etimologie del Lewis & Short e dell’LSJ (tag <etym>), del Wikizionario e l’analisi della forma, per le voci che non ne hanno altre; il confronto dei due Wiktionary (rimando dove concordano, alternativa con certezza 2 dove discordano): scritte solo dove cambiano.';
