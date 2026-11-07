@@ -21,3 +21,70 @@ select 'catene-da-sistemare', row_number() over (order by y.rango nulls last, y.
      group by l.id, l.lemma
     having bool_and(x.tipo = 'generico' and e.ricostruito and e.lemma like '%-')   -- una radice (*sek-), non una forma (*wardōn)
   ) y;
+
+-- 7 novembre 2026: secondo gruppo, «Passaggio sospetto». Le parole italiane d'uso comune (le prime 30.000 per frequenza)
+-- la cui catena accolta passa per un legame indeterminato tra due parole della stessa lingua che non hanno nemmeno un
+-- trigramma in comune, fuori dai composti: τύρρις «torre» < φιλία «amicizia» portava torre nella famiglia di φίλος.
+-- Quasi sempre è un confronto letto come origine. Una parola già nel primo gruppo non si ripete.
+insert into lista_lavoro (lista, posizione, lessema_id, gruppo, suggerimento)
+with recursive
+comuni as (
+  select l.id, min(f.rango) as rango, l.lemma
+    from lessema l join frequenza f on f.lingua = 'it' and f.forma = l.lemma
+   where l.lingua = 'it' and f.rango <= 30000
+   group by l.id, l.lemma),
+su (parola, id, prof) as (
+  select c.id, c.id, 0 from comuni c
+  union
+  select s.parola, x.etimo_id, s.prof + 1
+    from su s join ipotesi h on h.esito_id = s.id and h.stato = 'accolta'
+    join relazione x on x.ipotesi_id = h.id
+   where s.prof < 12),
+sospetti as (
+  select distinct s.parola, e.lemma as etimo, l.lemma as esito
+    from su s
+    join ipotesi h on h.esito_id = s.id and h.stato = 'accolta' and h.stato_editoriale = 'importato'
+    join relazione x on x.ipotesi_id = h.id and x.tipo = 'generico'   -- non le derivazioni: occupo < capio, θέμα < τίθημι sono giuste
+    join lessema l on l.id = x.esito_id
+    join lessema e on e.id = x.etimo_id and e.lingua = l.lingua and not e.ricostruito and not l.ricostruito
+   where (select count(*) from relazione y where y.ipotesi_id = h.id) = 1
+     and similarity(l.lemma_norm, e.lemma_norm) = 0
+     -- non le parole corte (invio < via), i nomi (Lola < Dolores), le radici semitiche scritte a lettere (أمير < ء م ر)
+     and length(l.lemma_norm) >= 4 and length(e.lemma_norm) >= 4
+     and not l.nome_proprio and not e.nome_proprio and e.lemma !~ '[ ־]')
+select 'catene-da-sistemare', coalesce((select max(posizione) from lista_lavoro where lista = 'catene-da-sistemare'), 0)
+         + row_number() over (order by c.rango, c.lemma), c.id, 'Passaggio sospetto',
+       'Nella catena ' || min(z.esito) || ' < ' || min(z.etimo) || ' non hanno niente in comune: controllare sulle fonti se è un etimo o un confronto.'
+  from sospetti z join comuni c on c.id = z.parola
+ group by c.id, c.rango, c.lemma
+on conflict do nothing;
+
+-- 7 novembre 2026: terzo gruppo, «Radice diversa da quella dichiarata». Le parole italiane che dichiarano la loro radice in
+-- Wiktionary (wiktionary_radice) e la cui catena, per i primi etimi, arriva a un'altra radice: otre arrivava a *kʷ- invece
+-- di *wed-, fusse a *h₁es- invece di *bʰuH-. Tra queste ci sono anche varianti di notazione della stessa radice (*h₂eh₁s- e
+-- *h₂eHs-) e composti con due radici: il suggerimento mostra le due radici, e chi controlla decide.
+insert into lista_lavoro (lista, posizione, lessema_id, gruppo, suggerimento)
+with recursive
+dich as (
+  select w.lessema_id, r.id as rid, r.lemma as rlemma
+    from wiktionary_radice w join lessema r on r.id = w.radice_id join lessema l on l.id = w.lessema_id
+   where l.lingua = 'it'),
+su (parola, id, prof) as (
+  select distinct lessema_id, lessema_id, 0 from dich
+  union
+  select s.parola, x.etimo_id, s.prof + 1
+    from su s join ipotesi h on h.esito_id = s.id and h.stato = 'accolta'
+    join relazione x on x.ipotesi_id = h.id and x.ordine = 1
+   where s.prof < 15),
+cima as (select distinct on (parola) parola, id from su order by parola, prof desc)
+select 'catene-da-sistemare', coalesce((select max(posizione) from lista_lavoro where lista = 'catene-da-sistemare'), 0)
+         + row_number() over (order by min(l.lemma)), k.parola, 'Radice diversa da quella dichiarata',
+       'La catena arriva a *' || min(c.lemma) || ', Wiktionary dichiara *' || string_agg(distinct d.rlemma, ', *')
+         || ': un errore, una variante di notazione o un composto con due radici.'
+  from cima k join lessema l on l.id = k.parola join lessema c on c.id = k.id
+  join dich d on d.lessema_id = k.parola
+ where c.ricostruito and c.lemma like '%-'
+   and not exists (select 1 from dich d2 where d2.lessema_id = k.parola and (d2.rid = k.id or d2.rlemma = c.lemma))
+   and not exists (select 1 from su s2 join dich d3 on d3.lessema_id = s2.parola and d3.rid = s2.id where s2.parola = k.parola)
+ group by k.parola
+on conflict do nothing;
