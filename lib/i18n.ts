@@ -34,6 +34,8 @@ export interface Testi {
   discendentiN: (n: number) => string;
   lingue: string;
   lingueNota: string;
+  alberoL: { conta: (lingue: number, parole: number) => string; varieta: string; altre: (n: number) => string; altreLingue: string;
+             altreFamiglie: string; altreFamiglieN: (famiglie: number, lingue: number) => string; indoeuropee: string };
   famiglia: (f: string) => string;
   indietro: string;
   stemmaTitolo: (lemma: string) => string;
@@ -274,7 +276,16 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     capostipitiNota: 'Parole da cui discende una famiglia, ma la cui etimologia non è ancora stata risalita.',
     discendentiN: (n) => `${n} ${n === 1 ? 'discendente' : 'discendenti'}`,
     lingue: 'Lingue',
-    lingueNota: 'Si può entrare da qualunque lingua: nessuna è privilegiata.',
+    lingueNota: 'Le lingue del dizionario nel loro albero genealogico: famiglia, ramo e discendenza, dalla protolingua alle lingue di oggi. Si può entrare da qualunque lingua.',
+    alberoL: {
+      conta: (l, p) => `${l.toLocaleString('it-IT')} ${l === 1 ? 'lingua' : 'lingue'} · ${p.toLocaleString('it-IT')} parole`,
+      varieta: 'varietà',
+      altre: (n) => (n === 1 ? 'e un’altra' : `e altre ${n}`),
+      altreLingue: 'Altre lingue della famiglia',
+      altreFamiglie: 'Altre famiglie',
+      altreFamiglieN: (f, l) => `altre ${f} famiglie · ${l.toLocaleString('it-IT')} lingue`,
+      indoeuropee: 'Lingue indoeuropee',
+    },
     famiglia: (f) => `Famiglia ${f.toLowerCase()}`,
     indietro: 'Indietro',
     stemmaTitolo: (l) => `${l}, famiglia di parole`,
@@ -509,7 +520,16 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     capostipitiNota: 'Words from which a family descends, but whose own etymology has not yet been traced.',
     discendentiN: (n) => `${n} ${n === 1 ? 'descendant' : 'descendants'}`,
     lingue: 'Languages',
-    lingueNota: 'You can start from any language: none is privileged.',
+    lingueNota: 'The languages of the dictionary in their family tree: family, branch and descent, from the proto-language to the languages of today. You can start from any language.',
+    alberoL: {
+      conta: (l, p) => `${l.toLocaleString('en-GB')} ${l === 1 ? 'language' : 'languages'} · ${p.toLocaleString('en-GB')} words`,
+      varieta: 'varieties',
+      altre: (n) => `and ${n} more`,
+      altreLingue: 'Other languages of the family',
+      altreFamiglie: 'Other families',
+      altreFamiglieN: (f, l) => `${f} more families · ${l.toLocaleString('en-GB')} languages`,
+      indoeuropee: 'Indo-European languages',
+    },
     famiglia: (f) => `${f} family`,
     indietro: 'Back',
     stemmaTitolo: (l) => `${l}, word family`,

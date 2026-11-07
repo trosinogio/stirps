@@ -29,6 +29,7 @@ const APPOGGIO = [
   ['stg_dizionario', 'dizionari'], ['stg_autore', 'autori'], ['stg_stima', 'stime'],
   ['stg_definizione', 'definizioni'], ['stg_pronuncia', 'pronunce'],
   ['stg_sensi', 'sensi'], ['stg_etimo_dizionario', 'etimi_dizionari'], ['stg_forma', 'forme_it'],
+  ['stg_lingua_wikt', 'lingue_wiktionary'], ['stg_famiglia_wikt', 'famiglie_wiktionary'],
 ];
 const BLOCCO = 5000;
 // impronta del pacchetto dati: se cambia, al deploy si rifà l'import
@@ -57,6 +58,8 @@ async function importa(client, pulisci) {
     await client.query(`analyze ${APPOGGIO.map(([t]) => t).join(', ')}`);   // stime giuste per i piani della fusione
     const { rows: [r] } = await client.query('select importa_wiktionary() as r');
     console.log('[db] fusione:', JSON.stringify(r.r), `(${secondi()} s)`);
+    const { rows: [lw] } = await client.query('select importa_lingue_wiktionary() as l');
+    console.log('[db] lingue di Wiktionary:', JSON.stringify(lw.l), `(${secondi()} s)`);
     if (pulisci) {
       const { rows: [p] } = await client.query('select pulisci_wiktionary() as p');
       console.log('[db] pulizia:', JSON.stringify(p.p), `(${secondi()} s)`);
@@ -123,7 +126,7 @@ const campo = (x) => (x === '\\N' ? null : x.replace(/\\\\/g, '\\'));
 
 async function carica(client, tabella, file) {
   // i dizionari possono mancare in un pacchetto vecchio: la tabella resta vuota e importa_dizionari() non fa nulla
-  if (['dizionari', 'autori', 'stime', 'definizioni', 'pronunce', 'sensi', 'etimi_dizionari', 'forme_it'].includes(file) && !existsSync(`dati/${file}.tsv.gz`)) return 0;
+  if (['dizionari', 'autori', 'stime', 'definizioni', 'pronunce', 'sensi', 'etimi_dizionari', 'forme_it', 'lingue_wiktionary', 'famiglie_wiktionary'].includes(file) && !existsSync(`dati/${file}.tsv.gz`)) return 0;
   const { rows: colonne } = await client.query(
     `select attname as nome, format_type(atttypid, atttypmod) as tipo from pg_attribute
       where attrelid = $1::regclass and attnum > 0 and not attisdropped order by attnum`, [tabella]);

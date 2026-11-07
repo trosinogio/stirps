@@ -522,4 +522,27 @@ begin
 exception when sqlstate 'P0098' then null;
 end $$;
 
+\echo '— lingue: famiglia, ramo, antenato e nome da Wiktionary'
+do $$
+begin
+  insert into lingua (codice, nome, sigla) values ('eu', 'Basque', 'eu'), ('ca', 'Catalan', 'ca'), ('xx-prova', 'calque of Prova', 'xx')
+  on conflict do nothing;
+  truncate stg_lingua_wikt, stg_famiglia_wikt;
+  insert into stg_famiglia_wikt values ('euq', 'Vasconic', ''), ('ine', 'Indo-European', ''), ('itc', 'Italic', 'ine'),
+    ('roa', 'Romance', 'itc');
+  insert into stg_lingua_wikt values ('eu', 'Basque', 'euq', '', '', '', 'Q8752', 'basco'),
+    ('ca', 'Catalan', 'roa', 'roa-oca', '', '', 'Q7026', 'catalano'), ('roa-oca', 'Old Catalan', '', '', 'la', 'etimologica', '', ''),
+    ('xx-prova', 'Prova', 'euq', '', '', '', '', '');
+  perform importa_lingue_wiktionary();
+  perform pg_temp.verifica(
+    (select famiglia = 'vasconica' and nome = 'basco' from lingua where codice = 'eu')
+    and (select famiglia = 'indoeuropea' and ramo = 'italica' and antenato = 'la' from lingua where codice = 'ca')
+    and (select nome = 'Prova' from lingua where codice = 'xx-prova')
+    and (select famiglia from lingua where codice = 'la') = 'indoeuropea',
+    'le lingue senza famiglia la prendono da Wiktionary (basco: vasconica; catalano: italica, dal latino attraverso il catalano antico), i nomi letti male si correggono, quelle già classificate non cambiano');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
+truncate stg_lingua_wikt, stg_famiglia_wikt;
+
 \echo '— collaudo dell’import completato'
