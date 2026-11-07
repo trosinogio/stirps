@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Stima di un import prima di farlo: confronta il pacchetto dati nuovo con quello di prima, conta le righe nuove e ne
-calcola lo spazio nel database con i byte per riga misurati sul database vero. Misura quanto le lingue si incontrano
+calcola lo spazio nel database con i byte per riga misurati sul database vero. Conta le voci senza etimologia, per lingua, prima e dopo. Misura quanto le lingue si incontrano
 (famiglie con più lingue moderne, prestiti tra lingue moderne) e, per ogni lingua esaminata, che voci entrano, in quali
 famiglie, quanto costano gli ambiti possibili e un campione di catene da guardare a mano.
 
@@ -104,8 +104,14 @@ if __name__ == '__main__':
     print('voci nuove per lingua:', ', '.join(f'{l} {n}' for l, n in per.most_common(15)))
 
     # le lingue si incontrano: famiglie con più lingue moderne, prestiti tra lingue moderne
-    _, p_primo, _, p_archi, _ = grafo(prima_d)
+    p_accolta, p_primo, _, p_archi, _ = grafo(prima_d)
     accolta, primo, etimi, archi, n_rel = grafo(dopo_d)
+    # le voci senza etimologia (le radici escluse), per lingua: le lingue di chiusura nuove collegano quelle che c'erano già
+    orfane = lambda less, acc: Counter(r[1] for k, r in less.items() if k not in acc and not r[2].endswith('-'))
+    po, do = orfane(p_less, p_accolta), orfane(d_less, accolta)
+    tot = Counter(r[1] for r in d_less.values())
+    print(f'\nvoci senza etimologia: {sum(po.values())} → {sum(do.values())}; dove cambiano di più:',
+          ', '.join(f'{l} {po[l]} → {do[l]} (su {tot[l]})' for l in sorted(po, key=lambda l: do[l] - po[l])[:20]))
     p_fam, d_fam = famiglie(p_less, p_primo), famiglie(d_less, primo)
     soglia = lambda f, n: sum(1 for v in f.values() if len(v) >= n)
     print(f'\nfamiglie con almeno 2 lingue moderne: {soglia(p_fam, 2)} → {soglia(d_fam, 2)}; con almeno 3: '
