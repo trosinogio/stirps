@@ -1,4 +1,5 @@
--- 31 ottobre 2026: storie di parole composte dai dati, sempre nuove.
+-- 31 ottobre 2026: storie di parole composte dai dati, sempre nuove. (v5, 7 novembre: una storia «parenti» per coppia,
+-- anche quando la coppia sta in due famiglie.)
 -- mv_storie raccoglie i candidati (tra le parole italiane d'uso comune) di quattro tipi:
 --   due_strade  allotropi: la stessa parola entrata due volte, per via popolare e per via dotta (burro, butirro)
 --   parenti     parole della stessa famiglia indoeuropea arrivate per strade diverse (idea, vedere)
@@ -11,7 +12,7 @@
 do $$
 begin
   if to_regclass('mv_storie') is not null
-     and coalesce(obj_description(to_regclass('mv_storie'), 'pg_class'), '') <> 'storie v4' then
+     and coalesce(obj_description(to_regclass('mv_storie'), 'pg_class'), '') <> 'storie v5' then
     drop materialized view mv_storie cascade;
   end if;
 end $$;
@@ -91,9 +92,12 @@ select 'due_strade'::text as tipo, 'due:' || m.a_id || '-' || m.b_id as chiave,
    and exists (select 1 from antenati x where x.parola = m.b_id and x.id = m.antenato)
    and regexp_replace(la.lemma, '[aeiou]$', '') <> regexp_replace(lb.lemma, '[aeiou]$', '')   -- esso, essa: forme, non strade
 union all
-select 'parenti', 'parenti:' || c.a_id || '-' || c.b_id, round(100000.0 / c.peso, 3), c.pubblico,
-       jsonb_build_object('radice', c.capo, 'a', c.a_id, 'b', c.b_id)
-  from coppie c where c.k <= 5
+-- una coppia può stare in due famiglie (un composto ha due radici): una storia sola, con la prima radice
+select * from (
+  select distinct on (c.a_id, c.b_id) 'parenti', 'parenti:' || c.a_id || '-' || c.b_id, round(100000.0 / c.peso, 3), c.pubblico,
+         jsonb_build_object('radice', c.capo, 'a', c.a_id, 'b', c.b_id)
+    from coppie c where c.k <= 5
+   order by c.a_id, c.b_id, c.capo) parenti_una_volta
 union all
 select 'viaggio', 'viaggio:' || p.parola,
        round(cardinality(p.famiglie) * 10 + cardinality(p.vie) * 5 + p.attestate * 2 - c.rango / 10000.0, 3), p.pubblico,
@@ -107,7 +111,7 @@ select 'famiglia', 'famiglia:' || f.capo, count(*), bool_and(f.pubblico),
   from fam f
  group by f.capo having count(*) >= 8;
 
-comment on materialized view mv_storie is 'storie v4';
+comment on materialized view mv_storie is 'storie v5';
 create unique index if not exists mv_storie_chiave on mv_storie (chiave);
 create index if not exists mv_storie_tipo on mv_storie (tipo, punteggio desc);
 
