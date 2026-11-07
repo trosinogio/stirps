@@ -414,9 +414,20 @@ begin
       'l''indice segue l''alfabeto: 23 lettere latine (uxor sotto V, iam e jam sotto I, niente W), 24 greche (niente Ϝ)');
     perform pg_temp.verifica(
       exists (select 1 from jsonb_array_elements(nomi->'parole') x where x->>'lemma' = 'Iuliusprova')
-      and exists (select 1 from jsonb_array_elements(parole_lingua('la', 'it', true, 'R')->'parole') x where x->>'lemma' = 'Romanusprova')
-      and (nomi->>'totale_nomi')::int > 0,
-      'i nomi propri hanno un indice a parte (Iulius); gli aggettivi con la maiuscola restano tra le parole (Romanus)');
+      and exists (select 1 from jsonb_array_elements(parole_lingua('la', 'it', true, 'R', true)->'parole') x where x->>'lemma' = 'Romanusprova')
+      and not exists (select 1 from jsonb_array_elements(parole_lingua('la', 'it', true, 'R')->'parole') x where x->>'lemma' = 'Romanusprova')
+      and (nomi->>'totale_nomi')::int > 0
+      and (select nodo_json(id)->>'nome_proprio' from lessema where lemma = 'Romanusprova') = 'true',
+      'l''indice dei nomi propri e derivati raccoglie i nomi (Iulius) e le altre voci con la maiuscola (Romanus, aggettivo)');
+    insert into lessema (lingua, lemma, pos, glossa_lingua, stato_editoriale) values
+      ('de', 'Hausprova', 's.', 'it', 'bozza'), ('en', 'I', 'pron.', 'it', 'bozza');
+    perform pg_temp.verifica(
+      (select count(*) from lessema where lemma in ('Hausprova', 'I') and nome_indice) = 0
+      and (select nome_indice from lessema where lemma = 'Romanusprova'),
+      'il tedesco scrive con la maiuscola tutti i nomi, e il pronome inglese I non è un nome: restano tra le parole');
+    update lessema set pos = 'np' where lemma = 'Romanusprova';
+    perform pg_temp.verifica((select nome_indice is null and nome_proprio from lessema where lemma = 'Romanusprova'),
+      'se una voce diventa un nome (np) la segna nome_proprio, e nome_indice si spegne');
     raise exception using errcode = 'P0098', message = 'annulla';
   exception when sqlstate 'P0098' then null;
   end;
@@ -437,7 +448,7 @@ select pg_temp.prova_e_annulla(array[
   'una stima entra con la sua confidenza e la scheda la presenta come tale');
 
 select pg_temp.verifica(
-  (select bool_and((nodo_json(id)->>'nome_proprio')::boolean is not distinct from nome_proprio) from lessema),
+  (select bool_and((nodo_json(id)->>'nome_proprio')::boolean is not distinct from (nome_proprio or coalesce(nome_indice, false))) from lessema),
   'nodo_json dice se una voce è un nome proprio: lo stemma li nasconde finché non si chiede di vederli');
 
 select pg_temp.verifica(
