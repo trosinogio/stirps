@@ -360,6 +360,28 @@ def etimo_esterno(lingua, v):
     return False
 
 
+# Wiktionary disegna un albero etimologico prima del testo, e Kaikki lo restituisce appiattito: «Etymology tree Latin
+# obstruō Proto-Indo-European *-tis … Latin obstrūctiō From obstruō + -tiō.» Il testo vero comincia con una formula fissa.
+INIZIO_PROSA = re.compile(r'\b(?:Inherited from|Borrowed from|Learned borrowing|Semi-learned borrowing|Orthographic borrowing|'
+                          r'Unadapted borrowing|Partial calque|Calque of|Semantic loan|Derived from|From|Back-formation|'
+                          r'Clipping of|Ellipsis of|Univerbation|Compound of|Blend of|Short for|Abbreviation of|Coined|'
+                          r'Named after|Possibly|Probably|Perhaps|Likely|Uncertain|Unknown|Of uncertain|Of unknown|'
+                          r'Onomatopoeic|Imitative|Equivalent to|Doublet of|Alteration of|Reborrowing|Diminutive of|'
+                          r'Augmentative of|Ultimately from|Variant of|Contraction of|Reduplication)\b')
+
+
+def senza_albero(testo):
+    """Il testo etimologico senza l'albero appiattito che lo precede, e senza l'etichetta che a volte lo introduce
+    («PIE word *wisós Etymology tree …»); vuoto se c'è solo l'albero."""
+    i = (testo or '').find('Etymology tree')
+    if i < 0:
+        return testo
+    prima = testo[:i].strip() if i > 80 else ''      # in testa c'è solo un'etichetta; più avanti, prosa vera
+    m = INIZIO_PROSA.search(testo, i + len('Etymology tree'))
+    dopo = senza_albero(testo[m.start():]) if m else ''
+    return ' '.join(x for x in (prima, dopo) if x)
+
+
 def lemma_valido(lingua, lemma, ricostruito=False):
     if not (lemma or '').strip('*- '):
         return False                    # un lemma vuoto («itc-pro:» da un termine senza parola) non è una voce
@@ -554,7 +576,7 @@ class Importatore:
         lingua_voce = lingua_voce or LINGUA
         parola, etimn = parola or v['w'], v.get('en')
         omo = int(etimn) if etimn and str(etimn).isdigit() else 1
-        testo = v.get('t') or ''
+        testo = senza_albero(v.get('t') or '')
         pos = POS.get(v.get('p'))
         if v.get('p') == 'noun':
             g = ((v.get('h') or [{}])[0].get('a') or {}).get('1', '')
