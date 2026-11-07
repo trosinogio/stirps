@@ -102,6 +102,12 @@ if [ "$DIZIONARI" = 1 ]; then
   cat "$DATI/rapporto_perseus.txt"
   # le voci di latino e greco ancora senza etimologia che sono un prefisso e una parola nota (analisi della forma)
   python3 analisi_composti.py "$DATI/tsv/etimi_dizionari.tsv" "$DATI/tsv/lessemi.tsv" "$DATI/tsv/dizionari.tsv" "$DATI/tsv/ipotesi.tsv"
+  # per il greco restano solo le regole che, misurate sulle voci di etimologia nota, indovinano la famiglia (apprendi_greco.py)
+  if ! python3 apprendi_greco.py "$DATI/tsv/etimi_dizionari.tsv" "$DATI/tsv/lessemi.tsv" "$DATI/tsv/dizionari.tsv" \
+       "$DATI/tsv/ipotesi.tsv" "$DATI/tsv/relazioni.tsv" 2> "$DATI/rapporto_greco.txt"; then
+    cat "$DATI/rapporto_greco.txt" >&2; exit 1
+  fi
+  cat "$DATI/rapporto_greco.txt"
   # stime della prima attestazione: l'autore datato più antico citato nella voce (DATAZIONI.md, passo 1)
   python3 datatore_dizionari.py autori "$DATI/tsv/autori.tsv"
   python3 datatore_dizionari.py stime "$DATI/tsv/autori.tsv" "$DATI/tsv/stime.tsv" "${locali[@]}"

@@ -222,6 +222,15 @@ etimi_di = lambda k: {(r['etimo'], r['tipo']) for r in imp.relazioni if r['esito
 assert (radio_, 'composizione') in etimi_di(imp.lessema('it', 'radioattivo')), etimi_di(imp.lessema('it', 'radioattivo'))
 assert not any(e == mente_ for e, _ in etimi_di(imp.lessema('it', 'velocemente')))
 assert not any(e == ulentus_ for e, _ in etimi_di(imp.lessema('la', 'vinolentus')))
+# greco: le regole che una coppia nota insegna (apprendi_greco.py), e una regola appresa che scatta solo su una base unica
+from apprendi_greco import regole_della_coppia as rc, Modello
+assert rc('σκοτιζω', ['σκοτοσ']) == [('S', 'ιζω', 'οσ')] and rc('καταβαινω', ['βαινω']) == [('P', 'κατα')]
+assert rc('λαμπαδηφοροσ', ['λαμπασ', 'φερω']) == [('C', 'φοροσ', 'φερω')] and rc('φιλοσοφοσ', ['φιλοσ', 'σοφοσ']) == [('C', 'σοφοσ', 'σοφοσ')]
+mg = Modello({'σκοτοσ': {'σκότος'}, 'κηρυσσω': {'κηρύσσω'}, 'ομοιοσ': {'ὅμοιος', 'ὁμοῖος'}}, {})
+mg.S['ιζω'].add('οσ'); mg.S['ξισ'].add('σσω'); mg.S['οω'].add('οσ')
+assert mg.scatti('σκοτιζω', 'σκοτίζω') == [(('S', 'ιζω', 'οσ'), ('σκότος',))]
+assert mg.scatti('κηρυξισ', 'κήρυξις') == [(('S', 'ξισ', 'σσω'), ('κηρύσσω',))]
+assert mg.scatti('ομοιοω', 'ὁμοιόω') == [], 'due basi con la stessa forma: nessuna previsione'
 # ricostruzioni alternative: *gʰeh₁bʰ- è una variante di *gʰebʰ- (Wiktionary lo dice), e habeō e give stanno in una
 # famiglia; il passaggio resta anche se la variante è una radice. *ker- e *ḱer- non si toccano
 from filtra import ricostruzioni_alternative as ra
