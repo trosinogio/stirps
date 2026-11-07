@@ -46,7 +46,11 @@ SCRITTURA = {'grc': re.compile(r'^[\u0370-\u03ff\u1f00-\u1fff]+$'), 'gkm': re.co
 LATINA = re.compile(r"^[A-Za-zÀ-ɏḀ-ỿ'’-]+$")
 # parole italiane che stanno dove dovrebbe stare l'etimo: «dall'inglese composto da soft e ware», «dal latino del …»
 NON_ETIMI = {'composto', 'composta', 'derivato', 'derivata', 'parola', 'termine', 'voce', 'nome', 'forma', 'verbo',
-             'del', 'della', 'dello', 'dei', 'degli', 'delle', 'il', 'lo', 'gli', 'un', 'una', 'uno'}
+             'del', 'della', 'dello', 'dei', 'degli', 'delle', 'il', 'lo', 'gli', 'un', 'una', 'uno',
+             # gli aggettivi delle varietà, quando una virgola li stacca: «dal latino tardo, aciarium» non è «tardo»
+             'tardo', 'medievale', 'volgare', 'classico', 'antico', 'moderno', 'parlato', 'popolare', 'ecclesiastico',
+             'scientifico', 'umanistico', 'cristiano', 'imperiale', 'arcaico', 'giuridico', 'botanico', 'bizantino',
+             'medio', 'ellenistico', 'letterario', 'dotto', 'basso', 'alto'}
 _LINGUA = '|'.join(sorted(map(re.escape, LINGUE), key=len, reverse=True))
 _PAROLA = r"([^\W\d_][\w'’-]*)"
 DALLA_LINGUA = re.compile(r"^(?:dal|dallo|dalla|dall['’]|deriva dal|deriva dallo|deriva dall['’])\s*(" + _LINGUA + r")\s+" + _PAROLA, re.I)

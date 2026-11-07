@@ -80,9 +80,10 @@ def distanza_uno(a, b):
     return a[i + (len(a) == len(b)):] == b[i + 1:]
 
 
-def classifica(elementi, catena):
+def classifica(elementi, catena, formazione_italiana=False):
     """elementi: [(lingua, etimo)] del Wikizionario; catena: {(famiglia di lingua, forma normalizzata)} di Wiktionary.
-    'concorda', 'discorda' o 'analisi' (due analisi italiane diverse)."""
+    'concorda', 'discorda' o 'analisi': due analisi italiane diverse, o una formazione italiana per Wiktionary
+    (ottaedro = otta- + -edro, formazione_italiana) e un prestito dotto per il Wikizionario (ὀκτάεδρος)."""
     def trovato(lingua, e):
         fl = famiglia_lingua(lingua)
         candidati = [f for (l2, f) in catena if l2 == fl or 'it' in (l2, fl)]
@@ -90,6 +91,8 @@ def classifica(elementi, catena):
     if all(trovato(l, e) for l, e in elementi):
         return 'concorda'
     if all(famiglia_lingua(l) == 'it' for l, e in elementi):
+        return 'analisi'
+    if formazione_italiana and all(famiglia_lingua(l) in ('la', 'grc') for l, e in elementi):
         return 'analisi'
     return 'discorda'
 
@@ -144,7 +147,9 @@ def main():
             esito[chiave] = None                 # un rimando non è un'etimologia da confrontare
             conta['rimandi tolti'] += 1
             continue
-        verdetto = classifica([(c[4], c[5]) for c in rr], catena(voci[0]))
+        primi = [lessemi[e][0] for e, _, _ in etimi_di[voci[0]] if e in lessemi]
+        verdetto = classifica([(c[4], c[5]) for c in rr], catena(voci[0]),
+                              formazione_italiana=bool(primi) and all(l == 'it' for l in primi))
         conta[verdetto] += 1
         esito[chiave] = {'concorda': 'Wikizionario-concorda', 'discorda': 'Wikizionario-discorda'}.get(verdetto)
         if len(esempi[verdetto]) < 15:
