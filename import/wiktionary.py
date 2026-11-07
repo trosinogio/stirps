@@ -25,7 +25,7 @@ CATENA = {'inh': 'eredita', 'inh+': 'eredita', 'bor': 'prestito', 'bor+': 'prest
           'lbor': 'prestito_dotto', 'slbor': 'semidotto', 'der': 'generico', 'der+': 'generico', 'uder': 'generico',
           'cal': 'calco', 'calque': 'calco', 'sl': 'calco_semantico', 'psm': 'calco'}
 LOCALI = {'bf': 'retroformazione', 'back-form': 'retroformazione', 'clipping': 'accorciamento', 'ellipsis': 'accorciamento',
-          'named-after': 'deonimico'}
+          'named-after': 'deonimico', 'deverbal': 'derivazione'}
 AFFISSI = {'af', 'affix', 'suffix', 'prefix', 'confix', 'compound', 'blend'}
 POS = {'verb': 'v.', 'adj': 'agg.', 'adv': 'avv.', 'name': 'np', 'prep': 'prep.', 'pron': 'pron.', 'conj': 'cong.',
        'intj': 'inter.', 'num': 'num.', 'det': 'det.', 'phrase': 'loc.', 'suffix': 'suff.', 'prefix': 'pref.'}
@@ -458,6 +458,18 @@ def antenato_lingua(c):
     return cur[6] if cur and cur[6] != c else None
 
 
+# una cima con almeno tante parole sotto non si lega a una radice per il voto di una parola sola (chiudi_su_radici)
+CIMA_GRANDE = 10
+
+
+def e_affisso(p):
+    """Un elemento di {{af}} che è un affisso: -ente, ab-, e anche *-eti (l'asterisco non nasconde il trattino). Una forma
+    ricostruita che finisce con il trattino è invece una radice o un tema, cioè la base: in {{af|ine-pro|*bʰer-|*-eti}}
+    la base di *bʰéreti è *bʰer-, non il suffisso."""
+    q = (p or '').lstrip('*')
+    return q.startswith('-') or (q.endswith('-') and not (p or '').startswith('*'))
+
+
 def forma_ricostruita(l):
     """«radice» per una radice ricostruita (*meh₂-, *(s)ker-), «tema» per un tema con un trattino interno (*meh₂-tu-,
     *wréǵ-ye-), None per il resto. Una radice è la cima della sua famiglia; un tema deriva dalla sua radice."""
@@ -656,11 +668,11 @@ class Importatore:
                     catena_attiva = False
                     continue
                 parti = self.parti_affissi(n, a)
-                basi = [p for p, _ in parti if not p.startswith('-') and not p.endswith('-')]
-                if any(p.endswith('-') and not p.startswith('-') for p, _ in parti) or len(basi) >= 2:
+                basi = [p for p, _ in parti if not e_affisso(p)]
+                if any(e_affisso(p) and not p.lstrip('*').startswith('-') for p, _ in parti) or len(basi) >= 2:
                     self.formazioni_ambigue.add(k0)
-                basi = [p for p in parti if not (p[0].startswith('-') or p[0].endswith('-'))]
-                affissi = [p[0] for p in parti if p[0].startswith('-') or p[0].endswith('-')]
+                basi = [p for p in parti if not e_affisso(p[0])]
+                affissi = [p[0] for p in parti if e_affisso(p[0])]
                 if not basi and len(parti) >= 2:
                     basi, affissi = parti, []        # fotografia = foto- + -grafia: i due elementi sono gli etimi
                     self.stat['composti_di_elementi'] += 1
@@ -670,10 +682,19 @@ class Importatore:
                     continue
                 tipo = 'derivazione' if len(basi) == 1 else 'composizione'
                 for i, (b, lb) in enumerate(basi, 1):
-                    kb = self.lessema(lb or codice_lingua(a.get('1')) or lingua_voce, b)
+                    lingua_b, forma_b = lb or codice_lingua(a.get('1')) or lingua_voce, None
+                    fx = None
+                    if not b.startswith('*'):
+                        # un elemento che è una forma flessa va al suo lemma, come forma citata (quattrocchi < occhio,
+                        # «occhi»); le altre forme e i participi li lega poi collega_participi()
+                        lr, pr, omo_r, fx = self.risolvi(lingua_b, b, None)
+                    if fx:
+                        kb, forma_b = self.lessema(lr, pr, omografo=omo_r), fx
+                    else:
+                        kb = self.lessema(lingua_b, b)
                     if kb != k0:
                         archi.append({'etimo': kb, 'esito': k0, 'tipo': tipo, 'ordine': i,
-                                      'affisso': ' '.join(affissi) or None, 'conf': 3, 'forma': None})
+                                      'affisso': ' '.join(affissi) or None, 'conf': 3, 'forma': forma_b})
                 primo = False
                 prec = None             # la catena non prosegue oltre l'analisi in affissi
                 continue
@@ -787,8 +808,10 @@ class Importatore:
             self.relazioni.append(x)
 
     # ---- chiusura delle catene: le voci delle lingue intermedie ----
-    def carica_chiusura(self, lingua, lemmi, forme=None, glosse=None):
-        """Indici di una lingua di chiusura, da caricare prima delle voci principali."""
+    def carica_chiusura(self, lingua, lemmi, forme=None, glosse=None, base=False):
+        """Indici di una lingua di chiusura, da caricare prima delle voci principali. Con base=True è la lingua di
+        partenza (--forme-base): servono solo i lemmi e le forme, e una forma flessa citata dentro la lingua va al suo
+        lemma, conservata come forma citata (quattrocchi < occhio, «occhi»), non resta una voce a sé."""
         voci = [json.loads(r) for r in open(lemmi, encoding='utf-8')]
         idx = {'voci': voci, 'lemmi': set(), 'omografi': defaultdict(list), 'forme': {}, 'participi': {}, 'flesse': {},
                'file_glosse': glosse}
@@ -837,7 +860,7 @@ class Importatore:
                 if pf not in migliori or rango < migliori[pf][0]:
                     migliori[pf] = (rango, l)
             for pf, (rango, l) in migliori.items():
-                dove = 'forme' if rango <= 2 else 'participi' if rango == 3 else 'flesse'
+                dove = 'forme' if rango <= 2 or (base and rango == 4) else 'participi' if rango == 3 else 'flesse'
                 idx[dove][pf] = l                        # il lemma conserva i macron (ēdūcō)
         self.chiusura[lingua] = idx
         self.stat[f'chiusura_{lingua}_voci_disponibili'] = len(voci)
@@ -1134,12 +1157,29 @@ class Importatore:
 
     # ---- radici dichiarate: la catena si chiude in cima con un legame indeterminato ----
     def chiudi_su_radici(self):
+        """Una cima senza etimo si lega alla radice che dichiarano le parole che ci arrivano, con tre cautele:
+        la radice di una parola che sta a metà della catena non va in cima (quintal dichiara la radice araba di qinṭār,
+        non quella di centum); una forma ricostruita non deriva dalla radice di una lingua attestata (*ḱm̥tóm non viene
+        dall'arabo); una cima grande non si lega per il voto di una parola sola che le sta sotto, perché quasi sempre
+        è un composto che dichiara la radice dell'altro suo elemento (immaterial per *méh₂tēr, omicidio per *ǵʰmṓ)."""
         accolte = {h['esito']: h['chiave'] for h in self.ipotesi.values() if h['stato'] == 'accolta'}
         primo_etimo = {}
         for r in self.relazioni:
             if r['ordine'] == 1 and accolte.get(r['esito']) == r['ipotesi']:
                 primo_etimo.setdefault(r['esito'], r['etimo'])
-        voti = defaultdict(Counter)
+        memo = {}
+
+        def cima_di(k):
+            cam, x = [], k
+            while x in primo_etimo and x not in memo and x not in cam:
+                cam.append(x)
+                x = primo_etimo[x]
+            top = memo.get(x, x)
+            for y in cam:
+                memo[y] = top
+            return top
+        sotto = Counter(cima_di(k) for k in primo_etimo)     # quante parole salgono fino a ogni cima
+        voti, diretti = defaultdict(Counter), defaultdict(Counter)
         for parola, radice in self.radici:
             cima, visti = parola, {parola}
             while cima in primo_etimo and primo_etimo[cima] not in visti:
@@ -1157,7 +1197,16 @@ class Importatore:
             if forma_ricostruita(self.lessemi[cima]) == 'radice':
                 self.stat['radici_dichiarate_in_conflitto'] += 1   # una radice non discende da un'altra radice
                 continue
+            lr = self.lessemi[radice]['lingua']
+            if lr != self.lessemi[cima]['lingua'] and any(self.lessemi[x]['lingua'] == lr for x in visti if x != cima):
+                self.stat['radici_di_una_parola_intermedia'] += 1
+                continue
+            if self.lessemi[cima]['ricostruito'] and not self.lessemi[radice]['ricostruito']:
+                self.stat['radici_attestate_per_forme_ricostruite'] += 1
+                continue
             voti[cima][radice] += 1
+            if parola == cima:
+                diretti[cima][radice] += 1
         for cima, conta in voti.items():
             # *leǵ- e *leǵ-@gather sono la stessa radice: la forma generica conta per l'unica variante precisa
             for r in [r for r in conta if '@' in r]:
@@ -1169,6 +1218,9 @@ class Importatore:
             (radice, n1), *resto = conta.most_common()
             if resto and n1 < 2 * resto[0][1]:
                 self.stat['radici_dichiarate_senza_maggioranza'] += 1
+                continue
+            if n1 < 2 and not diretti[cima][radice] and sotto[cima] >= CIMA_GRANDE:
+                self.stat['radici_con_un_solo_voto_lontano'] += 1
                 continue
             kh = cima + '#wikt-radice'
             self.ipotesi[kh] = {'chiave': kh, 'esito': cima, 'etichetta': 'Wiktionary (radice dichiarata)', 'stato': 'accolta',
@@ -1346,9 +1398,11 @@ def completa_glosse(imp, percorso, lingua=None):
 
 if __name__ == '__main__':
     # wiktionary.py lemmi.jsonl uscita/ [glosse.tsv] [--chiudi la=lemmi.jsonl,glosse.tsv,forme.tsv]… [--passi N]
+    #               [--forme-base it=forme.tsv]
     #               [--intere la,grc] [--con-etimologia en] [--elenco en=../dati/frequenze_en.tsv.gz] [--esterni en]
     #               [--glosse-precedenti ../dati/lessemi.tsv.gz]
     args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti = [], [], 1, set(), set(), {}, set(), {}
+    forme_base = None   # --forme-base it=forme.tsv: le forme flesse della lingua di partenza (filtra.py con FORME)
     it_ = iter(sys.argv[1:])
     for x in it_:
         if x == '--chiudi':
@@ -1370,6 +1424,8 @@ if __name__ == '__main__':
                         precedenti[c[0]] = c[7].replace('\\\\', '\\')
         elif x == '--esterni':
             esterni = {c for c in next(it_).split(',') if c}
+        elif x == '--forme-base':
+            forme_base = next(it_)
         elif x == '--con-etimologia':
             con_etimologia = {c for c in next(it_).split(',') if c}
         else:
@@ -1384,6 +1440,9 @@ if __name__ == '__main__':
         lingua, percorsi = c.split('=', 1)
         p = percorsi.split(',') + ['', '']
         imp.carica_chiusura(lingua, p[0], p[2] or None, p[1] or None)
+    if forme_base:
+        lingua_b, percorso_b = forme_base.split('=', 1)
+        imp.carica_chiusura(lingua_b, os.devnull, percorso_b, args[2] if len(args) > 2 else None, base=True)
     for riga in open(args[0], encoding='utf-8'):
         imp.voce(json.loads(riga))
     if len(args) > 2:

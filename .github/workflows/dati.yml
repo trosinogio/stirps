@@ -17,13 +17,19 @@ concurrency:
 jobs:
   dati:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 300   # con le lingue di chiusura delle parole orfane i dump da leggere sono una sessantina
     env:
       # le lingue di chiusura (import/importa.sh): l'inglese entra con tutte le voci che hanno un'etimologia
       # (CON_ETIMOLOGIA), con l'inglese medio e antico e il norreno (l'anglonormanno su Kaikki non c'è) per chiudere le sue catene
       # francese, tedesco e russo (stima del 6 novembre 2026), con le loro lingue antiche: francese medio, alto tedesco medio
       # e antico, slavo orientale antico e slavo ecclesiastico antico; un dump che Kaikki non ha è solo un avviso
-      CHIUSURA: 'la:Latin fro:Old French grc:Ancient Greek en:English enm:Middle English ang:Old English non:Old Norse fr:French frm:Middle French de:German gmh:Middle High German goh:Old High German ru:Russian orv:Old East Slavic cu:Old Church Slavonic'
+      # e le lingue di cui il dizionario ha già parole senza etimologia (diagnosi del 7 novembre 2026: napoletano 48 su 63,
+      # spagnolo 1.648 su 2.281, protoslavo 2.893 su 3.805…): di queste entrano solo le voci che le catene raggiungono
+      CHIUSURA: 'la:Latin fro:Old French grc:Ancient Greek en:English enm:Middle English ang:Old English non:Old Norse fr:French frm:Middle French de:German gmh:Middle High German goh:Old High German ru:Russian orv:Old East Slavic cu:Old Church Slavonic
+        nap:Neapolitan scn:Sicilian vec:Venetan lij:Ligurian sc:Sardinian lmo:Lombard pms:Piedmontese fur:Friulian es:Spanish osp:Old Spanish pt:Portuguese ca:Catalan oc:Occitan pro:Old Occitan ro:Romanian
+        ine-pro:Proto-Indo-European itc-pro:Proto-Italic grk-pro:Proto-Hellenic gem-pro:Proto-Germanic gmw-pro:Proto-West Germanic sla-pro:Proto-Slavic ine-bsl-pro:Proto-Balto-Slavic cel-pro:Proto-Celtic
+        nl:Dutch dum:Middle Dutch gml:Middle Low German osx:Old Saxon frk:Frankish got:Gothic yi:Yiddish pl:Polish ga:Irish
+        ar:Arabic he:Hebrew sa:Sanskrit hi:Hindi fa:Persian tr:Turkish ota:Ottoman Turkish ja:Japanese'
       INTERE: la,grc
       CON_ETIMOLOGIA: en,fr,de,ru
       # dell'inglese, il lessico comune (i lemmi tra le 50 mila forme più frequenti) e le parole con l'etimo fuori
@@ -32,6 +38,8 @@ jobs:
       ELENCHI: en=../dati/frequenze_en.tsv.gz fr=../dati/frequenze_fr.tsv.gz de=../dati/frequenze_de.tsv.gz ru=../dati/frequenze_ru.tsv.gz
       ESTERNI: en,fr,de,ru
       GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
+      # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
+      DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -130,7 +138,7 @@ jobs:
       - name: Pacchetto dati
         run: |
           t=import/dati/it/tsv
-          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni dizionari autori stime pronunce sensi; do
+          for f in lingue lessemi ipotesi relazioni doppioni radici attestazioni dizionari autori stime pronunce sensi etimi_dizionari; do
             gzip -9 -n -c "$t/$f.tsv" > "dati/$f.tsv.gz"
           done
           # voci per lingua, prima e dopo
@@ -166,8 +174,7 @@ jobs:
           # rispetto al pacchetto pubblicato, quello di main
           git fetch -q --depth 1 origin main
           for f in lessemi ipotesi relazioni attestazioni; do git show FETCH_HEAD:dati/$f.tsv.gz > /tmp/prima/$f.tsv.gz; done
-          python3 import/stima_import.py /tmp/prima dati fr,de,ru --attuale 557 \
-            --frequenze fr=dati/frequenze_fr.tsv.gz,de=dati/frequenze_de.tsv.gz,ru=dati/frequenze_ru.tsv.gz | tee /tmp/stima.txt
+          python3 import/stima_import.py /tmp/prima dati nap,es,sla-pro --attuale 850 | tee /tmp/stima.txt
           echo "::notice title=Stima::$(head -4 /tmp/stima.txt | tr '\n' ' ')"
 
       - name: Commit sul ramo

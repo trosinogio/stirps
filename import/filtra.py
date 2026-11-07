@@ -4,16 +4,19 @@ from collections import Counter
 LINGUA = os.environ.get('LINGUA', 'it')
 UTILI = {'inh', 'inh+', 'bor', 'bor+', 'lbor', 'slbor', 'ubor', 'obor', 'der', 'der+', 'uder', 'cal', 'calque', 'sl', 'psm',
          'bf', 'back-form', 'clipping', 'ellipsis', 'af', 'affix', 'suffix', 'prefix', 'confix', 'compound', 'blend',
-         'named-after', 'onom', 'onomatopoeic', 'unk', 'unc', 'root', 'doublet', 'dbt', 'it-deverbal', 'etydate'}
+         'named-after', 'onom', 'onomatopoeic', 'unk', 'unc', 'root', 'doublet', 'dbt', 'it-deverbal', 'etydate', 'deverbal'}
 MENZIONI = {'m', 'l', 'm+', 'mention', 'link', 'l-self'}
 # abbreviazioni dei modelli classici, con gli stessi argomenti
 ALIAS = {'suf': 'suffix', 'pre': 'prefix', 'com': 'compound', 'com+': 'compound', 'con': 'confix', 'univ': 'af',
          'univerbation': 'af', 'back-formation': 'bf', 'learned borrowing': 'lbor', 'semi-learned borrowing': 'slbor',
-         'borrowed': 'bor', 'inherited': 'inh', 'derived': 'der'}
+         'borrowed': 'bor', 'inherited': 'inh', 'derived': 'der',
+         # deverbale dalla prima persona del presente (it-deverbal fpp): stessi argomenti di it-deverbal; uno
+         # pseudoprestito (footing dall'inglese) ha gli argomenti di der: lingua, lingua d'origine, termine
+         'it-deverbal fpp': 'it-deverbal', 'pseudo-loan': 'der'}
 # i modelli che portano un etimo (gli altri utili sono radici, date, doppioni, origini ignote…)
 CON_ETIMO = {'inh', 'inh+', 'bor', 'bor+', 'lbor', 'slbor', 'ubor', 'obor', 'der', 'der+', 'uder', 'cal', 'calque', 'sl',
              'psm', 'bf', 'back-form', 'clipping', 'ellipsis', 'af', 'affix', 'suffix', 'prefix', 'confix', 'compound',
-             'blend', 'it-deverbal'}
+             'blend', 'it-deverbal', 'deverbal'}
 # {{ety}} e {{etymon}}, il sistema nuovo di Wiktionary (21.527 voci latine a novembre 2026): argomento 1 la lingua della
 # voce, poi parole chiave con i due punti (:inh, :bor, :af…) seguite dai loro termini, «lingua:termine<id:…><alt:…><t:…>»
 # o solo «termine» se è della stessa lingua; senza parola chiave vale :from. Dicono solo il primo livello: gli etimi
@@ -58,7 +61,7 @@ def porta_etimo(t):
     parti = [re.sub(r'<[^<>]*>', '', v).strip() for k, v in sorted(a.items()) if k.isdigit() and int(k) >= 2 and v and v.strip()]
     if n in ('af', 'affix', 'suffix', 'prefix', 'confix', 'compound', 'blend'):
         return len(parti) >= 2 or any(p and not p.startswith('-') and not p.endswith('-') for p in parti)
-    if n in ('bf', 'back-form', 'clipping', 'ellipsis', 'it-deverbal'):
+    if n in ('bf', 'back-form', 'clipping', 'ellipsis', 'it-deverbal', 'deverbal'):
         return bool(parti)
     return bool(re.sub(r'<[^<>]*>', '', a.get('3') or '').strip('*- '))
 
@@ -104,6 +107,21 @@ def da_ety(t, lingua):
         return {'name': nome, 'args': args, 'expansion': ''}
     return None
 DA_TESTO = re.compile(r'^\s*(from|derived from|deverbal from|back-formation from)\b', re.I)
+# Le etimologie scritte solo a parole, senza modelli («Deverbal of domandare», «Past participle of trovare»,
+# «From Latin dominus», «From divertire +‎ -ente»): i nomi delle lingue che si leggono nel testo
+LINGUE_TESTO = {'Latin': 'la', 'Late Latin': 'la', 'Medieval Latin': 'la', 'New Latin': 'la', 'Vulgar Latin': 'la-vul',
+                'Ancient Greek': 'grc', 'Byzantine Greek': 'gkm', 'French': 'fr', 'Old French': 'fro', 'Middle French': 'frm',
+                'English': 'en', 'Middle English': 'enm', 'Old English': 'ang', 'Spanish': 'es', 'Portuguese': 'pt',
+                'Catalan': 'ca', 'Occitan': 'oc', 'Old Occitan': 'pro', 'German': 'de', 'Arabic': 'ar', 'Persian': 'fa',
+                'Turkish': 'tr', 'Hebrew': 'he', 'Russian': 'ru', 'Neapolitan': 'nap', 'Sicilian': 'scn', 'Venetan': 'vec',
+                'Lombard': 'lmo', 'Old Italian': 'roa-oit', 'Italian': 'it', 'Japanese': 'ja', 'Dutch': 'nl'}
+_PAROLA = r"(?P<termine>[^\W\d_][\w'’-]*)"
+TESTO_DA = re.compile(r'^(?:(?:Borrowed|Learned borrowing|Inherited|Derived) )?[Ff]rom (?:(?P<lingua>'
+                      + '|'.join(sorted(map(re.escape, LINGUE_TESTO), key=len, reverse=True))
+                      + r') )?(?:the (?:verb|noun|adjective|adverb) )?' + _PAROLA + r'(?P<resto>.*)$')
+TESTO_DI = re.compile(r'^(?:Deverbal|Back-formation|Diminutive|Augmentative|Pejorative|Endearing form|Univerbation|'
+                      r'(?:Past|Present) participle) (?:of|from) (?:the (?:verb|noun|adjective) )?' + _PAROLA + r'\s*$')
+PIU = re.compile(r'^\s*\+\u200e?\s*(-?[^\W\d_][\w\'’-]*-?)')
 # Le glosse che descrivono una forma flessa: «second-person plural present passive indicative/imperative of contemperō»,
 # «genitive singular of nox», «superlative degree of piccolo», «past participle of fare». Servono quando Wiktionary non
 # marca il senso come forma (form_of, tag form-of): succede a qualche migliaio di voci latine e greche. Le varianti
@@ -233,8 +251,82 @@ def menzione_come_der(v):
              'e': m.get('expansion', '')}]
 
 
+def testo_come_der(v):
+    """Un'etimologia scritta solo a parole, senza nessun modello: la prima frase, se è semplice. «From Latin dominus»
+    (der dal latino), «From domandare» o «Deverbal of domandare» (der dalla stessa lingua), «Past participle of trovare»,
+    «From divertire +‎ -ente» (af). Niente se la frase confronta, dubita o parla di influssi: «From X, influenced by Y»
+    tiene X, ma «Possibly from X» o «Compare X» no."""
+    if v.get('etymology_templates'):
+        return []
+    testo = (v.get('etymology_text') or '').strip()
+    frase = re.split(r'[.;:(]|, (?:from|and|or|but|influenced|perhaps|possibly|probably)\b', testo, maxsplit=1)[0].strip(' ,')
+    if not frase or re.search(r'\b(?:compare|cognate|uncertain|unknown|possibly|probably|perhaps|influenc|cf)\b', frase, re.I):
+        return []
+    lingua_voce = v.get('lang_code') or LINGUA
+    m = TESTO_DI.match(frase)
+    if m:
+        return [{'n': 'der', 'a': {'1': lingua_voce, '2': lingua_voce, '3': m.group('termine')}, 'e': ''}]
+    m = TESTO_DA.match(frase)
+    if not m:
+        return []
+    resto, parti = m.group('resto'), [m.group('termine')]
+    while True:
+        p = PIU.match(resto)
+        if not p:
+            break
+        parti.append(p.group(1))
+        resto = resto[p.end():]
+    if resto.strip(' ,'):
+        return []                         # altro testo dopo l'etimo: la frase non è semplice
+    lingua = LINGUE_TESTO.get(m.group('lingua') or '', lingua_voce)
+    if len(parti) > 1:
+        if lingua != lingua_voce:
+            return []
+        return [{'n': 'af', 'a': {'1': lingua_voce, **{str(i): x for i, x in enumerate(parti, 2)}}, 'e': ''}]
+    return [{'n': 'der', 'a': {'1': lingua_voce, '2': lingua, '3': parti[0]}, 'e': ''}]
+
+
+PAROLA_SOLA = re.compile(r"[^\W\d_][\w'’-]*")
+
+
+def modello_di_ripiego(v):
+    """I modelli italiani che dicono l'etimo con una forma loro, quando la voce non ne ha un altro: il composto di verbo e
+    oggetto ({{it-verb-obj|girare|Sole}}: girasole = girare + sole), «From l'aquila» ({{from|it|l'aquila}}), la
+    contrazione di parole singole ({{contraction|it|ci|è}}: c'è), non di una frase (vaffanculo)."""
+    netto = lambda x: re.sub(r'<[^<>]*>', '', x or '').strip()
+    for t in v.get('etymology_templates') or []:
+        n, a = t.get('name'), t.get('args') or {}
+        if n == 'it-verb-obj' and a.get('1') and a.get('2'):
+            return [{'n': 'af', 'a': {'1': 'it', '2': netto(a['1']), '3': netto(a['2'])}, 'e': t.get('expansion', '')}]
+        if n == 'from' and PAROLA_SOLA.fullmatch(netto(a.get('2'))):
+            lv = a.get('1') or LINGUA
+            return [{'n': 'der', 'a': {'1': lv, '2': lv, '3': netto(a['2'])}, 'e': t.get('expansion', '')}]
+        if n == 'contraction':
+            lv = a.get('1') or LINGUA
+            parti = [netto(x) for k, x in sorted(a.items()) if k.isdigit() and int(k) >= 2 and x]
+            if parti and all(PAROLA_SOLA.fullmatch(p) for p in parti):
+                if len(parti) == 1:
+                    return [{'n': 'der', 'a': {'1': lv, '2': lv, '3': parti[0]}, 'e': t.get('expansion', '')}]
+                return [{'n': 'af', 'a': {'1': lv, **{str(i): p for i, p in enumerate(parti, 2)}}, 'e': t.get('expansion', '')}]
+    return []
+
+
+def surf_come_af(v):
+    """{{surf}} (l'analisi di superficie: «By surface analysis, divertire +‎ -ente») vale come af solo se la voce non
+    ha nessun altro etimo."""
+    t = next((t for t in v.get('etymology_templates') or [] if t.get('name') in ('surf', 'surface analysis')), None)
+    if not t:
+        return []
+    a = t.get('args') or {}
+    parti = {k: x for k, x in a.items() if k.isdigit() and int(k) >= 2 and x}
+    if len(parti) < 2 or v.get('word') in parti.values():          # de = «la» + «de»: un'analisi di sé stessa no
+        return []
+    return [{'n': 'af', 'a': {'1': a.get('1') or LINGUA, **parti}, 'e': t.get('expansion', '')}]
+
+
 if __name__ == '__main__':
-    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = non_parole = 0
+    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = non_parole = dal_testo = 0
+    esempi_testo = 0
     out = open(sys.argv[1], 'w', encoding='utf-8')
     glosse = open(sys.argv[2], 'w', encoding='utf-8')
     forme = open(os.environ['FORME'], 'w', encoding='utf-8') if os.environ.get('FORME') else None
@@ -305,6 +397,13 @@ if __name__ == '__main__':
             tpl = menzione_come_der(v)
             promosse += bool(tpl)
         if not tpl:
+            tpl = surf_come_af(v) or modello_di_ripiego(v) or testo_come_der(v)
+            dal_testo += bool(tpl)
+            if tpl and esempi_testo < 25:
+                esempi_testo += 1
+                print('  dal testo: ' + json.dumps({'parola': v.get('word'), 'testo': (v.get('etymology_text') or '')[:160],
+                                                    'modello': tpl[0]}, ensure_ascii=False), file=sys.stderr)
+        if not tpl:
             senza += 1
             nomi = sorted({t.get('name') or '' for t in (v.get('etymology_templates') or [])} - {''})
             causa = 'modelli non letti' if nomi else 'solo testo' if (v.get('etymology_text') or '').strip() else 'nessuna etimologia'
@@ -325,7 +424,7 @@ if __name__ == '__main__':
                               'se': dati_scheda(v),
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
-    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, da {{{{ety}}}} {dalla_ety}), forme flesse {flesse} '
+    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}, sigle e simboli esclusi {non_parole}', file=sys.stderr)
     if senza:

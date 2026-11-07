@@ -126,7 +126,8 @@ select pg_temp.verifica((select count(*) from lessema where lingua = 'arc' and s
   'una sola voce aramaica per אבא: i segni vocalici non creano doppioni');
 
 \echo '— latino e greco interi (--intere la,grc)'
-select pg_temp.verifica(lx('la/carus') is not null and not exists (select 1 from relazione x where x.etimo_id = lx('la/carus')),
+select pg_temp.verifica(lx('la/carus') is not null
+                        and not exists (select 1 from relazione x where x.etimo_id = lx('la/carus') and x.provenienza = 'wiktionary'),
   'una voce latina che nessuna catena italiana raggiunge entra lo stesso: cārus');
 select pg_temp.verifica(pg_temp.antenati_slug('la/carus') @> array['itc-pro/karos', 'ine-pro/keh2ros'],
   'e porta con sé la sua catena: cārus < *kāros < *kéh₂ros');
@@ -445,5 +446,58 @@ select pg_temp.verifica((select testa || '|' || (sensi->1->>1) from sensi where 
   'la riga delle forme e le accezioni con le etichette d''uso entrano');
 select pg_temp.verifica((select (r->>'nuove')::int + (r->>'cambiate')::int from (select importa_sensi() as r) x) = 0,
   'accezioni uguali non si riscrivono');
+
+\echo '— traslitterazioni nuove'
+do $$
+begin
+  insert into lessema (lingua, lemma, omografo, translit, provenienza, stato_editoriale, id_esterno)
+    values ('grc', 'ζζα', 1, 'zza', 'wiktionary', 'importato', 'prova:zza'), ('grc', 'ζζβ', 1, 'zzb', 'wiktionary', 'importato', 'prova:zzb');
+  insert into stg_lessema (chiave, lingua, lemma, omografo, ricostruito, translit)
+    values ('prova:zza', 'grc', 'ζζα', 1, false, 'zzz'), ('prova:zzb', 'grc', 'ζζβ', 1, false, 'zzz');
+  perform importa_wiktionary();
+  perform pg_temp.verifica((select count(*) from lessema where slug = 'grc/zzz') = 1,
+    'due voci che con la traslitterazione nuova andrebbero allo stesso indirizzo: ne cambia una, e l''import non si ferma');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
+
+\echo '— etimologie dei dizionari e analisi della forma'
+select pg_temp.verifica(
+  (select h.etichetta = 'Lewis & Short' and h.stato = 'accolta' and h.confidenza = 3 and h.provenienza = 'perseus'
+          and (select string_agg(e.lemma || ':' || x.tipo, ',') from relazione x join lessema e on e.id = x.etimo_id
+                where x.ipotesi_id = h.id) = 'carus:derivazione'
+          and exists (select 1 from rimando m join opera o on o.id = m.opera_id
+                       where m.ipotesi_id = h.id and o.sigla = 'Lewis–Short' and m.sv = 'Carus')
+     from ipotesi h where h.esito_id = lx('la/carus-2')),
+  'una voce senza etimologia riceve quella del dizionario, citato come fonte (Carus ← carus, Lewis & Short); l''analisi della forma cede al dizionario');
+select pg_temp.verifica(
+  (select h.etichetta = 'Analisi della forma' and h.confidenza = 2
+          and (select x.affisso || x.confidenza from relazione x where x.ipotesi_id = h.id) = 're-2'
+          and not exists (select 1 from rimando m where m.ipotesi_id = h.id)
+     from ipotesi h where h.esito_id = lx('la/moveo') and h.provenienza = 'perseus'),
+  'l''analisi della forma entra con certezza 2, senza fonte, con il prefisso come affisso');
+select pg_temp.verifica(
+  not exists (select 1 from ipotesi h where h.provenienza = 'perseus'
+                 and h.esito_id in (lx('la/mobilis'), lx('la/abactus-2'), lx('grc/akris-2'))),
+  'niente etimologia dei dizionari dove Wiktionary ne dà una (mobilis) o dove l''etimo non è tra le voci (abactus ← abigo, ἄκρις ← ἄκρος)');
+create temp table ed_prima as select id, xmin::text as v from ipotesi where provenienza = 'perseus';
+select pg_temp.verifica(
+  (select (r->>'etimologie_nuove')::int + (r->>'etimologie_tolte')::int from (select importa_etimi_dizionari() as r) x) = 0
+  and not exists (select 1 from ipotesi h join ed_prima p on p.id = h.id where h.xmin::text <> p.v),
+  'un nuovo import delle etimologie dei dizionari non riscrive niente');
+do $$
+begin
+  insert into ipotesi (esito_id, etichetta, stato, confidenza, origine, provenienza, stato_editoriale, id_esterno)
+    values (lx('la/moveo'), 'Wiktionary', 'alternativa', 3, 'etimo', 'wiktionary', 'importato', 'prova:moveo#wikt');
+  insert into stg_ipotesi (chiave, esito, etichetta, stato, confidenza, origine)
+    values ('prova:moveo#wikt', 'prova:moveo', 'Wiktionary', 'accolta', 3, 'etimo');
+  perform importa_etimi_dizionari();
+  perform pg_temp.verifica(
+    (select stato from ipotesi where id_esterno = 'prova:moveo#wikt') = 'accolta'
+    and not exists (select 1 from ipotesi where esito_id = lx('la/moveo') and provenienza = 'perseus'),
+    'quando Wiktionary dà un''etimologia, l''analisi della forma lascia il posto e quella di Wiktionary diventa accolta');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
 
 \echo '— collaudo dell’import completato'

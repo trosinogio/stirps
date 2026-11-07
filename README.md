@@ -45,6 +45,8 @@ neon.ts, .neon                   servizi e collegamento del progetto Neon (neon 
 
 Indirizzi: `/it/r/ine-pro/ped` (sintesi della famiglia), `/it/r/ine-pro/ped/stemma`, `/it/r/ine-pro/ped/lingue`, `/it/r/ine-pro/ped/mappa`, `/en/w/it/fegato` (voce), `/en/l/it/c` (le parole italiane con la C), `/it/radici` (le radici indoeuropee, a pagine), `/it/radici/gem-pro` (quelle di un’altra lingua), `/it/radici/tutte` e `/it/radici/provvisorie`.
 
+Le etimologie hanno quattro provenienze, e la scheda dice quale: Wiktionary (con le lingue di chiusura, di cui entrano solo le voci che le catene raggiungono), il Lewis & Short e l’LSJ (il tag `<etym>`, citati come fonte, certezza 3), l’«Analisi della forma» (un prefisso e una parola nota, καταδάπτω = κατα- + δάπτω, certezza 2, senza fonte) e la redazione. Le prime tre sono importate e si rifanno a ogni import; nessuna tocca una voce che ha già un’etimologia di un’altra provenienza.
+
 L’indice delle radici (`elenco_radici()`) mostra sotto ogni radice fino a quattro parole della lingua del lettore che ne discendono, le più usate per prime. La pagina di una famiglia si apre sulla sintesi: le parole della lingua del lettore, i rami principali (i figli diretti della radice, con quante parole portano) e le parole più vicine alla radice in ogni altra lingua; lo stemma si disegna fino a 150 parole (`LIMITE_DISEGNO`), oltre mostra i primi due livelli e ogni ramo ha la sua pagina.
 
 ## In locale
