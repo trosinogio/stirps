@@ -4,25 +4,27 @@ import { notFound } from 'next/navigation';
 import { isLang, TESTI, type Lang } from '@/lib/i18n';
 import Automatica from '@/components/Automatica';
 import Definizione from '@/components/Definizione';
-import { lingueGeo, scheda } from '@/lib/dati';
+import { lingueGeo, ranghi, scheda } from '@/lib/dati';
 import { classeRamo, contaRami, fmt, G, nodiUnici, ORDINE_LINGUE, ORDINE_RAMI, ramoDi } from '@/lib/forme';
-import { nodiFamiglia } from '@/lib/albero';
+import { contaNascosti, costruisciAlbero, dimensioni, LIMITE_DISEGNO, nodiFamiglia, nomiNascondibili } from '@/lib/albero';
 import { BarraRami, intercala, Legenda, VoceLink } from '@/components/comuni';
 import StemmaAdattivo from '@/components/StemmaAdattivo';
 import StemmaVerticale from '@/components/StemmaVerticale';
 import Mappa from '@/components/Mappa';
+import SintesiFamiglia from '@/components/SintesiFamiglia';
 import type { NodoPiatto, Scheda } from '@/lib/tipi';
 
 export const revalidate = 300;
 // nessuna pagina in fase di build: si generano alla prima visita e restano in cache (ISR)
 export async function generateStaticParams() { return []; }
-const VISTE = ['lingue', 'mappa'] as const;
+const VISTE = ['stemma', 'lingue', 'mappa'] as const;
+type Vista = 'sintesi' | (typeof VISTE)[number];
 
 function leggi(slug: string[]) {
   const parti = slug.map(decodeURIComponent);
   const ultima = parti[parti.length - 1];
-  const vista = parti.length === 3 && (VISTE as readonly string[]).includes(ultima) ? (ultima as 'lingue' | 'mappa') : 'stemma';
-  return { slug: (vista === 'stemma' ? parti : parti.slice(0, 2)).join('/'), vista };
+  const vista: Vista = parti.length === 3 && (VISTE as readonly string[]).includes(ultima) ? (ultima as Vista) : 'sintesi';
+  return { slug: (vista === 'sintesi' ? parti : parti.slice(0, 2)).join('/'), vista };
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ lang: string; slug: string[] }> }): Promise<Metadata> {
@@ -43,9 +45,15 @@ function Origine({ sc, lang }: { sc: Scheda; lang: Lang }) {
     const alt = sc.ipotesi.filter((i) => i.stato === 'alternativa' || i.stato === 'minoritaria');
     return <p className="origine">{t.origini[acc.origine]}, {t.ipotesiAccolta}.{acc.nota ? ' ' + acc.nota : ''}{alt.length ? ' ' + t.inAlternativa + alt.map((a) => a.etichetta).join('; ') + '.' : ''}</p>;
   }
+  if (L.ricostruito && L.pos === 'rad.' && L.definizione) return null;   // la definizione dice già che cos'è
   if (L.ricostruito) return <p className="origine">{L.pos === 'rad.' ? t.radiceRicostruita : t.formaRicostruitaCapo}</p>;
   if (L.pos === 'rad.') return <p className="origine">{t.radiceFormale}</p>;
   return <p className="origine">{t.capoProvvisorio}</p>;
+}
+
+function nomiNascosti(nodi: NodoPiatto[]) {
+  const { radice } = costruisciAlbero(nodi);
+  return contaNascosti(nomiNascondibili(radice), dimensioni(radice));
 }
 
 function PannelloLingue({ nodi, lang }: { nodi: NodoPiatto[]; lang: Lang }) {
@@ -63,8 +71,8 @@ function PannelloLingue({ nodi, lang }: { nodi: NodoPiatto[]; lang: Lang }) {
         <section key={r} className={`gruppo r-${r}`}>
           <h3 className="gruppo-tit">{RAMO[lang][r] ?? r}</h3>
           {[...lingue.entries()].sort((a, b) => posL(a[0]) - posL(b[0])).map(([c, ns]) => (
-            <div key={c} className={`riga-lingua ${classeRamo(ns[0].ramo)}`}>
-              <div className="nome-l">{ns[0].lingua_nome}</div>
+            <div key={c} id={`l-${c}`} className={`riga-lingua ${classeRamo(ns[0].ramo)}`}>
+              <div className="nome-l">{ns[0].lingua_nome} <span className="n">{ns.length}</span></div>
               <div className="parole">
                 {ns.sort((a, b) => a.lemma.localeCompare(b.lemma)).map((n) => (
                   <span key={n.id} className="parola-l">
@@ -96,13 +104,16 @@ export default async function Radice({ params }: { params: Promise<{ lang: strin
   const nodi = nodiFamiglia(sc);
   const discendenti = nodi.slice(1);
   const nl = new Set(discendenti.map((n) => n.lingua)).size;
+  const grande = nodi.length > LIMITE_DISEGNO;
   const base = `/${lang}/r/${L.slug}`;
-  const schede: [string, string, string][] = [['stemma', t.schede.stemma, base], ['lingue', t.schede.lingue, `${base}/lingue`], ['mappa', t.schede.mappa, `${base}/mappa`]];
+  const schede: [Vista, string, string][] = [['sintesi', t.schede.sintesi, base], ['stemma', t.schede.stemma, `${base}/stemma`],
+    ['lingue', t.schede.lingue, `${base}/lingue`], ['mappa', t.schede.mappa, `${base}/mappa`]];
   const geo = vista === 'mappa' ? await lingueGeo(lang) : [];
+  const usi = vista === 'sintesi' ? await ranghi(lang, [...new Set(discendenti.filter((n) => n.lingua === lang).map((n) => n.lemma))]) : new Map<string, number>();
 
   return (
     <>
-      <Link className="indietro" href={`/${lang}`}>‹ {t.radici}</Link>
+      <Link className="indietro" href={`/${lang}/radici`}>‹ {t.radici}</Link>
       <header className="testa-voce">
         <h1 className={`voce-titolo ${classeRamo(L.ramo)}`}><span className="lemma">{fmt(L)}</span><span className="sigla">{L.lingua_nome}</span></h1>
         {L.translit && <p className="translit">{L.translit}</p>}
@@ -122,10 +133,12 @@ export default async function Radice({ params }: { params: Promise<{ lang: strin
       <div className="pannello">
         {!discendenti.length ? <p className="vuoto">{t.nessunDiscendente}</p>
           : vista === 'lingue' ? <PannelloLingue nodi={nodi} lang={lang} />
+          : vista === 'sintesi' ? <SintesiFamiglia lang={lang} nodi={nodi} ranghi={usi} base={base} />
           : vista === 'mappa' ? <Mappa lang={lang} nodi={nodi} archi={discendenti.map((n) => ({ da: n.padre!, a: n.id, tipo: n.tipo! }))} lingue={geo} />
           : (
             <>
-              <StemmaAdattivo lang={lang} nodi={nodi}><StemmaVerticale lang={lang} nodi={nodi} /></StemmaAdattivo>
+              {grande && <p className="sintesi-nota">{t.stemmaRidotto}</p>}
+              <StemmaAdattivo lang={lang} nodi={grande ? null : nodi} nascosti={nomiNascosti(nodi)}><StemmaVerticale lang={lang} nodi={nodi} livelli={grande ? 2 : undefined} /></StemmaAdattivo>
               <Legenda lang={lang} />
             </>
           )}

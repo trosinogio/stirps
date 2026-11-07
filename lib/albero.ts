@@ -38,6 +38,8 @@ export function costruisciAlbero(nodi: NodoPiatto[]): { radice: NodoAlbero; tutt
 
 // Uno stemma leggibile: oltre SOGLIA_FIGLI figli, se ne mostrano FIGLI_MOSTRATI (quelli con i rami più grandi) e gli
 // altri vanno in una lista a tendina (-logia ha quasi duecento figli).
+// oltre queste parole lo stemma non si disegna: l'elenco annidato mostra i primi due livelli, e ogni ramo ha la sua pagina
+export const LIMITE_DISEGNO = 150;
 export const SOGLIA_FIGLI = 12;
 export const FIGLI_MOSTRATI = 6;
 

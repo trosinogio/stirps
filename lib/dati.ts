@@ -25,6 +25,14 @@ export async function sensi(slug: string): Promise<Sensi | null> {
   return r[0] ?? null;
 }
 
+// Il rango d'uso di alcune forme di una lingua (tabella frequenza: oggi solo l'italiano); le forme assenti non compaiono
+export async function ranghi(lingua: string, forme: string[]): Promise<Map<string, number>> {
+  if (!forme.length) return new Map();
+  const r = await query<{ forma: string; rango: number }>(
+    'select forma, rango from frequenza where lingua = $1 and forma = any($2::text[])', [lingua, forme]);
+  return new Map(r.map((x) => [x.forma, x.rango]));
+}
+
 export async function indice(lang: Lang, limite = 40): Promise<Indice> {
   const r = await query<{ i: Indice }>('select indice($1, $2, $3) as i', [lang, ANTEPRIMA, limite]);
   return r[0].i;
@@ -53,9 +61,10 @@ export async function nodiPerSlug(slugs: string[], lang: Lang): Promise<Map<stri
   return new Map(r.map((x) => [x.n.slug, x.n]));
 }
 
-export async function elencoRadici(lang: Lang, dichiarate: boolean, pagina: number): Promise<ElencoRadici> {
-  const r = await query<{ e: ElencoRadici }>('select elenco_radici($1, $2, $3, $4, $5) as e',
-    [lang, ANTEPRIMA, dichiarate, pagina, PER_PAGINA]);
+// capoLingua: solo i capostipiti di quella lingua (null: tutti)
+export async function elencoRadici(lang: Lang, dichiarate: boolean, pagina: number, capoLingua: string | null = null): Promise<ElencoRadici> {
+  const r = await query<{ e: ElencoRadici }>('select elenco_radici($1, $2, $3, $4, $5, $6) as e',
+    [lang, ANTEPRIMA, dichiarate, pagina, PER_PAGINA, capoLingua]);
   return r[0].e;
 }
 

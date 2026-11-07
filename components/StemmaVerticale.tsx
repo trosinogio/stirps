@@ -8,8 +8,11 @@ import type { NodoPiatto } from '@/lib/tipi';
 
 // Stemma come elenco annidato: leggibile su qualunque schermo e anche senza JavaScript.
 // I nomi propri da nascondere portano la classe «np» (li mostra o nasconde StemmaAdattivo); oltre la soglia i figli
-// minori stanno in un <details>, la lista a tendina nativa, con il numero dei loro discendenti.
-export default function StemmaVerticale({ lang, nodi }: { lang: Lang; nodi: NodoPiatto[] }) {
+// minori stanno in un <details>, la lista a tendina nativa, con il numero dei loro discendenti. Con «livelli» l'elenco si ferma
+// a quella profondità (i rami di poche parole restano interi): sotto, il numero dei discendenti porta allo stemma del ramo.
+const PICCOLO = 5;
+
+export default function StemmaVerticale({ lang, nodi, livelli }: { lang: Lang; nodi: NodoPiatto[]; livelli?: number }) {
   const t = TESTI[lang];
   const { radice } = costruisciAlbero(nodi);
   const nascosti = nomiNascondibili(radice);
@@ -23,16 +26,21 @@ export default function StemmaVerticale({ lang, nodi }: { lang: Lang; nodi: Nodo
       {n.glossa && <span className="gl">{G(n.glossa, lang)}</span>}
     </Link>
   );
-  const ramo = (n: NodoAlbero, np: boolean): ReactNode => {
+  const quanti = (c: NodoAlbero) => (dim.get(c.id) ?? 0) > 0 && (
+    <Link className="quanti" href={`/${lang}/r/${c.slug}/stemma`} prefetch={false} title={t.apriStemmaDi(fmt(c))}>
+      {t.discendentiN(dim.get(c.id)!)}
+    </Link>
+  );
+  const ramo = (n: NodoAlbero, np: boolean, liv: number): ReactNode => {
     const nascostoQui = (c: NodoAlbero) => np || nascosti.has(c.id);
     const { mostrati, raccolti } = dividiFigli(n.figli, dim, nascostoQui);
     const comuni = raccolti.filter((c) => !nascostoQui(c)).length;
     return (
       <li key={n.id} className={classi(n, np)}>
         {riga(n)}
-        {n.figli.length > 0 && (
+        {livelli != null && liv >= livelli && (dim.get(n.id) ?? 0) > PICCOLO ? quanti(n) : n.figli.length > 0 && (
           <ol>
-            {mostrati.map((c) => ramo(c, nascostoQui(c)))}
+            {mostrati.map((c) => ramo(c, nascostoQui(c), liv + 1))}
             {raccolti.length > 0 && (
               <li className={`raccolti${comuni ? '' : ' np'}`}>
                 <details>
@@ -44,11 +52,7 @@ export default function StemmaVerticale({ lang, nodi }: { lang: Lang; nodi: Nodo
                     {raccolti.map((c) => (
                       <li key={c.id} className={classi(c, nascostoQui(c))}>
                         {riga(c)}
-                        {(dim.get(c.id) ?? 0) > 0 && (
-                          <Link className="quanti" href={`/${lang}/r/${c.slug}`} prefetch={false} title={t.apriStemmaDi(fmt(c))}>
-                            {t.discendentiN(dim.get(c.id)!)}
-                          </Link>
-                        )}
+                        {quanti(c)}
                       </li>
                     ))}
                   </ul>
@@ -60,5 +64,5 @@ export default function StemmaVerticale({ lang, nodi }: { lang: Lang; nodi: Nodo
       </li>
     );
   };
-  return <ol className="stemma-v" aria-label={t.stemmaDi(fmt(radice))}>{ramo(radice, false)}</ol>;
+  return <ol className="stemma-v" aria-label={t.stemmaDi(fmt(radice))}>{ramo(radice, false, 0)}</ol>;
 }
