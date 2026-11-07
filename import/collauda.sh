@@ -222,6 +222,14 @@ etimi_di = lambda k: {(r['etimo'], r['tipo']) for r in imp.relazioni if r['esito
 assert (radio_, 'composizione') in etimi_di(imp.lessema('it', 'radioattivo')), etimi_di(imp.lessema('it', 'radioattivo'))
 assert not any(e == mente_ for e, _ in etimi_di(imp.lessema('it', 'velocemente')))
 assert not any(e == ulentus_ for e, _ in etimi_di(imp.lessema('la', 'vinolentus')))
+# le etimologie del Wikizionario: solo frasi semplici, l'etimo nella scrittura della sua lingua, mai una locuzione
+from etimi_wikizionario import leggi as lw
+assert lw('dal latino avarus, avido', 'avaro') == [(1, 'la', 'avarus', 'generico', 3)]
+assert lw('dal latino moderno psychologia', 'psicologia') == [(1, 'la', 'psychologia', 'generico', 3)], 'la varietà non è l\'etimo'
+assert lw('dal latino contra passum', 'contrappasso') == [] and lw("dall'inglese hand in cap", 'handicap') == [], 'una locuzione'
+assert lw('dal greco anecumène', 'anecumene') == [] and lw('dal greco παλαiός', 'paleo') == [], 'scrittura sbagliata'
+assert lw('dal greco ϕωνητικός', 'fonetico') == [(1, 'grc', 'φωνητικός', 'generico', 3)]
+assert lw('forse dal latino X', 'x') == [] and lw('composto da ago e puntura', 'agopuntura')[1][2] == 'puntura'
 # greco: le regole che una coppia nota insegna (apprendi_greco.py), e una regola appresa che scatta solo su una base unica
 from apprendi_greco import regole_della_coppia as rc, Modello
 assert rc('σκοτιζω', ['σκοτοσ']) == [('S', 'ιζω', 'οσ')] and rc('καταβαινω', ['βαινω']) == [('P', 'κατα')]

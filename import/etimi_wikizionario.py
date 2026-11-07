@@ -27,7 +27,23 @@ LINGUE = {'latino': 'la', 'latino tardo': 'la', 'latino medievale': 'la', 'latin
           'inglese': 'en', 'tedesco': 'de', 'olandese': 'nl', 'arabo': 'ar', 'persiano': 'fa', 'turco': 'tr', 'ebraico': 'he',
           'longobardo': 'lng', 'gotico': 'got', 'francone': 'frk', 'napoletano': 'nap', 'siciliano': 'scn', 'veneziano': 'vec',
           'veneto': 'vec', 'genovese': 'lij', 'ligure': 'lij', 'lombardo': 'lmo', 'milanese': 'lmo', 'piemontese': 'pms',
-          'sardo': 'sc', 'russo': 'ru', 'giapponese': 'ja', 'sanscrito': 'sa'}
+          'sardo': 'sc', 'russo': 'ru', 'giapponese': 'ja', 'sanscrito': 'sa',
+          # le varietà con un aggettivo: senza, «dal latino moderno X» dava l'etimo «moderno»
+          'latino volgare': 'la-vul', 'latino parlato': 'la-vul', 'latino popolare': 'la-vul', 'latino moderno': 'la',
+          'latino umanistico': 'la', 'latino cristiano': 'la', 'latino imperiale': 'la', 'latino arcaico': 'la',
+          'latino giuridico': 'la', 'latino botanico': 'la', 'greco tardo': 'grc', 'greco ellenistico': 'grc',
+          'greco medievale': 'gkm', 'francese medio': 'frm', 'inglese antico': 'ang', 'inglese medio': 'enm',
+          'alto tedesco antico': 'goh', 'spagnolo antico': 'osp', 'arabo classico': 'ar'}
+# dopo l'etimo vengono la fine, un segno, una glossa o un connettivo: «dal latino contra passum», «dall'inglese hand in cap»
+# sono locuzioni, e la prima parola non è l'etimo
+DOPO_ETIMO = re.compile(r"\s*(?:$|[,;.:()«»\"“”‘'’\[\]/–-]|(?:ossia|cioè|che|attraverso|tramite|derivat[oa]|composto|composta|"
+                        r"da|dal|dallo|dalla|dall['’]|di|del|dello|della|con|col|nel|nella|per|poi|a sua volta|a|al|"
+                        r"forse|probabilmente|nel senso)\b)", re.I)
+SCRITTURA = {'grc': re.compile(r'^[\u0370-\u03ff\u1f00-\u1fff]+$'), 'gkm': re.compile(r'^[\u0370-\u03ff\u1f00-\u1fff]+$'),
+             'el': re.compile(r'^[\u0370-\u03ff\u1f00-\u1fff]+$'), 'ru': re.compile(r'^[\u0400-\u04ff]+$'),
+             'ar': re.compile(r'^[\u0600-\u06ff]+$'), 'fa': re.compile(r'^[\u0600-\u06ff]+$'),
+             'he': re.compile(r'^[\u0590-\u05ff]+$')}
+LATINA = re.compile(r"^[A-Za-zÀ-ɏḀ-ỿ'’-]+$")
 _LINGUA = '|'.join(sorted(map(re.escape, LINGUE), key=len, reverse=True))
 _PAROLA = r"([^\W\d_][\w'’-]*)"
 DALLA_LINGUA = re.compile(r"^(?:dal|dallo|dalla|dall['’]|deriva dal|deriva dallo|deriva dall['’])\s*(" + _LINGUA + r")\s+" + _PAROLA, re.I)
@@ -48,9 +64,16 @@ def leggi(testo, parola):
         return []
     m = DALLA_LINGUA.match(t)
     if m:
-        lingua = LINGUE[m.group(1).lower()]
+        lingua = LINGUE[' '.join(m.group(1).lower().split())]
         etimo = m.group(2).strip("'’-")
-        return [(1, lingua, etimo, 'generico', 3)] if etimo else []
+        if not etimo or not DOPO_ETIMO.match(t[m.end():]):
+            return []
+        # l'etimo nella scrittura della sua lingua: ϕωνητικός sì, «anecumène» come greco o παλαiός (lettere miste) no
+        if not (SCRITTURA[lingua].match(etimo) if lingua in SCRITTURA else LATINA.match(etimo)):
+            return []
+        if lingua in ('grc', 'gkm', 'el'):
+            etimo = etimo.replace('ϕ', 'φ').replace('ϑ', 'θ')     # le varianti grafiche: ϕωνητικός è φωνητικός
+        return [(1, lingua, etimo, 'generico', 3)]
     frase = re.split(r'[;.:(]|,', t, maxsplit=1)[0].strip()
     m = COMPOSTO.match(frase)
     if m and m.group(1).lower() not in LINGUE:
