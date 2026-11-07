@@ -13,6 +13,9 @@ Sono testi automatici: nel dizionario portano il segno ≈ e il nome del modello
         Un batch interrotto si riprende da solo (uscita.tsv.gz.batch). Serve ANTHROPIC_API_KEY.
     python3 definisci.py unisci registro.tsv.gz uscita.tsv.gz…
         Aggiunge i risultati al registro (dati/definizioni.tsv.gz, nel pacchetto): per ogni voce vale l'ultimo.
+    python3 definisci.py estrai PGURL aree lotto.jsonl.gz
+        Le radici ricostruite in cima a una famiglia, per l'indice delle radici: Claude assegna a ciascuna un'area di
+        significato (AREE), e il risultato va nel registro dati/aree_radici.tsv.gz (l'area al posto della traduzione).
 
 Una voce senza risposta (il modello non conosce la parola con sicurezza) resta nel registro con i campi vuoti, così
 non si paga due volte.
@@ -45,6 +48,41 @@ SCHEMA = {
         'type': 'object',
         'properties': {'n': {'type': 'integer'}, 'traduzione': {'type': 'string'}, 'definizione': {'type': 'string'}},
         'required': ['n', 'traduzione', 'definizione'], 'additionalProperties': False}}},
+    'required': ['voci'], 'additionalProperties': False}
+
+# Le aree di significato dell'indice delle radici: codice e descrizione per il modello
+AREE = [
+    ('corpo', 'corpo e salute: parti del corpo, funzioni e stati fisici, malattia, guarigione'),
+    ('parentela', 'parentela e persone: famiglia, matrimonio, generazioni, persone, ospite e straniero'),
+    ('vita', 'vita e morte: nascere, crescere, vivere, morire, invecchiare'),
+    ('sentimenti', 'sentimenti e volontà: amare, temere, desiderare, odiare, gioia, dolore, volere'),
+    ('mente', 'percezione e mente: vedere, udire, sentire, conoscere, pensare, ricordare'),
+    ('parola', 'parola: dire, chiamare, nominare, gridare, cantare, chiedere'),
+    ('movimento', 'movimento: andare, venire, correre, volare, nuotare, portare, cadere, girare, spingere'),
+    ('azione', 'fare, prendere, dare: fare, porre, prendere, tenere, dare, tagliare, colpire, rompere, legare'),
+    ('stato', 'essere e stare: essere, esistere, stare in piedi, sedere, giacere, restare, abitare'),
+    ('natura', 'animali e piante: animali, piante, alberi, frutti, caccia e allevamento'),
+    ('elementi', 'terra, acqua, fuoco e cielo: elementi, paesaggio, astri, tempo atmosferico, minerali e metalli'),
+    ('luce', 'luce e colori: splendere, bruciare, colori, chiaro e scuro'),
+    ('misura', 'numeri e misure: numeri, quantità, grandezza, pieno e vuoto, peso'),
+    ('spazio', 'spazio e tempo: direzioni, posizioni, vicino e lontano, prima e dopo, giorno, anno, stagioni'),
+    ('casa', 'casa, mestieri e cibo: costruire, tessere, cucire, lavorare il legno e i metalli, attrezzi, coltivare, mangiare, bere, cucinare'),
+    ('societa', 'società, guerra e sacro: comandare, legge, scambio, dono, possesso, combattere, armi, religione, culto'),
+    ('qualita', 'qualità e forme: buono e cattivo, nuovo e vecchio, forte, debole, acuto, curvo, dritto, caldo, freddo'),
+    ('grammatica', 'pronomi e particelle: pronomi, dimostrativi, negazione, preposizioni, congiunzioni'),
+]
+SISTEMA_AREE = """Sei un linguista storico. Lavori a Stirps, un dizionario etimologico che raccoglie le parole in famiglie, ciascuna discesa da una radice o da una forma ricostruita (indoeuropea, protogermanica, protoslava, protoitalica…). Per l'indice delle radici ogni radice va in un'area di significato, scelta da questo elenco:
+
+""" + '\n'.join(f'- {c}: {d}' for c, d in AREE) + """
+
+Per ogni voce ricevi un numero tra parentesi quadre, la lingua, la forma ricostruita, la glossa e i discendenti più vicini con le loro glosse. Restituisci per ciascuna il codice dell'area che descrive meglio il significato ricostruito della radice (non quello di un singolo discendente). Se la radice ha più significati, scegli quello principale; se il significato non è noto con sicurezza, restituisci un'area vuota. Restituisci un elemento per ogni voce ricevuta, con lo stesso numero."""
+
+SCHEMA_AREE = {
+    'type': 'object',
+    'properties': {'voci': {'type': 'array', 'items': {
+        'type': 'object',
+        'properties': {'n': {'type': 'integer'}, 'area': {'type': 'string', 'enum': [c for c, _ in AREE] + ['']}},
+        'required': ['n', 'area'], 'additionalProperties': False}}},
     'required': ['voci'], 'additionalProperties': False}
 
 # prezzi per milione di token (ingresso, uscita, lettura della cache), prima dello sconto del 50% della Batch API
@@ -94,8 +132,12 @@ create temp table base as
  union all""" for i, (cond, n) in enumerate(STRATI)).removesuffix(' union all') + ';'
 
 
+SQL_AREE = SQL_RADICI.replace("json_build_object('tipo', 'radice',", "json_build_object('tipo', 'area',").replace(
+    "where " + DECLARATA + " and r.id_esterno", "where r.ricostruito and r.id_esterno")
+
+
 def estrai(pgurl, che, uscita):
-    sql = SQL_RADICI if che == 'radici' else SQL_CAMPIONE
+    sql = SQL_RADICI if che == 'radici' else SQL_AREE if che == 'aree' else SQL_CAMPIONE
     out = subprocess.run(['psql', '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1', pgurl], input=sql, capture_output=True,
                          text=True, check=True).stdout
     righe = [r for r in out.splitlines() if r.startswith('{')]
@@ -162,7 +204,7 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
             return
         # a gruppi della stessa lingua e dello stesso tipo
         da_fare.sort(key=lambda v: (v['tipo'], v['lingua'], v['chiave']))
-        k = per_richiesta or (8 if da_fare[0]['tipo'] == 'radice' else 20)
+        k = per_richiesta or {'radice': 8, 'area': 40}.get(da_fare[0]['tipo'], 20)
         gruppi, cur = [], []
         for v in da_fare:
             if cur and (len(cur) == k or cur[0]['lingua'] != v['lingua'] or cur[0]['tipo'] != v['tipo']):
@@ -171,9 +213,11 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
         gruppi.append(cur)
         richieste = [Request(custom_id=f'g{i:05d}', params=MessageCreateParamsNonStreaming(
             model=modello, max_tokens=32000,
-            system=[{'type': 'text', 'text': SISTEMA, 'cache_control': {'type': 'ephemeral', 'ttl': '1h'}}],
+            system=[{'type': 'text', 'text': SISTEMA_AREE if g[0]['tipo'] == 'area' else SISTEMA,
+                     'cache_control': {'type': 'ephemeral', 'ttl': '1h'}}],
             messages=[{'role': 'user', 'content': '\n\n'.join(riga(v, n) for n, v in enumerate(g, 1))}],
-            output_config={'effort': sforzo, 'format': {'type': 'json_schema', 'schema': SCHEMA}}))
+            output_config={'effort': sforzo, 'format': {'type': 'json_schema',
+                                                        'schema': SCHEMA_AREE if g[0]['tipo'] == 'area' else SCHEMA}}))
             for i, g in enumerate(gruppi)]
         batch_id = client.messages.batches.create(requests=richieste).id
         with open(segno, 'w', encoding='utf-8') as f:
@@ -210,6 +254,10 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
             x = risposte.get(n)
             if x is None:
                 esiti['senza_risposta'] += 1; continue        # si riprova alla prossima esecuzione
+            if v['tipo'] == 'area':                           # l'area va al posto della traduzione
+                esiti['ok' if x['area'] else 'vuote'] += 1
+                nuove[v['chiave']] = (v['originale'], x['area'], '', modello)
+                continue
             tr, de = pulisci(x['traduzione'])[:150], pulisci(x['definizione'])[:1500]
             if v.get('glossa_it'):
                 tr = ''                                        # c'è già una glossa italiana di rango più alto
