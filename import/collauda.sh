@@ -197,6 +197,13 @@ assert mr('from', {'1': 'it', '2': "l'aquila"}) == [('der', {'1': 'it', '2': 'it
 assert mr('contraction', {'1': 'it', '2': 'ci', '3': 'è'}) == [('af', {'1': 'it', '2': 'ci', '3': 'è'})]
 assert mr('contraction', {'1': 'it', '2': "va' a fa' 'n culo"}) == [] and mr('contraction', {'1': 'it', '2': 'non è?'}) == []
 assert surf_come_af({'word': 'de', 'etymology_templates': [{'name': 'surf', 'args': {'1': 'it', '2': 'la', '3': 'de'}}]}) == []
+import os, tempfile
+# una pagina con una radice tra gli omografi (वा: «o» e «soffiare»): l'etimo citato è la radice
+cartella_sa = tempfile.mkdtemp()
+open(cartella_sa + '/glosse.tsv', 'w').write('वा\t1\tconj\tor\t\nवा\t2\troot\tto blow\t\nदा\t1\troot\tto give\t\n')
+imp = Importatore()
+imp.carica_chiusura('sa', os.devnull, None, cartella_sa + '/glosse.tsv')
+assert imp.risolvi('sa', 'वा', None)[2] == 2 and imp.risolvi('sa', 'दा', None)[2] == 1
 # nella lingua di partenza una forma flessa citata va al suo lemma, come forma citata (quattrocchi < occhio, «occhi»)
 import os, tempfile
 cartella = tempfile.mkdtemp()

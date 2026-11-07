@@ -66,8 +66,8 @@ if __name__ == '__main__':
             k = primo[k]
             cammino.append(k)
         cima = cammino[-1]
-        if cima in radici:
-            esito = 'giusta'
+        if cima in radici or any('@' not in r and r == senza_id(cima) for r in radici):
+            esito = 'giusta'            # anche la radice dichiarata generica (*bʰeh₁-) con la catena sulla variante precisa
         elif radici & set(cammino):
             esito = 'sale oltre la radice'          # la attraversa e poi continua: la cima mostrata è un'altra
         elif any(senza_id(r) == senza_id(c) for r in radici for c in cammino):

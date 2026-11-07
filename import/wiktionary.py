@@ -814,8 +814,9 @@ class Importatore:
         lemma, conservata come forma citata (quattrocchi < occhio, «occhi»), non resta una voce a sé."""
         voci = [json.loads(r) for r in open(lemmi, encoding='utf-8')]
         idx = {'voci': voci, 'lemmi': set(), 'omografi': defaultdict(list), 'forme': {}, 'participi': {}, 'flesse': {},
-               'file_glosse': glosse}
+               'file_glosse': glosse, 'omo_radice': {}}
         forme_omografi = defaultdict(dict)
+        pos_omografi = defaultdict(dict)
         if glosse and os.path.exists(glosse):
             # tutti i lemmi, anche senza etimologia: pugnō è un lemma, non il dativo di pugnus
             for riga in open(glosse, encoding='utf-8'):
@@ -825,6 +826,7 @@ class Importatore:
                 omo = int(c[1]) if c[1].isdigit() else 1
                 forme_omografi[pagina].setdefault(omo, set()).update(
                     unicodedata.normalize('NFC', x.lower()) for x in c[4].split(',') if x)
+                pos_omografi[pagina].setdefault(omo, set()).add(c[2])
         per_pagina = defaultdict(set)
         for v in voci:
             pagina = nome_pagina(lingua, v['w'])
@@ -839,6 +841,12 @@ class Importatore:
             if len(per_omo) > 1:
                 idx['omografi'][pagina] = [(o, f) for o, f in sorted(per_omo.items())]
         idx['omografi'] = {p: c for p, c in idx['omografi'].items() if len(c) > 1}
+        # una pagina con più etimologie di cui una sola è una radice (वा: la congiunzione «o» e la radice «soffiare»): un
+        # etimo citato senza altri indizi è la radice, perché sono le radici che si citano come etimi (vāná < वा)
+        for pagina, per_omo in pos_omografi.items():
+            radici = [o for o, ps in per_omo.items() if 'root' in ps]
+            if len(per_omo) > 1 and len(radici) == 1:
+                idx['omo_radice'][pagina] = radici[0]
         if forme and os.path.exists(forme):
             migliori = {}
             for riga in open(forme, encoding='utf-8'):
@@ -896,6 +904,9 @@ class Importatore:
             if scelti:
                 omo = scelti[0]                 # a parità vince l'etimologia principale, la prima                 # mālum «mela», non malum «male»; fundere, non fundāre
                 self.stat[f'omografi_distinti_{lingua}'] += 1
+        if omo == 1 and pagina in idx.get('omo_radice', {}):
+            omo = idx['omo_radice'][pagina]
+            self.stat[f'omografi_radice_{lingua}'] += 1
         return lingua, pagina, omo, forma_extra
 
     def scegli_glossa(self, l):
