@@ -56,14 +56,25 @@ jobs:
           echo "::notice title=Parser::$(jq -c '{lessemi, ipotesi, relazioni, voci, intere_la, intere_grc, intere_en, intere_fr, intere_de, intere_ru, lemmi_interi_la, lemmi_interi_grc}' dati/it/rapporto_parser.json)"
           echo "::notice title=Perseus::$(tail -1 dati/it/rapporto_perseus.txt)"
 
-      - name: Diagnosi delle etimologie mancanti
-        continue-on-error: true          # una diagnosi: se il Wikizionario non si scarica, il pacchetto va avanti
+      - name: Etimologie del Wikizionario e diagnosi delle mancanti
         run: |
           cd import
           cut -f3 dati/it/senza_etimologia.tsv | sort | uniq -c
-          curl -sf "https://kaikki.org/itwiktionary/All%20languages%20combined/kaikki.org-dictionary-all.jsonl" \
-            | python3 diagnosi_wikizionario.py dati/it/senza_etimologia.tsv | tee /tmp/diagnosi.txt
-          echo "::notice title=Etimologie mancanti::$(head -2 /tmp/diagnosi.txt | tr '\n' ' ')"
+          # le etimologie italiane del Wikizionario (etimi_wikizionario.py) vanno nelle righe degli etimi dei dizionari; se il
+          # dump non si scarica si tengono quelle del pacchetto di main, perché un pacchetto senza le toglierebbe dal sito
+          if curl -sf -o /tmp/wikizionario.jsonl "https://kaikki.org/itwiktionary/All%20languages%20combined/kaikki.org-dictionary-all.jsonl"; then
+            python3 etimi_wikizionario.py dati/it/tsv/etimi_dizionari.tsv < /tmp/wikizionario.jsonl 2> /tmp/wikizionario.txt
+            cat /tmp/wikizionario.txt
+            echo "::notice title=Wikizionario::$(head -1 /tmp/wikizionario.txt)"
+            python3 diagnosi_wikizionario.py dati/it/senza_etimologia.tsv < /tmp/wikizionario.jsonl | tee /tmp/diagnosi.txt || true
+            echo "::notice title=Etimologie mancanti::$(head -2 /tmp/diagnosi.txt | tr '\n' ' ')"
+            rm -f /tmp/wikizionario.jsonl
+          else
+            echo "::warning title=Wikizionario::dump non scaricabile: restano le etimologie del Wikizionario del pacchetto di main"
+            git fetch -q --depth 1 origin main
+            (git show FETCH_HEAD:dati/etimi_dizionari.tsv.gz 2> /dev/null | zcat | grep -P '\tWikizionario(-vedi)?$' || true) \
+              >> dati/it/tsv/etimi_dizionari.tsv
+          fi
 
       - name: Voci vere per il banco di prova
         run: |

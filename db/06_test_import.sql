@@ -480,7 +480,13 @@ select pg_temp.verifica(
   not exists (select 1 from ipotesi h where h.provenienza = 'perseus'
                  and h.esito_id in (lx('la/mobilis'), lx('la/abactus-2'), lx('grc/akris-2'))),
   'niente etimologia dei dizionari dove Wiktionary ne dà una (mobilis) o dove l''etimo non è tra le voci (abactus ← abigo, ἄκρις ← ἄκρος)');
-create temp table ed_prima as select id, xmin::text as v from ipotesi where provenienza = 'perseus';
+select pg_temp.verifica(
+  (select h.etichetta = 'Wikizionario' and h.provenienza = 'wikizionario' and h.confidenza = 3
+          and exists (select 1 from rimando m join opera o on o.id = m.opera_id where m.ipotesi_id = h.id and o.sigla = 'Wikizionario')
+     from ipotesi h where h.esito_id = lx('it/oscuro'))
+  and (select h.confidenza from ipotesi h where h.esito_id = lx('it/torto') and h.provenienza = 'wikizionario') = 2,
+  'una voce italiana senza etimologia riceve quella del Wikizionario, citato come fonte; un rimando «vedi» vale certezza 2');
+create temp table ed_prima as select id, xmin::text as v from ipotesi where provenienza in ('perseus', 'wikizionario');
 select pg_temp.verifica(
   (select (r->>'etimologie_nuove')::int + (r->>'etimologie_tolte')::int from (select importa_etimi_dizionari() as r) x) = 0
   and not exists (select 1 from ipotesi h join ed_prima p on p.id = h.id where h.xmin::text <> p.v),
