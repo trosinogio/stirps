@@ -205,6 +205,10 @@ open(cartella + '/glosse.tsv', 'w').write('occhio\t1\tnoun\teye\t\n')
 imp = Importatore()
 imp.carica_chiusura('it', os.devnull, cartella + '/forme.tsv', cartella + '/glosse.tsv', base=True)
 assert imp.risolvi('it', 'occhi', None)[1::2] == ('occhio', 'occhi'), imp.risolvi('it', 'occhi', None)
+imp.voce({'w': 'quattrocchi', 'tpl': [{'n': 'af', 'a': {'1': 'it', '2': 'quattro', '3': 'occhi'}, 'e': ''}]})
+archi = {(r['etimo'], r['forma']) for r in imp.relazioni if r['esito'] == imp.lessema('it', 'quattrocchi')}
+from wiktionary import chiave
+assert (imp.lessema('it', 'occhio'), 'occhi') in archi and chiave('it', 'occhi') not in imp.lessemi, archi
 # l'inglese: il suo alfabeto, le sue forme verbali, niente sigle; entrano solo le voci con un'etimologia (--con-etimologia)
 assert lemma_valido('en', 'hound') and lemma_valido('ang', 'þing') and lemma_valido('en', 'café') and lemma_valido('en', 'I')
 assert not lemma_valido('en', '4x4') and not lemma_valido('en', 'A'), 'cifre e lettere isolate non sono parole'

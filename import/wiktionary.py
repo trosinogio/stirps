@@ -682,10 +682,19 @@ class Importatore:
                     continue
                 tipo = 'derivazione' if len(basi) == 1 else 'composizione'
                 for i, (b, lb) in enumerate(basi, 1):
-                    kb = self.lessema(lb or codice_lingua(a.get('1')) or lingua_voce, b)
+                    lingua_b, forma_b = lb or codice_lingua(a.get('1')) or lingua_voce, None
+                    fx = None
+                    if not b.startswith('*'):
+                        # un elemento che è una forma flessa va al suo lemma, come forma citata (quattrocchi < occhio,
+                        # «occhi»); le altre forme e i participi li lega poi collega_participi()
+                        lr, pr, omo_r, fx = self.risolvi(lingua_b, b, None)
+                    if fx:
+                        kb, forma_b = self.lessema(lr, pr, omografo=omo_r), fx
+                    else:
+                        kb = self.lessema(lingua_b, b)
                     if kb != k0:
                         archi.append({'etimo': kb, 'esito': k0, 'tipo': tipo, 'ordine': i,
-                                      'affisso': ' '.join(affissi) or None, 'conf': 3, 'forma': None})
+                                      'affisso': ' '.join(affissi) or None, 'conf': 3, 'forma': forma_b})
                 primo = False
                 prec = None             # la catena non prosegue oltre l'analisi in affissi
                 continue
