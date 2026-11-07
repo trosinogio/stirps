@@ -173,6 +173,16 @@ trovate = {r[2]: (r[5], r[7]) for r in righe}
 assert trovate.get('καταδάπτω') == ('δάπτω', 'κατα-') and trovate.get('ἐφίστημι') == ('ἵστημι', 'ἐφ-'), trovate
 assert trovate.get('transtollo') == ('tollo', 'trans-') and trovate.get('affero') == ('fero', 'ad-'), trovate
 assert 'ἐπικάρπιος' not in trovate and 'ἀεργός' not in trovate and 'acfero' not in trovate and 'perlego' not in trovate, trovate
+# greco: suffissi regolari e composti di due parole note con -ο-; non i composti con elisione o parole corte
+voci = [('s1', 'grc', 'σκοτίζω', 'v.'), ('s2', 'grc', 'σκότος', None), ('s3', 'grc', 'μοσχομάγειρος', None), ('s4', 'grc', 'μόσχος', None),
+        ('s5', 'grc', 'μάγειρος', None), ('s6', 'grc', 'ἄκραντος', None), ('s7', 'grc', 'ἄκρος', None), ('s8', 'grc', 'ἄντος', None)]
+righe, _ = analizza(voci, set())
+per = {}
+for r in righe:
+    per.setdefault(r[2], []).append((r[5], r[6], r[7]))
+assert per.get('σκοτίζω') == [('σκότος', 'derivazione', '-ίζω')], per
+assert per.get('μοσχομάγειρος') == [('μόσχος', 'composizione', None), ('μάγειρος', 'composizione', None)], per
+assert 'ἄκραντος' not in per, per
 # una radice ricostruita è la base del suo derivato, non un prefisso; un suffisso ricostruito resta un affisso
 from wiktionary import e_affisso
 assert e_affisso('-ente') and e_affisso('ab-') and e_affisso('*-eti') and not e_affisso('*bʰer-') and not e_affisso('casa')

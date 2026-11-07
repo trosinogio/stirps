@@ -13,6 +13,9 @@ Regole, per non legare a caso:
 - in latino un prefisso assimilato vale solo davanti alla sua consonante (af-fero, col-loco, e-loquor, a-spicio);
 - in greco ἀ- privativo solo davanti a consonante (davanti a vocale è ἀν-).
 
+Per il greco anche i suffissi regolari (σκοτίζω = σκότος + -ίζω) e i composti di due parole note con la vocale -ο-
+(μοσχομάγειρος = μόσχος + μάγειρος), con le regole di suffisso_o_composto().
+
 Scrive righe nello stesso formato di filtra_perseus.py --etimi, con opera «analisi» e la chiave della voce:
 
     python3 analisi_composti.py etimi.tsv lessemi.tsv dizionari.tsv ipotesi.tsv     (aggiunge le righe a etimi.tsv)
@@ -42,6 +45,16 @@ LATINI = {
     'intro': ('intro', None),
 }
 VOCALI_GR = set('αεηιουω')
+# greco: i suffissi regolari, con le finali che la base può avere sul suo tema (σκοτίζω = σκότος + -ίζω, σκοτεινότης =
+# σκοτεινός + -ότης); il più lungo per primo. Nella forma senza accenti, e come si mostrano
+_FIN = ['οσ', 'ον', 'η', 'α', 'ησ', 'υσ', 'ισ', 'ευσ', 'ω', 'εω', 'αω', 'οω', 'ιζω', 'μα', 'ια', 'ιον']
+SUFFISSI_GR = sorted([
+    ('ικωσ', '-ικῶς', ['ικοσ']), ('ισμοσ', '-ισμός', ['ιζω']), ('ιστησ', '-ιστής', ['ιζω']),
+    ('ιδιον', '-ίδιον', ['οσ', 'ον', 'η', 'α', 'ισ']), ('ισκοσ', '-ίσκος', ['οσ', 'ον', 'η', 'α', 'ησ']),
+    ('οτησ', '-ότης', ['οσ', 'υσ', 'ησ']), ('ωδησ', '-ώδης', _FIN), ('ικοσ', '-ικός', _FIN), ('ινοσ', '-ινος', ['οσ', 'ον', 'η', 'α']),
+    ('ιζω', '-ίζω', ['οσ', 'ον', 'η', 'α', 'ησ']), ('ευω', '-εύω', ['ευσ', 'οσ']), ('ιοσ', '-ιος', _FIN),
+    ('ιον', '-ιον', ['οσ', 'ον', 'η', 'α', 'ισ', 'ησ']), ('οω', '-όω', ['οσ', 'ον', 'η', 'α']), ('ια', '-ία', ['οσ', 'ησ', 'ον', 'η', 'α']),
+    ('ωσ', '-ως', ['οσ', 'ησ', 'υσ', 'ον'])], key=lambda x: -len(x[0]))
 
 
 def nudo(w):
@@ -56,6 +69,33 @@ def leggi(percorso):
 
 def comune(lemma, pos):
     return pos != 'np' and lemma[:1] == lemma[:1].lower() and not lemma.startswith('-') and not lemma.endswith('-')
+
+
+def suffisso_o_composto(n, lemma, basi):
+    """Per una voce greca (n: senza accenti) che non comincia con un prefisso noto: la base e il suffisso (σκοτίζω = σκότος +
+    -ίζω), o un composto di due parole note con la vocale di congiunzione -ο- (μοσχομάγειρος = μόσχος + μάγειρος), la
+    seconda di almeno cinque lettere e con una consonante iniziale: i composti con elisione o con parole corte, nelle prove,
+    sbagliavano una volta su due (ἄκραντος non è ἄκρος + ἄντος)."""
+    def unica(forma):
+        c = basi.get(('grc', forma), set()) - {lemma}
+        return next(iter(c)) if len(c) == 1 else None
+    for suf, mostra, finali in SUFFISSI_GR:
+        if n.endswith(suf) and len(n) - len(suf) >= 3:
+            tema = n[:-len(suf)]
+            for f in finali:
+                b = unica(tema + f)
+                if b:
+                    return (b, mostra)
+    for k in range(4, len(n) - 4):
+        if n[k - 1] != 'ο' or len(n) - k < 5 or n[k] in VOCALI_GR:
+            continue
+        seconda = unica(n[k:])
+        if not seconda or len(n[:k - 1]) < 3:
+            continue
+        prima = next((unica(n[:k - 1] + f) for f in ('οσ', 'ον', 'η', 'α') if unica(n[:k - 1] + f)), None)
+        if prima and prima != seconda:
+            return (prima, seconda, 'composto')
+    return None
 
 
 def analizza(voci, coperte):
@@ -84,6 +124,14 @@ def analizza(voci, coperte):
                 if len(cand) == 1:
                     trovata = (next(iter(cand)), prefisso + '-')
                     break
+            if not trovata:
+                trovata = suffisso_o_composto(n, lemma, basi)
+                if trovata and len(trovata) == 3:            # un composto di due parole: due righe
+                    a1, b1, _ = trovata
+                    righe.append(('analisi:' + k, lingua, lemma, 1, lingua, a1, 'composizione', None, 'analisi'))
+                    righe.append(('analisi:' + k, lingua, lemma, 2, lingua, b1, 'composizione', None, 'analisi'))
+                    conta['grc_composti'] += 1
+                    continue
         elif lingua == 'la':
             for forma, (prefisso, iniziali) in latini:
                 resto = lemma[len(forma):]
