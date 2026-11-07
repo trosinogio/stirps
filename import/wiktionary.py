@@ -462,6 +462,12 @@ def antenato_lingua(c):
 CIMA_GRANDE = 10
 
 
+# i suffissi che vengono da una parola ma sono diventati grammaticali: un avverbio in -mente non sta nella famiglia di mens
+ELEMENTI_GRAMMATICALI = {norm(x) for x in ('-mente', '-ment', '-ly', '-lich', '-heit', '-keit', '-schaft', '-hood', '-dom', '-ship',
+                                           '-ful', '-less', '-some', '-wise', '-ward', '-wards', '-ling', '-lein', '-chen')}
+POS_LESSICALI = {'s.', 's.m.', 's.f.', 'v.', 'agg.', 'avv.'}
+
+
 def e_affisso(p):
     """Un elemento di {{af}} che è un affisso: -ente, ab-, e anche *-eti (l'asterisco non nasconde il trattino). Una forma
     ricostruita che finisce con il trattino è invece una radice o un tema, cioè la base: in {{af|ine-pro|*bʰer-|*-eti}}
@@ -808,13 +814,19 @@ class Importatore:
             self.relazioni.append(x)
 
     # ---- chiusura delle catene: le voci delle lingue intermedie ----
-    def carica_chiusura(self, lingua, lemmi, forme=None, glosse=None, base=False):
+    def carica_chiusura(self, lingua, lemmi, forme=None, glosse=None, base=False, varianti=None):
         """Indici di una lingua di chiusura, da caricare prima delle voci principali. Con base=True è la lingua di
         partenza (--forme-base): servono solo i lemmi e le forme, e una forma flessa citata dentro la lingua va al suo
         lemma, conservata come forma citata (quattrocchi < occhio, «occhi»), non resta una voce a sé."""
         voci = [json.loads(r) for r in open(lemmi, encoding='utf-8')]
         idx = {'voci': voci, 'lemmi': set(), 'omografi': defaultdict(list), 'forme': {}, 'participi': {}, 'flesse': {},
-               'file_glosse': glosse, 'omo_radice': {}}
+               'file_glosse': glosse, 'omo_radice': {}, 'varianti': []}
+        if varianti and os.path.exists(varianti):
+            # le ricostruzioni alternative (filtra.py con VARIANTI): *gʰeh₁bʰ- e *gʰebʰ- sono la stessa radice
+            for riga in open(varianti, encoding='utf-8'):
+                c = riga.rstrip('\n').split('\t')
+                if len(c) >= 2 and c[0] and c[1]:
+                    idx['varianti'].append((nome_pagina(lingua, c[0]), nome_pagina(lingua, c[1])))
         forme_omografi = defaultdict(dict)
         pos_omografi = defaultdict(dict)
         if glosse and os.path.exists(glosse):
@@ -1153,6 +1165,8 @@ class Importatore:
         ipotesi rimaste senza archi; un'alternativa, se c'è, viene promossa alla scrittura."""
         via = set()
         for r in self.relazioni:
+            if r['tipo'] == 'variante' and r['ipotesi'].endswith('#wikt-variante'):
+                continue                    # due grafie della stessa radice (unisci_varianti): non è un etimo
             motivo = self.arco_impossibile(r['etimo'], r['esito'])
             if motivo:
                 via.add(id(r))
@@ -1165,6 +1179,92 @@ class Importatore:
         tolte = {h['chiave'] for h in self.ipotesi.values() if prima[h['chiave']] and not dopo[h['chiave']]}
         self.ipotesi = {k: h for k, h in self.ipotesi.items() if h['chiave'] not in tolte}
         self.stat['ipotesi_tolte_archi_impossibili'] += len(tolte)
+
+    # ---- elementi di composizione: un composto con due radici ----
+    def elementi_di_composizione(self):
+        """Un affisso che viene da una parola lessicale (radio- < radius, bio- < βίος, -metro < μέτρον, -fico < faciō, -φόρος <
+        φέρω) è un elemento di composizione: la parola che lo usa (radioattivo = radio- + attivo) ne è un composto, e sta
+        anche nella sua famiglia. Il parser la legava solo alla base, con l'affisso come nota; qui si aggiunge il secondo
+        etimo. Non i suffissi diventati grammaticali (-mente, -ly), non gli affissi che vengono da un altro affisso o da
+        una forma ricostruita, e solo se l'elemento comincia con lo stesso suono della parola (-ulentus non viene da
+        frustum, come dice un legame sbagliato nei dati)."""
+        accolte = {h['esito']: h['chiave'] for h in self.ipotesi.values() if h['stato'] == 'accolta'}
+        primo = {}
+        for r in self.relazioni:
+            if r['ordine'] == 1 and accolte.get(r['esito']) == r['ipotesi']:
+                primo.setdefault(r['esito'], r['etimo'])
+
+        def suono(lemma, translit):
+            t = norm(translit or lemma).lstrip('-')
+            for a_, b_ in (('ch', 'k'), ('kh', 'k'), ('ph', 'f'), ('th', 't'), ('c', 'k'), ('y', 'u')):
+                t = t.replace(a_, b_)
+            return t[:1]
+        buoni = {}
+        for k, l in self.lessemi.items():
+            if not e_affisso(l['lemma']) or norm(l['lemma']) in ELEMENTI_GRAMMATICALI or k not in primo:
+                continue
+            e = self.lessemi.get(primo[k])
+            if not e or e['ricostruito'] or e_affisso(e['lemma']) or e.get('pos') not in POS_LESSICALI:
+                continue
+            if suono(l['lemma'], None) != suono(e['lemma'], e.get('translit') or (translit_grc(e['lemma']) if base_lingua(e['lingua']) == 'grc' else None)):
+                continue
+            buoni[k] = primo[k]
+        per_ipotesi = defaultdict(list)
+        for r in self.relazioni:
+            per_ipotesi[r['ipotesi']].append(r)
+        nuovi = []
+        for r in self.relazioni:
+            if not r.get('affisso') or accolte.get(r['esito']) != r['ipotesi']:
+                continue
+            lingua = self.lessemi[r['esito']]['lingua'] if r['esito'] in self.lessemi else None
+            for a in r['affisso'].split():
+                ka = chiave(lingua, a) if lingua else None
+                if ka not in buoni or ka == r['esito'] or any(x['etimo'] == ka for x in per_ipotesi[r['ipotesi']] + nuovi):
+                    continue
+                ordine = max(x['ordine'] for x in per_ipotesi[r['ipotesi']]) + 1 + sum(1 for x in nuovi if x['ipotesi'] == r['ipotesi'])
+                nuovi.append({'chiave': f"{r['ipotesi']}#el{ordine}", 'ipotesi': r['ipotesi'], 'etimo': ka, 'esito': r['esito'],
+                              'tipo': 'composizione', 'ordine': ordine, 'affisso': None, 'conf': r['conf'], 'forma': None})
+        self.relazioni.extend(nuovi)
+        self.stat['elementi_di_composizione'] = len(buoni)
+        self.stat['composti_con_un_elemento'] = len(nuovi)
+
+    # ---- ricostruzioni alternative: due grafie della stessa forma stanno in una famiglia sola ----
+    def unisci_varianti(self):
+        """Wiktionary scrive a volte la stessa radice in due modi, e le parole si dividono tra le due pagine: give dichiara
+        *gʰebʰ-, habeō *gʰeh₁bʰ-. Quando una pagina ricostruita dice che un'altra forma ne è una ricostruzione alternativa
+        (filtra.py, VARIANTI), la variante si lega alla forma principale con un passaggio «variante», e le due famiglie
+        diventano una. È un dato di Wiktionary, non una somiglianza di grafia (*ker- e *ḱer- restano due radici). Solo tra
+        voci che ci sono già, nella stessa lingua, per una variante senza etimo e con una sola forma principale; se le due
+        pagine si citano a vicenda è principale quella con più parole sotto."""
+        accolte = {h['esito'] for h in self.ipotesi.values() if h['stato'] == 'accolta'}
+        figli = Counter(r['etimo'] for r in self.relazioni)
+        coppie = set()
+        for lingua, idx in self.chiusura.items():
+            for v, p in idx.get('varianti', ()):
+                lc = 'la-vul' if lingua == 'la' and self.chiave_di('la-vul', '*' + v) in self.lessemi else lingua
+                kv, kp = self.chiave_di(lc, '*' + v), self.chiave_di(lc, '*' + p)
+                if kv != kp and kv in self.lessemi and kp in self.lessemi:
+                    coppie.add((kv, kp))
+        rango = lambda k: (figli[k], k)
+        principali = defaultdict(set)
+        for kv, kp in coppie:
+            if (kp, kv) in coppie and rango(kp) < rango(kv):
+                continue                                     # si citano a vicenda: vince quella con più parole sotto
+            principali[kv].add(kp)
+        for kv, kps in sorted(principali.items()):
+            if len(kps) > 1:
+                self.stat['varianti_con_più_principali'] += 1
+                continue
+            if kv in accolte:
+                self.stat['varianti_con_un_etimo'] += 1
+                continue
+            kp = next(iter(kps))
+            kh = kv + '#wikt-variante'
+            self.ipotesi[kh] = {'chiave': kh, 'esito': kv, 'etichetta': 'Wiktionary (ricostruzione alternativa)',
+                                'stato': 'accolta', 'confidenza': 3, 'origine': 'etimo', 'nota': None}
+            self.relazioni.append({'chiave': kh + '#0', 'ipotesi': kh, 'etimo': kp, 'esito': kv, 'tipo': 'variante',
+                                   'ordine': 1, 'affisso': None, 'conf': 3, 'forma': None})
+            self.stat['varianti_unite'] += 1
 
     # ---- radici dichiarate: la catena si chiude in cima con un legame indeterminato ----
     def chiudi_su_radici(self):
@@ -1449,8 +1549,8 @@ if __name__ == '__main__':
     imp.glosse_precedenti = precedenti
     for c in chiusure:
         lingua, percorsi = c.split('=', 1)
-        p = percorsi.split(',') + ['', '']
-        imp.carica_chiusura(lingua, p[0], p[2] or None, p[1] or None)
+        p = percorsi.split(',') + ['', '', '']
+        imp.carica_chiusura(lingua, p[0], p[2] or None, p[1] or None, varianti=p[3] or None)
     if forme_base:
         lingua_b, percorso_b = forme_base.split('=', 1)
         imp.carica_chiusura(lingua_b, os.devnull, percorso_b, args[2] if len(args) > 2 else None, base=True)
@@ -1469,6 +1569,8 @@ if __name__ == '__main__':
     imp.nomi_tedeschi()
     imp.risolvi_intermedi()
     imp.precisa_omografe()
+    imp.elementi_di_composizione()
+    imp.unisci_varianti()
     imp.chiudi_su_radici()
     imp.togli_cicli()
     imp.aggiungi_lemmi_interi()

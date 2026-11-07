@@ -71,7 +71,7 @@ export interface Testi {
   formaRicostruita: string;
   formaAntiquata: string;
   pronuncia: { titolo: string; sillabazione: string; ascolta: string; audio: string; varieta: (etichette: string) => string };
-  inBreve: { titolo: string; origine: string; radice: string; attestazione: string; parenti: string; parentiN: (n: number, lingue: number) => string };
+  inBreve: { titolo: string; origine: string; radice: string; radici: string; attestazione: string; parenti: string; parentiN: (n: number, lingue: number) => string };
   scheda: { etichette: (etichette: string) => string; grammatica: (testo: string) => string; sensiWiktionary: string };
   dati: (nome: string, licenza: string) => string;
   sezioni: {
@@ -316,7 +316,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     formaAntiquata: 'forma antiquata',
     pronuncia: { titolo: 'Pronuncia', sillabazione: 'sillabazione', ascolta: 'Ascolta la pronuncia',
                  audio: 'audio: Wikimedia Commons', varieta: varieta(VARIETA_IT) },
-    inBreve: { titolo: 'In breve', origine: 'Origine', radice: 'Capostipite', attestazione: 'Prima attestazione', parenti: 'Parole imparentate',
+    inBreve: { titolo: 'In breve', origine: 'Origine', radice: 'Capostipite', radici: 'Capostipiti', attestazione: 'Prima attestazione', parenti: 'Parole imparentate',
                parentiN: (n, l) => `${n} ${n === 1 ? 'parola' : 'parole'} in ${l} ${l === 1 ? 'lingua' : 'lingue'}` },
     scheda: { etichette: etichette(ETICHETTE_IT), grammatica: grammaticaIt, sensiWiktionary: 'Accezioni di Wiktionary, in inglese.' },
     dati: (n, l) => `dati ${n}, ${l}`,
@@ -534,7 +534,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     formaAntiquata: 'archaic form',
     pronuncia: { titolo: 'Pronunciation', sillabazione: 'hyphenation', ascolta: 'Listen to the pronunciation',
                  audio: 'audio: Wikimedia Commons', varieta: varieta(null) },
-    inBreve: { titolo: 'At a glance', origine: 'Origin', radice: 'Earliest ancestor', attestazione: 'First attested', parenti: 'Related words',
+    inBreve: { titolo: 'At a glance', origine: 'Origin', radice: 'Earliest ancestor', radici: 'Earliest ancestors', attestazione: 'First attested', parenti: 'Related words',
                parentiN: (n, l) => `${n} ${n === 1 ? 'word' : 'words'} in ${l} ${l === 1 ? 'language' : 'languages'}` },
     scheda: { etichette: etichette(null), grammatica: (x) => x, sensiWiktionary: 'Senses from Wiktionary.' },
     dati: (n, l) => `${n} data, ${l}`,

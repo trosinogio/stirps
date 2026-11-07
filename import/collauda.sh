@@ -208,6 +208,37 @@ assert mr('contraction', {'1': 'it', '2': 'ci', '3': 'è'}) == [('af', {'1': 'it
 assert mr('contraction', {'1': 'it', '2': "va' a fa' 'n culo"}) == [] and mr('contraction', {'1': 'it', '2': 'non è?'}) == []
 assert surf_come_af({'word': 'de', 'etymology_templates': [{'name': 'surf', 'args': {'1': 'it', '2': 'la', '3': 'de'}}]}) == []
 import os, tempfile
+# composti con due radici: un elemento di composizione che viene da una parola (radio- < radius) è il secondo etimo;
+# non un suffisso grammaticale (-mente < mens) né un legame sbagliato (-ulentus < frustum)
+imp = Importatore()
+radius, mens, frustum = imp.lessema('la', 'radius', pos='s.'), imp.lessema('la', 'mens', pos='s.f.'), imp.lessema('la', 'frustum', pos='s.')
+radio_, mente_, ulentus_ = imp.lessema('it', 'radio-'), imp.lessema('it', '-mente'), imp.lessema('la', '-ulentus')
+arco(imp, radio_, radius); arco(imp, mente_, mens); arco(imp, ulentus_, frustum)
+imp.voce({'w': 'radioattivo', 'tpl': [{'n': 'af', 'a': {'1': 'it', '2': 'radio-', '3': 'attivo'}, 'e': ''}]})
+imp.voce({'w': 'velocemente', 'tpl': [{'n': 'af', 'a': {'1': 'it', '2': 'veloce', '3': '-mente'}, 'e': ''}]})
+imp.voce({'w': 'vinolentus', 'tpl': [{'n': 'af', 'a': {'1': 'la', '2': 'vinum', '3': '-ulentus'}, 'e': ''}]}, lingua_voce='la', parola='vinolentus')
+imp.elementi_di_composizione()
+etimi_di = lambda k: {(r['etimo'], r['tipo']) for r in imp.relazioni if r['esito'] == k}
+assert (radio_, 'composizione') in etimi_di(imp.lessema('it', 'radioattivo')), etimi_di(imp.lessema('it', 'radioattivo'))
+assert not any(e == mente_ for e, _ in etimi_di(imp.lessema('it', 'velocemente')))
+assert not any(e == ulentus_ for e, _ in etimi_di(imp.lessema('la', 'vinolentus')))
+# ricostruzioni alternative: *gʰeh₁bʰ- è una variante di *gʰebʰ- (Wiktionary lo dice), e habeō e give stanno in una
+# famiglia; il passaggio resta anche se la variante è una radice. *ker- e *ḱer- non si toccano
+from filtra import ricostruzioni_alternative as ra
+assert ra({'word': 'gʰeh₁bʰ-', 'senses': [{'alt_of': [{'word': '*gʰebʰ-'}]}]}) == [('gʰeh₁bʰ-', 'gʰebʰ-', 'alt_of')]
+assert ra({'word': 'gʰebʰ-', 'forms': [{'form': '*gʰeh₁bʰ-', 'tags': ['alternative']}, {'form': '*x- (Beekes)', 'tags': ['alternative']}]}) \
+    == [('gʰeh₁bʰ-', 'gʰebʰ-', 'alternative')]
+cartella_v = tempfile.mkdtemp()
+open(cartella_v + '/varianti.tsv', 'w').write('gʰeh₁bʰ-\tgʰebʰ-\ngʰebʰ-\tgʰeh₁bʰ-\nḱer-\tker-\n')
+imp = Importatore()
+imp.carica_chiusura('ine-pro', os.devnull, varianti=cartella_v + '/varianti.tsv')
+habeo, give = imp.lessema('la', 'habeō'), imp.lessema('en', 'give')
+r1, r2, r3 = imp.lessema('ine-pro', '*gʰeh₁bʰ-'), imp.lessema('ine-pro', '*gʰebʰ-'), imp.lessema('ine-pro', '*ker-')
+arco(imp, habeo, r1); arco(imp, give, r2); arco(imp, imp.lessema('en', 'gift'), r2)
+imp.unisci_varianti(); imp.togli_archi_impossibili(); imp.togli_cicli()
+v = [(r['esito'], r['etimo'], r['tipo']) for r in imp.relazioni if r['tipo'] == 'variante']
+assert v == [(r1, r2, 'variante')], v          # si citano a vicenda: principale *gʰebʰ-, con più parole sotto
+assert imp.ipotesi[r1 + '#wikt-variante']['confidenza'] == 3
 # una pagina con una radice tra gli omografi (वा: «o» e «soffiare»): l'etimo citato è la radice
 cartella_sa = tempfile.mkdtemp()
 open(cartella_sa + '/glosse.tsv', 'w').write('वा\t1\tconj\tor\t\nवा\t2\troot\tto blow\t\nदा\t1\troot\tto give\t\n')
