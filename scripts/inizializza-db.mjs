@@ -29,7 +29,7 @@ const APPOGGIO = [
   ['stg_dizionario', 'dizionari'], ['stg_autore', 'autori'], ['stg_stima', 'stime'],
   ['stg_definizione', 'definizioni'], ['stg_pronuncia', 'pronunce'],
   ['stg_sensi', 'sensi'], ['stg_etimo_dizionario', 'etimi_dizionari'], ['stg_forma', 'forme_it'],
-  ['stg_lingua_wikt', 'lingue_wiktionary'], ['stg_famiglia_wikt', 'famiglie_wiktionary'],
+  ['stg_lingua_wikt', 'lingue_wiktionary'], ['stg_famiglia_wikt', 'famiglie_wiktionary'], ['stg_area_radice', 'aree_radici'],
 ];
 const BLOCCO = 5000;
 // impronta del pacchetto dati: se cambia, al deploy si rifà l'import
@@ -82,6 +82,8 @@ async function importa(client, pulisci) {
     console.log('[db] sensi:', JSON.stringify(se.s), `(${secondi()} s)`);
     const { rows: [fo] } = await client.query('select importa_forme() as f');
     console.log('[db] forme:', JSON.stringify(fo.f), `(${secondi()} s)`);
+    const { rows: [ar] } = await client.query('select importa_aree() as a');
+    console.log('[db] aree delle radici:', JSON.stringify(ar.a), `(${secondi()} s)`);
     await client.query('refresh materialized view mv_allotropi');
     console.log(`[db] mv_allotropi (${secondi()} s)`);
     await client.query('refresh materialized view mv_famiglia');
@@ -126,7 +128,7 @@ const campo = (x) => (x === '\\N' ? null : x.replace(/\\\\/g, '\\'));
 
 async function carica(client, tabella, file) {
   // i dizionari possono mancare in un pacchetto vecchio: la tabella resta vuota e importa_dizionari() non fa nulla
-  if (['dizionari', 'autori', 'stime', 'definizioni', 'pronunce', 'sensi', 'etimi_dizionari', 'forme_it', 'lingue_wiktionary', 'famiglie_wiktionary'].includes(file) && !existsSync(`dati/${file}.tsv.gz`)) return 0;
+  if (['dizionari', 'autori', 'stime', 'definizioni', 'pronunce', 'sensi', 'etimi_dizionari', 'forme_it', 'lingue_wiktionary', 'famiglie_wiktionary', 'aree_radici'].includes(file) && !existsSync(`dati/${file}.tsv.gz`)) return 0;
   const { rows: colonne } = await client.query(
     `select attname as nome, format_type(atttypid, atttypmod) as tipo from pg_attribute
       where attrelid = $1::regclass and attnum > 0 and not attisdropped order by attnum`, [tabella]);

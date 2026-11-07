@@ -545,4 +545,24 @@ exception when sqlstate 'P0098' then null;
 end $$;
 truncate stg_lingua_wikt, stg_famiglia_wikt;
 
+\echo '— aree di significato delle radici'
+do $$
+declare v_l bigint := (select id from lessema where ricostruito and id_esterno is not null order by id limit 1);
+        v_k text := (select id_esterno from lessema where id = v_l);
+begin
+  truncate stg_area_radice;
+  insert into stg_area_radice values (v_k, 'x', 'movimento', '', 'claude-prova'), ('chiave:che:non:esiste', 'x', 'corpo', '', 'claude-prova');
+  perform importa_aree();
+  perform pg_temp.verifica((select area = 'movimento' and provenienza = 'claude' from area_radice where lessema_id = v_l),
+    'le aree di Claude entrano per la radice giusta');
+  update area_radice set area = 'corpo', provenienza = 'redazione' where lessema_id = v_l;
+  update stg_area_radice set area = 'parola';
+  perform importa_aree();
+  perform pg_temp.verifica((select area = 'corpo' and provenienza = 'redazione' from area_radice where lessema_id = v_l),
+    'l''area scelta dalla redazione non cambia con un nuovo import');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
+truncate stg_area_radice;
+
 \echo '— collaudo dell’import completato'

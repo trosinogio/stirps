@@ -1058,6 +1058,7 @@ begin
   if not exists (select 1 from stg_forma) then
     return jsonb_build_object('saltato', 'tabella di appoggio vuota');
   end if;
+  drop table if exists cand_fo;
   create temp table cand_fo on commit drop as
     select distinct s.lingua, lower(s.forma) as forma, s.lemma
       from stg_forma s
@@ -1256,3 +1257,39 @@ begin
   return r;
 end $$;
 comment on function importa_lingue_wiktionary() is 'Famiglia, ramo, antenato, varietà e nome delle lingue dai dati di Wiktionary, solo dove mancano.';
+
+-- ===== Aree di significato delle radici (8 novembre 2026) =====
+-- Le aree delle radici dal registro di Claude (dati/aree_radici.tsv.gz: chiave, glossa d'origine, area, -, modello), per
+-- differenza; le aree della redazione non si toccano
+create unlogged table if not exists stg_area_radice (chiave text, originale text, area text, vuoto text, modello text);
+
+create or replace function importa_aree() returns jsonb
+language plpgsql as $$
+declare
+  nuove int;
+  cambiate int;
+  tolte int;
+begin
+  if not exists (select 1 from stg_area_radice) then
+    return jsonb_build_object('saltato', 'tabella di appoggio vuota');
+  end if;
+  drop table if exists cand_ar;
+  create temp table cand_ar on commit drop as
+    select distinct on (l.id) l.id, s.area, s.modello
+      from stg_area_radice s join lessema l on l.id_esterno = s.chiave
+     where s.area in (select codice from area_semantica)
+     order by l.id;
+  create index on cand_ar (id);
+  analyze cand_ar;
+  delete from area_radice a
+   where a.provenienza = 'claude' and not exists (select 1 from cand_ar c where c.id = a.lessema_id);
+  get diagnostics tolte = row_count;
+  update area_radice a set area = c.area, modello = c.modello
+    from cand_ar c where c.id = a.lessema_id and a.provenienza = 'claude' and (a.area, a.modello) is distinct from (c.area, c.modello);
+  get diagnostics cambiate = row_count;
+  insert into area_radice (lessema_id, area, provenienza, modello)
+  select id, area, 'claude', modello from cand_ar on conflict (lessema_id) do nothing;
+  get diagnostics nuove = row_count;
+  return jsonb_build_object('nuove', nuove, 'cambiate', cambiate, 'tolte', tolte);
+end $$;
+comment on function importa_aree() is 'Aree di significato delle radici da Claude, per differenza; quelle della redazione non si toccano.';

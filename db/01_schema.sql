@@ -561,3 +561,31 @@ create table if not exists meta (
   valore        text not null,
   aggiornato_il timestamptz not null default now()
 );
+
+-- Le aree di significato dell'indice delle radici (corpo, parentela, movimento…): le assegna Claude dalle glosse
+-- (import/definisci.py, lotto «aree»), la redazione può correggerle (provenienza «redazione», che l'import non tocca)
+create table if not exists area_semantica (
+  codice  text primary key,
+  ordine  int not null,
+  it      text not null,
+  en      text not null
+);
+insert into area_semantica (codice, ordine, it, en) values
+  ('corpo', 1, 'Corpo e salute', 'Body and health'), ('parentela', 2, 'Parentela e persone', 'Kinship and people'),
+  ('vita', 3, 'Vita e morte', 'Life and death'), ('sentimenti', 4, 'Sentimenti e volontà', 'Feelings and will'),
+  ('mente', 5, 'Percezione e mente', 'Perception and mind'), ('parola', 6, 'Parola', 'Speech'),
+  ('movimento', 7, 'Movimento', 'Motion'), ('azione', 8, 'Fare, prendere, dare', 'Doing, taking, giving'),
+  ('stato', 9, 'Essere e stare', 'Being and staying'), ('natura', 10, 'Animali e piante', 'Animals and plants'),
+  ('elementi', 11, 'Terra, acqua, fuoco e cielo', 'Earth, water, fire and sky'), ('luce', 12, 'Luce e colori', 'Light and colour'),
+  ('misura', 13, 'Numeri e misure', 'Numbers and measures'), ('spazio', 14, 'Spazio e tempo', 'Space and time'),
+  ('casa', 15, 'Casa, mestieri e cibo', 'Home, crafts and food'), ('societa', 16, 'Società, guerra e sacro', 'Society, war and the sacred'),
+  ('qualita', 17, 'Qualità e forme', 'Qualities and shapes'), ('grammatica', 18, 'Pronomi e particelle', 'Pronouns and particles')
+on conflict (codice) do update set ordine = excluded.ordine, it = excluded.it, en = excluded.en;
+
+create table if not exists area_radice (
+  lessema_id   bigint primary key references lessema on delete cascade,
+  area         text not null references area_semantica,
+  provenienza  text not null default 'redazione',
+  modello      text
+);
+create index if not exists area_radice_area on area_radice (area);

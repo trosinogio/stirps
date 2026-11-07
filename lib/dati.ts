@@ -2,7 +2,7 @@ import { cache } from 'react';
 // Accesso ai dati: ogni pagina chiama una funzione SQL e riceve JSON pronto.
 import { query } from './db';
 import type { Lang } from './i18n';
-import type { AnalisiTesto, ElencoRadici, Indice, LinguaGeo, LinguaInfo, Nodo, Opera, ParoleLingua, Pronuncia, RisultatoRicerca, Scheda, Sensi } from './tipi';
+import type { AnalisiTesto, ElencoRadici, IndiceRadici, Indice, LinguaGeo, LinguaInfo, Nodo, Opera, ParoleLingua, Pronuncia, RisultatoRicerca, Scheda, Sensi } from './tipi';
 
 // ANTEPRIMA=1 mostra anche le bozze (il seme pilota è tutto in bozza)
 export const ANTEPRIMA = process.env.ANTEPRIMA === '1';
@@ -121,4 +121,12 @@ export async function radiciELingueMappa(): Promise<{ radici: string[]; lingue: 
 export async function analizzaTesto(forme: string[], conteggi: number[], lang: Lang): Promise<AnalisiTesto> {
   const r = await query<{ r: AnalisiTesto }>('select analizza_testo($1, $2, $3, $4, $5) as r', ['it', forme, conteggi, lang, ANTEPRIMA]);
   return r[0].r;
+}
+
+// L'indice delle radici ricostruite di una protolingua: per area, o dentro un'area in ordine alfabetico ('' = senza area)
+export const PER_PAGINA_AREA = 200;
+export async function indiceRadici(lang: Lang, capoLingua: string, area: string | null, pagina = 1): Promise<IndiceRadici> {
+  const r = await query<{ i: IndiceRadici }>('select indice_radici($1, $2, $3, $4, $5, $6) as i',
+    [lang, ANTEPRIMA, capoLingua, area, pagina, PER_PAGINA_AREA]);
+  return r[0].i;
 }

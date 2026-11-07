@@ -34,6 +34,9 @@ jobs:
           fi
           cd import
           mkdir -p claude/esiti
+          # l'impronta degli esiti prima della corsa: nel registro entrano solo quelli che questa corsa ha cambiato
+          # (rifondere quelli vecchi riscriverebbe le definizioni aggiunte dopo)
+          for f in claude/esiti/*.tsv.gz; do [ -f "$f" ] && sha1sum "$f"; done > /tmp/esiti_prima.txt
           pid=()
           while read -r lotto modello sforzo destinazione; do
             case "$lotto" in ''|'#'*) continue ;; esac
@@ -47,12 +50,11 @@ jobs:
           # i lotti per il dizionario entrano nel registro del pacchetto
           while read -r lotto modello sforzo destinazione; do
             case "$lotto" in ''|'#'*) continue ;; esac
-            if [ "$destinazione" = registro ] && [ -f "claude/esiti/$lotto.$modello.tsv.gz" ]; then
-              python3 definisci.py unisci ../dati/definizioni.tsv.gz "claude/esiti/$lotto.$modello.tsv.gz"
-            fi
-            if [ "$destinazione" = aree ] && [ -f "claude/esiti/$lotto.$modello.tsv.gz" ]; then
-              python3 definisci.py unisci ../dati/aree_radici.tsv.gz "claude/esiti/$lotto.$modello.tsv.gz"
-            fi
+            esito_f="claude/esiti/$lotto.$modello.tsv.gz"
+            [ -f "$esito_f" ] || continue
+            if grep -qxF "$(sha1sum "$esito_f")" /tmp/esiti_prima.txt; then continue; fi   # non è cambiato
+            [ "$destinazione" = registro ] && python3 definisci.py unisci ../dati/definizioni.tsv.gz "$esito_f"
+            [ "$destinazione" = aree ] && python3 definisci.py unisci ../dati/aree_radici.tsv.gz "$esito_f"
           done < claude/lotti.conf
           exit $esito
 

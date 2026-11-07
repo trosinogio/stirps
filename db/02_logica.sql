@@ -1004,3 +1004,80 @@ select jsonb_build_object(
 $$;
 comment on function analizza_testo(text, text[], int[], text, boolean) is
   'Le parole di un testo per lingua d''origine e via d''ingresso, risalendo le catene accolte (pagina «Analizza un testo»).';
+
+-- L'indice delle radici per area di significato (8 novembre 2026): le forme ricostruite in cima a una famiglia, di una
+-- protolingua. Senza area: per ogni area le radici con più discendenti (p_in_vista), e quante sono. Con un'area: tutte le
+-- sue radici in ordine alfabetico, a pagine, con le iniziali. Per ogni radice fino a quattro parole della lingua del
+-- lettore che ne discendono, come in elenco_radici().
+create or replace function indice_radici(p_lingua text default 'it', p_anteprima boolean default false,
+                                         p_capo_lingua text default 'ine-pro', p_area text default null,
+                                         p_pagina int default 1, p_per_pagina int default 200, p_in_vista int default 8)
+returns jsonb language sql stable as $$
+with
+capi as (
+  select f.capo as id, count(*) as discendenti, count(distinct x.lingua) as lingue
+    from mv_famiglia f join lessema c on c.id = f.capo join lessema x on x.id = f.id
+   where c.ricostruito and (p_anteprima or f.pubblico)
+     and visibile(c.stato_editoriale, p_anteprima) and visibile(x.stato_editoriale, p_anteprima)
+   group by f.capo),
+tutti as (
+  select k.*, l.lemma, l.lingua, coalesce(a.area, '') as area, lower(left(nullif(l.lemma_norm, ''), 1)) as iniziale,
+         coalesce(l.lemma_norm, l.lemma) as ordine
+    from capi k join lessema l on l.id = k.id left join area_radice a on a.lessema_id = k.id),
+scelte as (select * from tutti where lingua = p_capo_lingua),
+vista as (
+  select * from (
+    select s.*, row_number() over (partition by s.area order by s.discendenti desc, s.ordine) as pos
+      from scelte s where p_area is null) v
+   where pos <= p_in_vista
+  union all
+  select s.*, 0 from scelte s where s.area = p_area
+   order by 1 offset 0),
+pagina as (
+  select * from vista where p_area is null
+  union all
+  select * from (select * from vista where p_area is not null order by ordine, lemma
+                  offset (greatest(p_pagina, 1) - 1) * p_per_pagina limit p_per_pagina) x),
+esempi as (
+  select pg.id, (
+    select jsonb_agg(e.lemma order by e.rango nulls last, e.prof, e.lemma) from (
+      select x.lemma, min(case when x.omografo = 1 then q.rango end) as rango, min(f.profondita) as prof
+        from mv_famiglia f join lessema x on x.id = f.id
+        left join frequenza q on q.lingua = x.lingua and q.forma = x.lemma
+       where f.capo = pg.id and x.id <> pg.id and x.lingua = p_lingua and not x.nome_proprio and x.nome_indice is not true
+         and (p_anteprima or f.pubblico) and visibile(x.stato_editoriale, p_anteprima)
+       group by x.lemma
+       order by rango nulls last, prof, x.lemma limit 4) e) as esempi
+    from pagina pg),
+voce as (
+  select pg.area, pg.id, pg.discendenti, pg.ordine, pg.lemma,
+         nodo_json(pg.id, p_lingua, p_anteprima) || jsonb_build_object('discendenti', pg.discendenti, 'lingue', pg.lingue,
+           'esempi', coalesce(e.esempi, '[]'::jsonb), 'area', nullif(pg.area, ''), 'iniziale', pg.iniziale) as j
+    from pagina pg join esempi e on e.id = pg.id)
+select jsonb_build_object(
+  'capo_lingua', p_capo_lingua, 'area', p_area, 'pagina', greatest(p_pagina, 1), 'per_pagina', p_per_pagina,
+  'totale', (select count(*) from scelte),
+  'gruppi', coalesce((select jsonb_agg(jsonb_build_object('lingua', g.lingua, 'n', g.n,
+                        'nome', coalesce(etichetta_in('lingua', g.lingua, p_lingua), l.nome)) order by g.n desc, g.lingua)
+                      from (select lingua, count(*) as n from tutti group by lingua) g join lingua l on l.codice = g.lingua), '[]'::jsonb),
+  'aree', coalesce((select jsonb_agg(jsonb_build_object('area', x.area, 'n', x.n,
+                       'nome', case when p_lingua = 'it' then a.it else a.en end) order by coalesce(a.ordine, 99))
+                    from (select area, count(*) as n from scelte group by area) x
+                    left join area_semantica a on a.codice = x.area), '[]'::jsonb),
+  'iniziali', case when p_area is null then '[]'::jsonb else coalesce((
+      select jsonb_agg(jsonb_build_object('iniziale', i.iniziale, 'n', i.n, 'pagina', i.pagina) order by i.iniziale)
+        from (select iniziale, count(*) as n,
+                     min((rn - 1) / p_per_pagina + 1) as pagina
+                from (select iniziale, row_number() over (order by ordine, lemma) as rn from scelte where area = p_area) r
+               group by iniziale) i), '[]'::jsonb) end,
+  'sezioni', case when p_area is not null then '[]'::jsonb else coalesce((
+      select jsonb_agg(jsonb_build_object('area', x.area, 'n', x.n,
+                         'nome', case when p_lingua = 'it' then a.it else a.en end,
+                         'radici', (select jsonb_agg(v.j order by v.discendenti desc, v.ordine) from voce v where v.area = x.area))
+                       order by coalesce(a.ordine, 99))
+        from (select area, count(*) as n from scelte group by area) x left join area_semantica a on a.codice = x.area), '[]'::jsonb) end,
+  'radici', case when p_area is null then '[]'::jsonb
+                 else coalesce((select jsonb_agg(v.j order by v.ordine, v.lemma) from voce v), '[]'::jsonb) end)
+$$;
+comment on function indice_radici(text, boolean, text, text, int, int, int) is
+  'L''indice delle radici ricostruite di una protolingua, per area di significato e, dentro un''area, in ordine alfabetico.';

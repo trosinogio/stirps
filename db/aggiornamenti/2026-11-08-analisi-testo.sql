@@ -19,6 +19,7 @@ begin
   if not exists (select 1 from stg_forma) then
     return jsonb_build_object('saltato', 'tabella di appoggio vuota');
   end if;
+  drop table if exists cand_fo;
   create temp table cand_fo on commit drop as
     select distinct s.lingua, lower(s.forma) as forma, s.lemma
       from stg_forma s

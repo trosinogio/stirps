@@ -22,6 +22,8 @@ export interface Testi {
   altraRadice: string;
   radici: string;
   radiciNota: string;
+  aree: { titolo: string; tutte: (n: number) => string; senzaArea: string; conto: (n: number, area: string) => string;
+          nota: string; tutteLeAree: string; iniziali: string };
   paroleLingue: (p: number, l: number) => string;
   paroleInLingue: (p: number, l: number) => string;
   capostipitiProvvisori: string;
@@ -265,6 +267,15 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     altraRadice: 'Un’altra radice',
     radici: 'Radici',
     radiciNota: 'Ogni radice è la capostipite di una famiglia di parole, in tutte le lingue in cui è arrivata. Sotto ciascuna, alcune parole italiane che ne discendono.',
+    aree: {
+      titolo: 'Aree di significato',
+      tutte: (n) => `tutte le ${n.toLocaleString('it-IT')} radici dell’area ›`,
+      senzaArea: 'Senza area',
+      conto: (n, a) => `${n.toLocaleString('it-IT')} ${n === 1 ? 'radice' : 'radici'} · ${a}, in ordine alfabetico`,
+      nota: 'Le aree di significato le ha proposte Claude dalle glosse e dai discendenti di ogni radice; la redazione può correggerle.',
+      tutteLeAree: '‹ tutte le aree',
+      iniziali: 'Iniziali',
+    },
     radiciPerLingua: 'Lingua della radice',
     tutteLeLingueChip: 'tutte',
     altreLingueN: (n) => `altre ${n} lingue`,
@@ -509,6 +520,15 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     altraRadice: 'Another root',
     radici: 'Roots',
     radiciNota: 'Each root heads a family of words, in every language it reached. Under each one, a few English words that descend from it.',
+    aree: {
+      titolo: 'Areas of meaning',
+      tutte: (n) => `all ${n.toLocaleString('en-GB')} roots in this area ›`,
+      senzaArea: 'No area',
+      conto: (n, a) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'root' : 'roots'} · ${a}, in alphabetical order`,
+      nota: 'The areas of meaning were proposed by Claude from the glosses and descendants of each root; the editors can correct them.',
+      tutteLeAree: '‹ all areas',
+      iniziali: 'Initials',
+    },
     radiciPerLingua: 'Language of the root',
     tutteLeLingueChip: 'all',
     altreLingueN: (n) => `${n} more languages`,

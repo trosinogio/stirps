@@ -19,7 +19,8 @@ const ordina = (ns: NodoLingua[]) => {
   return ns;
 };
 
-export function alberoLingue(lingue: LinguaIndice[]): FamigliaAlbero[] {
+export function alberoLingue(tutteLeLingue: LinguaIndice[]): FamigliaAlbero[] {
+  const lingue = tutteLeLingue.filter((l) => !l.codice.startsWith('+'));   // «+univ»: un modello letto come lingua
   const per = new Map(lingue.map((l) => [l.codice, l]));
   // le varietà vanno accanto alla loro lingua, se c'è: non sono un ramo dell'albero
   const varieta = new Map<string, LinguaIndice[]>();
