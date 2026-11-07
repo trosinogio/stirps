@@ -53,7 +53,14 @@ assert da_ety({'args': {'1': 'la', '2': ':inh', '3': 'itc-pro:<id:x>'}}, 'la') i
 from filtra import porta_etimo
 assert not porta_etimo({'name': 'suffix', 'args': {'1': 'la', '2': '-ia'}}), '{{suffix|la|-ia}} senza base non dà un etimo: vale {{ety}}'
 assert porta_etimo({'name': 'suffix', 'args': {'1': 'la', '2': 'audiēns', '3': 'ia'}}) and porta_etimo({'name': 'inh', 'args': {'1': 'it', '2': 'la', '3': 'aquila'}})
-from wiktionary import lemma_valido
+from wiktionary import lemma_valido, senza_albero
+# l'albero etimologico appiattito prima del testo di Wiktionary non è testo
+assert senza_albero('Etymology tree Latin obstruō Proto-Indo-European *-tis Latin -tiō Latin obstrūctiō From obstruō + -tiō.') == 'From obstruō + -tiō.'
+assert senza_albero('Etymology tree Proto-Indo-European *dem- Latin dominus Latin dominiumder') == ''
+assert senza_albero('From Latin carō.') == 'From Latin carō.' and senza_albero('') == ''
+assert senza_albero('PIE word  *wisós Etymology tree Proto-Indo-European *weys- Latin virus From Proto-Italic *weizos.') == 'From Proto-Italic *weizos.'
+t = 'From Old English cyningdōm, from Proto-Germanic *kuningadōmaz. Equivalent to king + -dom. Etymology tree Proto-Indo-European *ǵenh₁- English kingdom'
+assert senza_albero(t) == t[:t.index(' Etymology tree')], senza_albero(t)
 assert not lemma_valido('itc-pro', '', True) and not lemma_valido('ine-pro', '*', True), 'un lemma vuoto non è una voce'
 from filtra import lemma_della_forma as lf
 assert lf(s('second-person plural present passive indicative/imperative of contemperō')) == ('contemperō', ['second-person', 'plural', 'present', 'passive', 'indicative', 'imperative'])
