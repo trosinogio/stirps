@@ -11,9 +11,11 @@ Il Wikizionario scrive l'etimologia a parole, con frasi brevi e regolari, e si l
 - «vedi amminoacido», «vedi bicicletta»: un rimando, che vale come legame indeterminato con certezza 2.
 Mai «Etimologia mancante», mai una frase che dubita («forse», «probabilmente», «etimologia incerta»). Le righe valgono solo
 per le voci che il dizionario ha già senza un'etimologia, e solo se l'etimo è una voce del dizionario
-(importa_etimi_dizionari()).
+(importa_etimi_dizionari()): con i file delle voci (lessemi.tsv, dizionari.tsv) si scrivono solo le righe in cui la
+parola e l'etimo sono voci, e restano fuori le forme flesse («comprò: vedi comprare», 475 mila righe inutili).
 
-    curl -s …/itwiktionary/All%20languages%20combined/kaikki.org-dictionary-all.jsonl | python3 etimi_wikizionario.py etimi.tsv
+    curl -s …/itwiktionary/All%20languages%20combined/kaikki.org-dictionary-all.jsonl \
+        | python3 etimi_wikizionario.py etimi.tsv [lessemi.tsv dizionari.tsv]
 """
 import json, re, sys, unicodedata
 from collections import Counter
@@ -66,8 +68,23 @@ def esc(v):
     return '\\N' if v is None or v == '' else str(v).replace('\\', '\\\\').replace('\t', ' ').replace('\n', ' ')
 
 
+def carica_voci(percorsi):
+    """Le coppie (lingua, lemma) delle voci, dai TSV del parser e dei dizionari; None se non ci sono file."""
+    if not percorsi:
+        return None
+    voci = set()
+    for p in percorsi:
+        with open(p, encoding='utf-8') as f:
+            for r in f:
+                c = r.rstrip('\n').split('\t')
+                if len(c) > 2:
+                    voci.add((c[1], unicodedata.normalize('NFC', c[2])))
+    return voci
+
+
 if __name__ == '__main__':
     out = open(sys.argv[1], 'a', encoding='utf-8')
+    voci = carica_voci(sys.argv[2:])
     conta, esempi, viste = Counter(), [], set()
     for riga in sys.stdin:
         try:
@@ -85,6 +102,10 @@ if __name__ == '__main__':
         conta['con etimologia'] += 1
         if not righe:
             conta['non lette'] += 1
+            continue
+        if voci is not None and ((('it', unicodedata.normalize('NFC', parola)) not in voci)
+                                 or any((l, unicodedata.normalize('NFC', e)) not in voci for _, l, e, _, _ in righe)):
+            conta['non voci'] += 1                 # una forma flessa, o un etimo che il dizionario non ha
             continue
         conta[righe[0][3]] += 1
         if len(esempi) < 25 and conta['lette'] % 400 == 0:

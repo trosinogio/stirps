@@ -63,7 +63,7 @@ jobs:
           # le etimologie italiane del Wikizionario (etimi_wikizionario.py) vanno nelle righe degli etimi dei dizionari; se il
           # dump non si scarica si tengono quelle del pacchetto di main, perché un pacchetto senza le toglierebbe dal sito
           if curl -sf -o /tmp/wikizionario.jsonl "https://kaikki.org/itwiktionary/All%20languages%20combined/kaikki.org-dictionary-all.jsonl"; then
-            python3 etimi_wikizionario.py dati/it/tsv/etimi_dizionari.tsv < /tmp/wikizionario.jsonl 2> /tmp/wikizionario.txt
+            python3 etimi_wikizionario.py dati/it/tsv/etimi_dizionari.tsv dati/it/tsv/lessemi.tsv dati/it/tsv/dizionari.tsv < /tmp/wikizionario.jsonl 2> /tmp/wikizionario.txt
             cat /tmp/wikizionario.txt
             echo "::notice title=Wikizionario::$(head -1 /tmp/wikizionario.txt)"
             python3 diagnosi_wikizionario.py dati/it/senza_etimologia.tsv < /tmp/wikizionario.jsonl | tee /tmp/diagnosi.txt || true
