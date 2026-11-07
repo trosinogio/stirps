@@ -447,6 +447,20 @@ select pg_temp.verifica((select testa || '|' || (sensi->1->>1) from sensi where 
 select pg_temp.verifica((select (r->>'nuove')::int + (r->>'cambiate')::int from (select importa_sensi() as r) x) = 0,
   'accezioni uguali non si riscrivono');
 
+\echo '— traslitterazioni nuove'
+do $$
+begin
+  insert into lessema (lingua, lemma, omografo, translit, provenienza, stato_editoriale, id_esterno)
+    values ('grc', 'ζζα', 1, 'zza', 'wiktionary', 'importato', 'prova:zza'), ('grc', 'ζζβ', 1, 'zzb', 'wiktionary', 'importato', 'prova:zzb');
+  insert into stg_lessema (chiave, lingua, lemma, omografo, ricostruito, translit)
+    values ('prova:zza', 'grc', 'ζζα', 1, false, 'zzz'), ('prova:zzb', 'grc', 'ζζβ', 1, false, 'zzz');
+  perform importa_wiktionary();
+  perform pg_temp.verifica((select count(*) from lessema where slug = 'grc/zzz') = 1,
+    'due voci che con la traslitterazione nuova andrebbero allo stesso indirizzo: ne cambia una, e l''import non si ferma');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
+
 \echo '— etimologie dei dizionari e analisi della forma'
 select pg_temp.verifica(
   (select h.etichetta = 'Lewis & Short' and h.stato = 'accolta' and h.confidenza = 3 and h.provenienza = 'perseus'

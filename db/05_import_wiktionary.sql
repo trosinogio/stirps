@@ -154,14 +154,18 @@ begin
   get diagnostics n = row_count;
   r := r || jsonb_build_object('lessemi_aggiornati', n);
   -- la traslitterazione cambia l'indirizzo: si aggiorna solo se il nuovo indirizzo è libero (un doppione superato
-  -- può ancora occuparlo; lo toglie pulisci_wiktionary(), che poi completa l'aggiornamento)
-  update lessema l
-     set translit = s.translit
-    from m_scelta s
-   where l.id = s.id and l.provenienza = 'wiktionary' and l.stato_editoriale = 'importato'
-     and s.translit is not null and l.translit is distinct from s.translit
-     and not exists (select 1 from lessema y where y.id <> l.id
-                      and y.slug = slug_di(l.lingua, l.lemma, s.translit, l.omografo, l.ricostruito));
+  -- può ancora occuparlo; lo toglie pulisci_wiktionary(), che poi completa l'aggiornamento), e una voce sola per
+  -- indirizzo: due voci che nello stesso aggiornamento andrebbero allo stesso indirizzo (gmw-pro/i) non passano entrambe
+  with nuove as (
+    select l.id, s.translit, slug_di(l.lingua, l.lemma, s.translit, l.omografo, l.ricostruito) as nuovo
+      from lessema l join m_scelta s on s.id = l.id
+     where l.provenienza = 'wiktionary' and l.stato_editoriale = 'importato'
+       and s.translit is not null and l.translit is distinct from s.translit),
+  libere as (
+    select distinct on (n.nuovo) n.id, n.translit from nuove n
+     where not exists (select 1 from lessema y where y.id <> n.id and y.slug = n.nuovo)
+     order by n.nuovo, n.id)
+  update lessema l set translit = f.translit from libere f where l.id = f.id;
 
   with ins as (
     insert into lessema (lingua, lemma, omografo, ricostruito, translit, pos, glossa, glossa_lingua,
@@ -465,13 +469,16 @@ begin
   r := r || jsonb_build_object('lessemi_tolti', n);
 
   -- 4. le traslitterazioni rimaste in sospeso perché l'indirizzo era occupato da un doppione ora tolto
-  update lessema l
-     set translit = s.translit
-    from stg_lessema s
-   where s.chiave = l.id_esterno and s.translit is not null and l.translit is distinct from s.translit
-     and l.provenienza = 'wiktionary' and l.stato_editoriale = 'importato'
-     and not exists (select 1 from lessema y where y.id <> l.id
-                      and y.slug = slug_di(l.lingua, l.lemma, s.translit, l.omografo, l.ricostruito));
+  with nuove as (
+    select l.id, s.translit, slug_di(l.lingua, l.lemma, s.translit, l.omografo, l.ricostruito) as nuovo
+      from lessema l join stg_lessema s on s.chiave = l.id_esterno
+     where s.translit is not null and l.translit is distinct from s.translit
+       and l.provenienza = 'wiktionary' and l.stato_editoriale = 'importato'),
+  libere as (
+    select distinct on (n.nuovo) n.id, n.translit from nuove n
+     where not exists (select 1 from lessema y where y.id <> n.id and y.slug = n.nuovo)
+     order by n.nuovo, n.id)
+  update lessema l set translit = f.translit from libere f where l.id = f.id;
   get diagnostics n = row_count;
   r := r || jsonb_build_object('traslitterazioni_completate', n);
 
