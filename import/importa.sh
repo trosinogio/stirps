@@ -38,17 +38,40 @@ scarica() {   # scarica <nome inglese della lingua> : stampa il dump di Kaikki
 echo "1/4  scarico e filtro il dump di Kaikki ($NOME)"
 scarica "$NOME" | SENZA="$DATI/senza_etimologia.tsv" FORME="$DATI/forme.tsv" python3 filtra.py "$DATI/lemmi.jsonl" "$DATI/glosse.tsv"
 ARGOMENTI=()
+MANCANTI=()
 for voce in $(printf '%s' "$CHIUSURA" | sed 's/ \([a-z][a-z-]*:\)/\n\1/g' | tr ' ' '~'); do
   codice=${voce%%:*}; nome=$(printf '%s' "${voce#*:}" | tr '~' ' ')
   echo "     chiusura delle catene: $nome"
   mkdir -p "dati/$codice"
-  # un dump che Kaikki non ha (l'anglonormanno) è un avviso, non la fine del lavoro: la lingua resta fuori dalla chiusura
+  # un dump che Kaikki non ha per lingua (protoellenico, francone…) si cerca dopo nel dump grezzo di tutte le lingue
   if ! scarica "$nome" | LINGUA=$codice FORME="dati/$codice/forme.tsv" python3 filtra.py "dati/$codice/lemmi.jsonl" "dati/$codice/glosse.tsv"; then
-    echo "::warning title=Chiusura::dump di Kaikki non disponibile per $nome: la lingua resta fuori"
+    MANCANTI+=("$codice")
     continue
   fi
   ARGOMENTI+=(--chiudi "$codice=dati/$codice/lemmi.jsonl,dati/$codice/glosse.tsv,dati/$codice/forme.tsv")
 done
+if [ ${#MANCANTI[@]} -gt 0 ]; then
+  # il dump grezzo di Wiktionary inglese ha tutte le lingue: si scarica una volta, per tutte quelle che mancano, e se ne
+  # tengono solo le righe con il loro codice; un dump che manca anche lì è un avviso, e la lingua resta fuori
+  echo "     dump mancanti (${MANCANTI[*]}): li cerco nel dump grezzo di tutte le lingue"
+  codici=$(printf '%s|' "${MANCANTI[@]}"); codici=${codici%|}
+  if curl -sf "https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz" | gunzip \
+       | grep -E "\"lang_code\": ?\"($codici)\"" > dati/grezzi.jsonl; then
+    for codice in "${MANCANTI[@]}"; do
+      grep -E "\"lang_code\": ?\"$codice\"" dati/grezzi.jsonl \
+        | LINGUA=$codice FORME="dati/$codice/forme.tsv" python3 filtra.py "dati/$codice/lemmi.jsonl" "dati/$codice/glosse.tsv" || true
+      if [ -s "dati/$codice/lemmi.jsonl" ]; then
+        echo "     $codice: $(wc -l < "dati/$codice/lemmi.jsonl") voci dal dump grezzo"
+        ARGOMENTI+=(--chiudi "$codice=dati/$codice/lemmi.jsonl,dati/$codice/glosse.tsv,dati/$codice/forme.tsv")
+      else
+        echo "::warning title=Chiusura::nessuna voce per $codice, nemmeno nel dump grezzo: la lingua resta fuori"
+      fi
+    done
+    rm -f dati/grezzi.jsonl
+  else
+    echo "::warning title=Chiusura::dump grezzo non disponibile: ${MANCANTI[*]} restano fuori"
+  fi
+fi
 
 if [ "$WIKIZIONARIO" = 1 ]; then
   echo "     glosse italiane: Wikizionario"
