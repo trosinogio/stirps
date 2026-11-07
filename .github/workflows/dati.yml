@@ -39,7 +39,7 @@ jobs:
       ESTERNI: en,fr,de,ru
       GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
       # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
-      DIAGNOSI_MODELLI: it-verb-obj,m-g,yesno,internationalism,from,contraction
+      DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

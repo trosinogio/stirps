@@ -173,6 +173,14 @@ trovate = {r[2]: (r[5], r[7]) for r in righe}
 assert trovate.get('καταδάπτω') == ('δάπτω', 'κατα-') and trovate.get('ἐφίστημι') == ('ἵστημι', 'ἐφ-'), trovate
 assert trovate.get('transtollo') == ('tollo', 'trans-') and trovate.get('affero') == ('fero', 'ad-'), trovate
 assert 'ἐπικάρπιος' not in trovate and 'ἀεργός' not in trovate and 'acfero' not in trovate and 'perlego' not in trovate, trovate
+# una radice ricostruita è la base del suo derivato, non un prefisso; un suffisso ricostruito resta un affisso
+from wiktionary import e_affisso
+assert e_affisso('-ente') and e_affisso('ab-') and e_affisso('*-eti') and not e_affisso('*bʰer-') and not e_affisso('casa')
+imp = Importatore()
+imp.voce({'w': '*bʰéreti', 'l': 'ine-pro', 'rec': True, 'tpl': [{'n': 'af', 'a': {'1': 'ine-pro', '2': '*bʰer-', '3': '*-eti'}, 'e': ''}]},
+         lingua_voce='ine-pro', parola='*bʰéreti')
+archi = [(r['etimo'], r['affisso']) for r in imp.relazioni if r['esito'] == imp.lessema('ine-pro', '*bʰéreti')]
+assert archi == [(imp.lessema('ine-pro', '*bʰer-'), '*-eti')], archi
 # le etimologie scritte solo a parole, senza modelli: la prima frase, se è semplice; mai dubbi, confronti o influssi
 from filtra import testo_come_der, surf_come_af
 tc = lambda t: [(x['n'], x['a']) for x in testo_come_der({'etymology_text': t, 'lang_code': 'it'})]
@@ -182,6 +190,13 @@ assert tc('From Latin dominus, from domus.') == [('der', {'1': 'it', '2': 'la', 
 assert tc('From divertire +\u200e -ente.') == [('af', {'1': 'it', '2': 'divertire', '3': '-ente'})]
 assert tc('Possibly from Latin X.') == [] and tc('Compare French fou.') == [] and tc('From French papa, a child word.') == []
 assert surf_come_af({'etymology_templates': [{'name': 'surf', 'args': {'1': 'it', '2': 'divertire', '3': '-ente'}}]})[0]['n'] == 'af'
+from filtra import modello_di_ripiego
+mr = lambda n, a: [(x['n'], x['a']) for x in modello_di_ripiego({'etymology_templates': [{'name': n, 'args': a}]})]
+assert mr('it-verb-obj', {'1': 'lanciare<t:to launch>', '2': 'razzo<t:rockets><pl:1>'}) == [('af', {'1': 'it', '2': 'lanciare', '3': 'razzo'})]
+assert mr('from', {'1': 'it', '2': "l'aquila"}) == [('der', {'1': 'it', '2': 'it', '3': "l'aquila"})]
+assert mr('contraction', {'1': 'it', '2': 'ci', '3': 'è'}) == [('af', {'1': 'it', '2': 'ci', '3': 'è'})]
+assert mr('contraction', {'1': 'it', '2': "va' a fa' 'n culo"}) == [] and mr('contraction', {'1': 'it', '2': 'non è?'}) == []
+assert surf_come_af({'word': 'de', 'etymology_templates': [{'name': 'surf', 'args': {'1': 'it', '2': 'la', '3': 'de'}}]}) == []
 # nella lingua di partenza una forma flessa citata va al suo lemma, come forma citata (quattrocchi < occhio, «occhi»)
 import os, tempfile
 cartella = tempfile.mkdtemp()

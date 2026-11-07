@@ -286,6 +286,31 @@ def testo_come_der(v):
     return [{'n': 'der', 'a': {'1': lingua_voce, '2': lingua, '3': parti[0]}, 'e': ''}]
 
 
+PAROLA_SOLA = re.compile(r"[^\W\d_][\w'’-]*")
+
+
+def modello_di_ripiego(v):
+    """I modelli italiani che dicono l'etimo con una forma loro, quando la voce non ne ha un altro: il composto di verbo e
+    oggetto ({{it-verb-obj|girare|Sole}}: girasole = girare + sole), «From l'aquila» ({{from|it|l'aquila}}), la
+    contrazione di parole singole ({{contraction|it|ci|è}}: c'è), non di una frase (vaffanculo)."""
+    netto = lambda x: re.sub(r'<[^<>]*>', '', x or '').strip()
+    for t in v.get('etymology_templates') or []:
+        n, a = t.get('name'), t.get('args') or {}
+        if n == 'it-verb-obj' and a.get('1') and a.get('2'):
+            return [{'n': 'af', 'a': {'1': 'it', '2': netto(a['1']), '3': netto(a['2'])}, 'e': t.get('expansion', '')}]
+        if n == 'from' and PAROLA_SOLA.fullmatch(netto(a.get('2'))):
+            lv = a.get('1') or LINGUA
+            return [{'n': 'der', 'a': {'1': lv, '2': lv, '3': netto(a['2'])}, 'e': t.get('expansion', '')}]
+        if n == 'contraction':
+            lv = a.get('1') or LINGUA
+            parti = [netto(x) for k, x in sorted(a.items()) if k.isdigit() and int(k) >= 2 and x]
+            if parti and all(PAROLA_SOLA.fullmatch(p) for p in parti):
+                if len(parti) == 1:
+                    return [{'n': 'der', 'a': {'1': lv, '2': lv, '3': parti[0]}, 'e': t.get('expansion', '')}]
+                return [{'n': 'af', 'a': {'1': lv, **{str(i): p for i, p in enumerate(parti, 2)}}, 'e': t.get('expansion', '')}]
+    return []
+
+
 def surf_come_af(v):
     """{{surf}} (l'analisi di superficie: «By surface analysis, divertire +‎ -ente») vale come af solo se la voce non
     ha nessun altro etimo."""
@@ -294,7 +319,9 @@ def surf_come_af(v):
         return []
     a = t.get('args') or {}
     parti = {k: x for k, x in a.items() if k.isdigit() and int(k) >= 2 and x}
-    return [{'n': 'af', 'a': {'1': a.get('1') or LINGUA, **parti}, 'e': t.get('expansion', '')}] if len(parti) >= 2 else []
+    if len(parti) < 2 or v.get('word') in parti.values():          # de = «la» + «de»: un'analisi di sé stessa no
+        return []
+    return [{'n': 'af', 'a': {'1': a.get('1') or LINGUA, **parti}, 'e': t.get('expansion', '')}]
 
 
 if __name__ == '__main__':
@@ -370,7 +397,7 @@ if __name__ == '__main__':
             tpl = menzione_come_der(v)
             promosse += bool(tpl)
         if not tpl:
-            tpl = surf_come_af(v) or testo_come_der(v)
+            tpl = surf_come_af(v) or modello_di_ripiego(v) or testo_come_der(v)
             dal_testo += bool(tpl)
             if tpl and esempi_testo < 25:
                 esempi_testo += 1
@@ -397,7 +424,7 @@ if __name__ == '__main__':
                               'se': dati_scheda(v),
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
-    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da {{{{surf}}}} {dal_testo}, da {{{{ety}}}} {dalla_ety}), forme flesse {flesse} '
+    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}, sigle e simboli esclusi {non_parole}', file=sys.stderr)
     if senza:

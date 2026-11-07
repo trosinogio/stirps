@@ -462,6 +462,14 @@ def antenato_lingua(c):
 CIMA_GRANDE = 10
 
 
+def e_affisso(p):
+    """Un elemento di {{af}} che è un affisso: -ente, ab-, e anche *-eti (l'asterisco non nasconde il trattino). Una forma
+    ricostruita che finisce con il trattino è invece una radice o un tema, cioè la base: in {{af|ine-pro|*bʰer-|*-eti}}
+    la base di *bʰéreti è *bʰer-, non il suffisso."""
+    q = (p or '').lstrip('*')
+    return q.startswith('-') or (q.endswith('-') and not (p or '').startswith('*'))
+
+
 def forma_ricostruita(l):
     """«radice» per una radice ricostruita (*meh₂-, *(s)ker-), «tema» per un tema con un trattino interno (*meh₂-tu-,
     *wréǵ-ye-), None per il resto. Una radice è la cima della sua famiglia; un tema deriva dalla sua radice."""
@@ -660,11 +668,11 @@ class Importatore:
                     catena_attiva = False
                     continue
                 parti = self.parti_affissi(n, a)
-                basi = [p for p, _ in parti if not p.startswith('-') and not p.endswith('-')]
-                if any(p.endswith('-') and not p.startswith('-') for p, _ in parti) or len(basi) >= 2:
+                basi = [p for p, _ in parti if not e_affisso(p)]
+                if any(e_affisso(p) and not p.lstrip('*').startswith('-') for p, _ in parti) or len(basi) >= 2:
                     self.formazioni_ambigue.add(k0)
-                basi = [p for p in parti if not (p[0].startswith('-') or p[0].endswith('-'))]
-                affissi = [p[0] for p in parti if p[0].startswith('-') or p[0].endswith('-')]
+                basi = [p for p in parti if not e_affisso(p[0])]
+                affissi = [p[0] for p in parti if e_affisso(p[0])]
                 if not basi and len(parti) >= 2:
                     basi, affissi = parti, []        # fotografia = foto- + -grafia: i due elementi sono gli etimi
                     self.stat['composti_di_elementi'] += 1
