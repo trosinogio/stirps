@@ -4,15 +4,16 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { useRouter } from 'next/navigation';
 import { TESTI, type Lang } from '@/lib/i18n';
 import { classeArco, classeRamo, fmt, G } from '@/lib/forme';
-import { contaNascosti, costruisciAlbero, dimensioni, dividiFigli, nomiNascondibili, type NodoAlbero } from '@/lib/albero';
+import { costruisciAlbero, dimensioni, dividiFigli, nomiNascondibili, type NodoAlbero } from '@/lib/albero';
 import type { NodoPiatto } from '@/lib/tipi';
 
 const CHIAVE_NOMI = 'stirps.stemma.nomi';   // la scelta del lettore sui nomi propri, solo nel suo browser
 
 // Su schermo stretto mostra lo stemma verticale (generato sul server, passato come children);
-// su schermo largo lo sostituisce con lo stemma orizzontale disegnato qui. Sopra, gli strumenti dello stemma:
+// su schermo largo, se la famiglia non supera LIMITE_DISEGNO parole (nodi non nullo), lo sostituisce con lo stemma orizzontale disegnato qui. Sopra, gli strumenti dello stemma:
 // i nomi propri sono nascosti finché il lettore non chiede di vederli.
-export default function StemmaAdattivo({ lang, nodi, children }: { lang: Lang; nodi: NodoPiatto[]; children: ReactNode }) {
+// nodi è null per una famiglia oltre LIMITE_DISEGNO: non si disegna, e le parole non viaggiano fino al browser.
+export default function StemmaAdattivo({ lang, nodi, nascosti, children }: { lang: Lang; nodi: NodoPiatto[] | null; nascosti: number; children: ReactNode }) {
   const t = TESTI[lang];
   const [largo, setLargo] = useState(false);
   const [nomi, setNomi] = useState(false);
@@ -24,10 +25,6 @@ export default function StemmaAdattivo({ lang, nodi, children }: { lang: Lang; n
     try { setNomi(localStorage.getItem(CHIAVE_NOMI) === '1'); } catch { /* memoria del browser non disponibile */ }
     return () => mq.removeEventListener('change', f);
   }, []);
-  const nascosti = useMemo(() => {
-    const { radice } = costruisciAlbero(nodi);
-    return contaNascosti(nomiNascondibili(radice), dimensioni(radice));
-  }, [nodi]);
   const cambia = () => {
     const v = !nomi;
     setNomi(v);
@@ -43,7 +40,7 @@ export default function StemmaAdattivo({ lang, nodi, children }: { lang: Lang; n
         </div>
       )}
       <div className="stemma-ctrl" data-nomi={nomi ? 'si' : 'no'}>
-        {largo ? <StemmaOrizzontale lang={lang} nodi={nodi} nomi={nomi} /> : children}
+        {largo && nodi ? <StemmaOrizzontale lang={lang} nodi={nodi} nomi={nomi} /> : children}
       </div>
     </>
   );
@@ -264,7 +261,7 @@ function Tendina({ id, lang, titolo, membri, dim, onChiudi, ancora, stile }: {
               {m.glossa && <span className="gl"> {G(m.glossa, lang)}</span>}
             </Link>
             {(dim.get(m.id) ?? 0) > 0 && (
-              <Link className="quanti" href={`/${lang}/r/${m.slug}`} prefetch={false} title={t.apriStemmaDi(fmt(m))}>
+              <Link className="quanti" href={`/${lang}/r/${m.slug}/stemma`} prefetch={false} title={t.apriStemmaDi(fmt(m))}>
                 {t.discendentiN(dim.get(m.id)!)}
               </Link>
             )}

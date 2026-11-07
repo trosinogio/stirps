@@ -161,14 +161,19 @@ try {
     const { rows: [m] } = await client.query('select count(*)::int as n from lessema');
     console.log(`[db] pronto: ${m.n} lessemi, ${secondi()} s`);
   }
-  // frequenze d'uso (ordinano la ricerca e la coda di verifica): anche su un database già pronto, se mancano
+  // frequenze d'uso (ordinano la ricerca, la coda di verifica e le parole nella sintesi di una famiglia): una lingua alla
+  // volta, dai file dati/frequenze_<lingua>.tsv.gz, anche su un database già pronto, se di quella lingua non ce ne sono
   const { rows: [fq] } = await client.query(`select to_regclass('public.frequenza') is not null as c`);
-  if (fq.c && existsSync('dati/frequenze_it.tsv.gz')) {
-    const { rows: [nf] } = await client.query('select count(*)::int as n from frequenza');
-    if (nf.n === 0) {
-      const k = await carica(client, 'frequenza', 'frequenze_it');
+  if (fq.c && existsSync('dati')) {
+    const { readdirSync } = await import('node:fs');
+    for (const f of readdirSync('dati').filter((x) => /^frequenze_[a-z-]+\.tsv\.gz$/.test(x)).sort()) {
+      const lingua = f.slice('frequenze_'.length, -'.tsv.gz'.length);
+      const { rows: [nf] } = await client.query(
+        'select (select count(*)::int from frequenza where lingua = $1) as n, exists (select 1 from lingua where codice = $1) as nota', [lingua]);
+      if (nf.n > 0 || !nf.nota) continue;
+      const k = await carica(client, 'frequenza', f.slice(0, -'.tsv.gz'.length));
       await client.query('analyze frequenza');
-      console.log(`[db] frequenze: ${k} forme`);
+      console.log(`[db] frequenze ${lingua}: ${k} forme`);
     }
   }
   // aggiornamenti datati (db/aggiornamenti/): tutti ripetibili senza danni, si applicano a ogni avvio in ordine di data

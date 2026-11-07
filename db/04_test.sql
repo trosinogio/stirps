@@ -444,4 +444,41 @@ select pg_temp.verifica(
   (select array_agg(x->>'sigla') from jsonb_array_elements(scheda('en/night', true, 'it')->'consultabili') x) @> array['AHD', 'Etymonline', 'OED'],
   'una voce inglese rimanda alle tre fonti centrali: OED, American Heritage Dictionary, Etymonline');
 
+-- ---------------------------------------------------------------------
+\echo '— indice delle radici'
+-- ---------------------------------------------------------------------
+select pg_temp.verifica(
+  (select count(*) > 0 and bool_and(x->>'lingua' = 'ine-pro')
+     from jsonb_array_elements(elenco_radici('it', true, true, 1, 100, 'ine-pro')->'radici') x)
+  and (elenco_radici('it', true, true, 1, 100, 'ine-pro')->>'totale')::int
+      = (select (g->>'n')::int from jsonb_array_elements(elenco_radici('it', true, true)->'gruppi') g where g->>'lingua' = 'ine-pro')
+  and (elenco_radici('it', true, true)->>'totale')::int
+      = (select sum((g->>'n')::int) from jsonb_array_elements(elenco_radici('it', true, true)->'gruppi') g),
+  'l''indice delle radici si sfoglia per lingua della radice, e ogni lingua dice quante radici ha');
+
+select pg_temp.verifica(
+  exists (select 1 from jsonb_array_elements(elenco_radici('it', true, true)->'radici') r where jsonb_array_length(r->'esempi') between 1 and 4)
+  and not exists (
+    select 1 from jsonb_array_elements(elenco_radici('it', true, true)->'radici') r, jsonb_array_elements_text(r->'esempi') e
+    where jsonb_array_length(r->'esempi') > 4
+       or not exists (select 1 from mv_famiglia f join lessema x on x.id = f.id
+                      where f.capo = (r->>'id')::bigint and x.id <> f.capo and x.lingua = 'it' and x.lemma = e)),
+  'sotto ogni radice fino a quattro parole italiane che ne discendono');
+
+-- l'ultima parola d'esempio di una radice, resa la più usata, passa in testa
+do $$
+declare r jsonb; ultima text;
+begin
+  select x into r from jsonb_array_elements(elenco_radici('it', true, true)->'radici') x where jsonb_array_length(x->'esempi') >= 2 limit 1;
+  ultima := r->'esempi'->>(jsonb_array_length(r->'esempi') - 1);
+  begin
+    insert into frequenza (lingua, forma, rango, fonte) values ('it', ultima, 1, 'frequencywords') on conflict (lingua, forma) do update set rango = 1;
+    perform pg_temp.verifica(
+      (select x->'esempi'->>0 from jsonb_array_elements(elenco_radici('it', true, true)->'radici') x where x->'id' = r->'id') = ultima,
+      'gli esempi sotto una radice vengono per frequenza d''uso: le parole più usate per prime');
+    raise exception using errcode = 'P0098', message = 'annulla';
+  exception when sqlstate 'P0098' then null;
+  end;
+end $$;
+
 \echo '— collaudo completato'

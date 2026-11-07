@@ -3,8 +3,16 @@ import type { Lang, Testi } from './i18n';
 import type { Attestazione, Nodo, Scheda } from './tipi';
 
 export const ORDINE_RAMI = ['proto', 'italica', 'ellenica', 'germanica', 'slava', 'indoiranica', 'semitica'];
-export const ORDINE_LINGUE = ['ine-pro', 'itc-pro', 'la', 'la-vul', 'la-med', 'it', 'fro', 'fr', 'es', 'pt', 'grc',
-  'gem-pro', 'ang', 'en', 'de', 'sla-pro', 'ru', 'sa', 'pal', 'fa', 'ar'];
+// le lingue principali di ogni ramo, prima gli antenati: ordinano elenchi, stemmi e mappe (le altre vengono dopo)
+export const ORDINE_LINGUE = ['ine-pro',
+  'itc-pro', 'itc-ola', 'la', 'la-vul', 'la-lat', 'la-med', 'la-new', 'roa-oit', 'it', 'fro', 'xno', 'frm', 'fr', 'pro', 'oc', 'ca',
+  'osp', 'es', 'roa-opt', 'pt', 'ro',
+  'grk-pro', 'gmy', 'grc', 'gkm', 'el',
+  'gem-pro', 'got', 'non', 'gmw-pro', 'ang', 'enm', 'en', 'sco', 'goh', 'gmh', 'de', 'osx', 'gml', 'odt', 'dum', 'nl', 'frk', 'lng',
+  'cel-pro', 'cel-gau', 'ga', 'cy',
+  'ine-bsl-pro', 'sla-pro', 'cu', 'orv', 'ru', 'uk', 'pl', 'cs', 'sh',
+  'iir-pro', 'sa', 'hi', 'ira-pro', 'peo', 'pal', 'fa',
+  'sem-pro', 'akk', 'hbo', 'he', 'arc', 'ar'];
 
 // Stesse categorie della tabella tipo_relazione
 export const CATEGORIA: Record<string, 'trasmissione' | 'formazione' | 'indeterminata' | 'influsso'> = {

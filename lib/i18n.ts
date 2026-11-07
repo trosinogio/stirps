@@ -26,13 +26,21 @@ export interface Testi {
   paroleInLingue: (p: number, l: number) => string;
   capostipitiProvvisori: string;
   capostipitiNota: string;
+  radiciPerLingua: string;
+  tutteLeLingueChip: string;
+  altreLingueN: (n: number) => string;
+  radiciConto: (n: number, provvisorie: boolean) => string;
+  radiceEsempi: (parole: string[]) => string;
   discendentiN: (n: number) => string;
   lingue: string;
   lingueNota: string;
   famiglia: (f: string) => string;
   indietro: string;
   stemmaTitolo: (lemma: string) => string;
-  schede: { stemma: string; lingue: string; mappa: string };
+  schede: { sintesi: string; stemma: string; lingue: string; mappa: string };
+  sintesi: { nellaLingua: (n: number) => string; perUso: string; tutte: (n: number) => string; rami: string; ramiNota: (lemma: string) => string;
+    altriRami: (n: number) => string; altreLingue: (n: number) => string; altreLingueNota: string; apriFamiglia: (lemma: string) => string };
+  stemmaRidotto: string;
   vistaFamiglia: string;
   nessunDiscendente: string;
   apriVoceDi: (lemma: string) => string;
@@ -245,10 +253,15 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     cambiaLingua: 'Lingua dell’interfaccia',
     eroeAria: 'Una radice in evidenza',
     eroeDidascalia: (n) => `La stessa parola, trasmessa per eredità, in ${n} lingue.`,
-    apriStemma: 'Apri lo stemma',
+    apriStemma: 'Apri la famiglia',
     altraRadice: 'Un’altra radice',
     radici: 'Radici',
-    radiciNota: 'Forme ricostruite e radici dichiarate, di qualunque famiglia linguistica. Ogni famiglia raccoglie le parole ereditate, prese in prestito e derivate.',
+    radiciNota: 'Ogni radice è la capostipite di una famiglia di parole, in tutte le lingue in cui è arrivata. Sotto ciascuna, alcune parole italiane che ne discendono.',
+    radiciPerLingua: 'Lingua della radice',
+    tutteLeLingueChip: 'tutte',
+    altreLingueN: (n) => `altre ${n} lingue`,
+    radiciConto: (n, p) => `${n.toLocaleString('it-IT')} ${p ? (n === 1 ? 'capostipite' : 'capostipiti') : n === 1 ? 'radice' : 'radici'}, dalla famiglia più numerosa`,
+    radiceEsempi: (ps) => `in italiano: ${ps.join(', ')}`,
     paroleLingue: (p, l) => `${p.toLocaleString('it-IT')} ${p === 1 ? 'parola' : 'parole'}, ${l} ${l === 1 ? 'lingua' : 'lingue'}`,
     paroleInLingue: (p, l) => `${p} ${p === 1 ? 'parola' : 'parole'} in ${l} ${l === 1 ? 'lingua' : 'lingue'}`,
     capostipitiProvvisori: 'Capostipiti provvisori',
@@ -258,8 +271,20 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     lingueNota: 'Si può entrare da qualunque lingua: nessuna è privilegiata.',
     famiglia: (f) => `Famiglia ${f.toLowerCase()}`,
     indietro: 'Indietro',
-    stemmaTitolo: (l) => `${l}, stemma della famiglia`,
-    schede: { stemma: 'Stemma', lingue: 'Lingue', mappa: 'Mappa' },
+    stemmaTitolo: (l) => `${l}, famiglia di parole`,
+    schede: { sintesi: 'Sintesi', stemma: 'Stemma', lingue: 'Lingue', mappa: 'Mappa' },
+    sintesi: {
+      nellaLingua: (n) => `In italiano · ${n.toLocaleString('it-IT')} ${n === 1 ? 'parola' : 'parole'}`,
+      perUso: 'Prima le parole più usate.',
+      tutte: (n) => `tutte le ${n.toLocaleString('it-IT')} parole italiane`,
+      rami: 'Rami principali',
+      ramiNota: (l) => `Le parole che derivano direttamente da ${l}, con quante altre ne portano.`,
+      altriRami: (n) => `+ ${n.toLocaleString('it-IT')} ${n === 1 ? 'altra derivata diretta' : 'altre derivate dirette'}, nello stemma`,
+      altreLingue: (n) => `Nelle altre lingue · ${n}`,
+      altreLingueNota: 'Per ogni lingua, prima le parole più vicine all’origine.',
+      apriFamiglia: (l) => `Apri la famiglia di ${l}`,
+    },
+    stemmaRidotto: 'Una famiglia grande: qui i primi due livelli. Ogni ramo si apre nella sua pagina.',
     vistaFamiglia: 'Vista della famiglia',
     nessunDiscendente: 'Nei dati attuali nessuna parola discende da questa forma.',
     apriVoceDi: (l) => `Apri la voce di ${l}`,
@@ -331,7 +356,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     primaAttestazione: 'prima attestazione',
     dataPassaggio: 'data del passaggio, secondo le fonti',
     forma: 'forma',
-    apriStemmaDa: 'Apri lo stemma da questa parola',
+    apriStemmaDa: 'Apri la famiglia di questa parola',
     legame: (t) => `legame ${t} con`,
     tipiConnessione: { culturale: 'culturale', semantica: 'semantico', omonimia: 'di omonimia', paronimia: 'di paronimia', falso_amico: 'di falso amico', altro: '' },
     inLingua: (n) => `in ${n}`,
@@ -446,10 +471,15 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     cambiaLingua: 'Interface language',
     eroeAria: 'A featured root',
     eroeDidascalia: (n) => `The same word, passed down by inheritance, in ${n} languages.`,
-    apriStemma: 'Open the stemma',
+    apriStemma: 'Open the family',
     altraRadice: 'Another root',
     radici: 'Roots',
-    radiciNota: 'Reconstructed forms and declared roots, from any language family. Each family gathers the inherited, borrowed and derived words.',
+    radiciNota: 'Each root heads a family of words, in every language it reached. Under each one, a few English words that descend from it.',
+    radiciPerLingua: 'Language of the root',
+    tutteLeLingueChip: 'all',
+    altreLingueN: (n) => `${n} more languages`,
+    radiciConto: (n, p) => `${n.toLocaleString('en-GB')} ${p ? (n === 1 ? 'family head' : 'family heads') : n === 1 ? 'root' : 'roots'}, largest family first`,
+    radiceEsempi: (ps) => `in English: ${ps.join(', ')}`,
     paroleLingue: (p, l) => `${p.toLocaleString('en-GB')} ${p === 1 ? 'word' : 'words'}, ${l} ${l === 1 ? 'language' : 'languages'}`,
     paroleInLingue: (p, l) => `${p} ${p === 1 ? 'word' : 'words'} in ${l} ${l === 1 ? 'language' : 'languages'}`,
     capostipitiProvvisori: 'Provisional ancestors',
@@ -459,8 +489,20 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     lingueNota: 'You can start from any language: none is privileged.',
     famiglia: (f) => `${f} family`,
     indietro: 'Back',
-    stemmaTitolo: (l) => `${l}, family stemma`,
-    schede: { stemma: 'Stemma', lingue: 'Languages', mappa: 'Map' },
+    stemmaTitolo: (l) => `${l}, word family`,
+    schede: { sintesi: 'Overview', stemma: 'Stemma', lingue: 'Languages', mappa: 'Map' },
+    sintesi: {
+      nellaLingua: (n) => `In English · ${n.toLocaleString('en-GB')} ${n === 1 ? 'word' : 'words'}`,
+      perUso: 'Most frequent words first.',
+      tutte: (n) => `all ${n.toLocaleString('en-GB')} English words`,
+      rami: 'Main branches',
+      ramiNota: (l) => `The words derived directly from ${l}, with how many more each one carries.`,
+      altriRami: (n) => `+ ${n.toLocaleString('en-GB')} more direct ${n === 1 ? 'derivative' : 'derivatives'}, in the stemma`,
+      altreLingue: (n) => `In other languages · ${n}`,
+      altreLingueNota: 'For each language, the words closest to the origin come first.',
+      apriFamiglia: (l) => `Open the family of ${l}`,
+    },
+    stemmaRidotto: 'A large family: the first two levels are shown here. Each branch opens on its own page.',
     vistaFamiglia: 'Family view',
     nessunDiscendente: 'In the current data no word descends from this form.',
     apriVoceDi: (l) => `Open the entry for ${l}`,
@@ -532,7 +574,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     primaAttestazione: 'first attestation',
     dataPassaggio: 'date of the step, according to the sources',
     forma: 'form',
-    apriStemmaDa: 'Open the stemma from this word',
+    apriStemmaDa: 'Open the family of this word',
     legame: (t) => `${t} link with`,
     tipiConnessione: { culturale: 'cultural', semantica: 'semantic', omonimia: 'homonymy', paronimia: 'paronymy', falso_amico: 'false-friend', altro: '' },
     inLingua: (n) => `in ${n}`,

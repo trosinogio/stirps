@@ -77,7 +77,11 @@ export interface LinguaInfo {
   ramo_nome: string | null; antenato: string | null; varieta_di: string | null; antenato_nome: string | null; varieta_di_nome: string | null;
 }
 export interface Indice { radici: RadiceIndice[]; lingue: LinguaIndice[]; totali: { lessemi: number; lingue: number; radici: number; capostipiti: number } }
-export interface ElencoRadici { totale: number; pagina: number; per_pagina: number; radici: (Nodo & { discendenti: number; lingue: number })[] }
+export interface ElencoRadici {
+  totale: number; pagina: number; per_pagina: number; capo_lingua: string | null;
+  gruppi: { lingua: string; nome: string; n: number }[];          // quanti capostipiti ha ogni lingua, dalla più ricca
+  radici: (Nodo & { discendenti: number; lingue: number; esempi: string[] })[];   // esempi: parole della lingua del lettore
+}
 export interface ParoleLingua {
   totale: number; totale_parole: number; totale_nomi: number; iniziale: string | null; iniziali: { iniziale: string; n: number }[];
   // un'iniziale con molte parole si sfoglia per le prime due lettere

@@ -17,7 +17,7 @@ app/[lang]/page.tsx              pagina iniziale: radice in evidenza, radici, ca
 app/[lang]/r/[...slug]/page.tsx  famiglia di una radice: stemma, lingue, mappa
 app/[lang]/w/[...slug]/page.tsx  voce: catena, ipotesi e fonti, sorelle, allotropi, viaggio, attestazioni
 app/[lang]/l/[codice]/[[...iniziale]]/page.tsx   parole di una lingua, per iniziale
-app/[lang]/radici/[[...resto]]/page.tsx         tutte le radici e i capostipiti provvisori, a pagine
+app/[lang]/radici/[[...resto]]/page.tsx         l’indice delle radici, per lingua della radice, e i capostipiti provvisori, a pagine
 app/[lang]/lingue/page.tsx                      tutte le lingue, per famiglia e ramo
 app/[lang]/storie, metodo, chi-siamo            storie di parole, metodo, chi siamo
 app/[lang]/bibliografia/page.tsx                le opere di riferimento, per ambito
@@ -43,7 +43,9 @@ neon.ts, .neon                   servizi e collegamento del progetto Neon (neon 
 .agents/skills/                  skill di Neon per gli agenti di programmazione
 ```
 
-Indirizzi: `/it/r/ine-pro/ped` (stemma), `/it/r/ine-pro/ped/mappa`, `/en/w/it/fegato` (voce), `/en/l/it/c` (le parole italiane con la C), `/it/radici` e `/it/radici/provvisorie` (tutte le radici, a pagine).
+Indirizzi: `/it/r/ine-pro/ped` (sintesi della famiglia), `/it/r/ine-pro/ped/stemma`, `/it/r/ine-pro/ped/lingue`, `/it/r/ine-pro/ped/mappa`, `/en/w/it/fegato` (voce), `/en/l/it/c` (le parole italiane con la C), `/it/radici` (le radici indoeuropee, a pagine), `/it/radici/gem-pro` (quelle di un’altra lingua), `/it/radici/tutte` e `/it/radici/provvisorie`.
+
+L’indice delle radici (`elenco_radici()`) mostra sotto ogni radice fino a quattro parole della lingua del lettore che ne discendono, le più usate per prime. La pagina di una famiglia si apre sulla sintesi: le parole della lingua del lettore, i rami principali (i figli diretti della radice, con quante parole portano) e le parole più vicine alla radice in ogni altra lingua; lo stemma si disegna fino a 150 parole (`LIMITE_DISEGNO`), oltre mostra i primi due livelli e ogni ramo ha la sua pagina.
 
 ## In locale
 

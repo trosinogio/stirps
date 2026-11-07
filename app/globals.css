@@ -640,3 +640,39 @@ footer.piede{max-width:none;margin:48px 0 0;padding:0;border-top:1px solid var(-
 .red-lista p{margin:4px 0}
 .red-lista-testa{color:var(--ink)}
 .red-conta{font:600 14px var(--sans);color:var(--ink-3);margin-left:6px}
+
+/* Famiglia: la sintesi (la prima scheda) */
+.sintesi-sez{margin:22px 0 30px}
+.sintesi-tit{font:700 13px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:0 0 4px}
+.sintesi-nota{font:14px var(--sans);color:var(--ink-2);margin:0 0 10px}
+.sintesi-prime{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px 28px}
+.sintesi-prime li{display:flex;align-items:baseline;gap:10px;min-width:0;padding:6px 0;border-top:1px solid var(--filo)}
+.sintesi-prime .voce{flex:none}
+.sintesi-prime .gl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sintesi-prime .lemma{font-size:19px}
+.sintesi-prime .gl,.sintesi-rami .gl{font-size:14.5px;color:var(--ink-2)}
+.sintesi-anche{margin:12px 0 0;line-height:1.7}
+.sintesi-rami{list-style:none;margin:0;padding:0}
+.sintesi-rami li{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,280px);gap:4px 20px;align-items:center;padding:8px 0;border-top:1px solid var(--filo)}
+.sr-voce{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.sr-voce .lemma{font-size:19px}
+.sr-quanti{display:flex;align-items:center;gap:10px}
+.sr-barra{display:block;height:6px;border-radius:3px;background:var(--pig);opacity:.75;flex:none;max-width:50%}
+@media (max-width:560px){.sintesi-rami li{grid-template-columns:1fr}}
+.riga-lingua .nome-l .n{font-size:12.5px;color:var(--ink-3)}
+.riga-lingua{scroll-margin-top:16px}
+.riga-lingua:target{background:var(--terra)}
+.stemma-v li > .quanti{margin-left:8px}
+
+/* Indice delle radici: filtri per lingua della radice ed esempi nella lingua del lettore */
+.filtri-radici{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:4px 0 18px}
+.filtri-tit{font:13px var(--sans);color:var(--ink-3);margin-right:4px}
+.filtri-radici .btn-chip{text-decoration:none;display:inline-flex;gap:6px;align-items:baseline}
+.filtri-radici .btn-chip .n{font-size:12px;color:var(--ink-3)}
+.filtri-radici .btn-chip[aria-current="page"]{color:var(--ink);border-color:var(--ink);background:var(--terra);font-weight:600}
+.filtri-altre summary{font:13.5px var(--sans);color:var(--lapis);cursor:pointer;padding:5px 4px}
+.filtri-altre[open]{flex-basis:100%}
+.filtri-lista{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.conto-radici{font:13.5px var(--sans);color:var(--ink-2);margin:0 0 6px}
+.rad-esempi{grid-column:1 / -1;font:italic 15.5px/1.4 var(--serif);color:var(--ink-2)}
+.rad-provvisorie{margin-top:26px}
