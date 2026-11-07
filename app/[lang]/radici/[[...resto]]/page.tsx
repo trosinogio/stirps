@@ -186,9 +186,9 @@ async function PerAree({ lang, capo, area: chiesta, pagina }: { lang: Lang; capo
       </ul>
       {pagine > 1 && (
         <nav className="paginazione" aria-label={t.paginaDi(pagina, pagine)}>
-          {pagina > 1 && <Link className="btn" href={href(pagina - 1)}>{t.precedenti}</Link>}
+          {pagina > 1 && <Link className="btn" href={href(pagina - 1)} prefetch={false}>{t.precedenti}</Link>}
           <span>{t.paginaDi(pagina, pagine)}</span>
-          {pagina < pagine && <Link className="btn" href={href(pagina + 1)}>{t.successive}</Link>}
+          {pagina < pagine && <Link className="btn" href={href(pagina + 1)} prefetch={false}>{t.successive}</Link>}
         </nav>
       )}
       {!unicaArea && <p className="nota-sez">{t.aree.nota}</p>}
@@ -247,9 +247,9 @@ export default async function Radici({ params }: { params: Promise<{ lang: strin
       </ul>
       {pagine > 1 && (
         <nav className="paginazione" aria-label={t.paginaDi(pagina, pagine)}>
-          {pagina > 1 && <Link className="btn" href={href(pagina - 1)}>{t.precedenti}</Link>}
+          {pagina > 1 && <Link className="btn" href={href(pagina - 1)} prefetch={false}>{t.precedenti}</Link>}
           <span>{t.paginaDi(pagina, pagine)}</span>
-          {pagina < pagine && <Link className="btn" href={href(pagina + 1)}>{t.successive}</Link>}
+          {pagina < pagine && <Link className="btn" href={href(pagina + 1)} prefetch={false}>{t.successive}</Link>}
         </nav>
       )}
       {!provvisorie && (
