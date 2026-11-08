@@ -225,6 +225,20 @@ select pg_temp.verifica(
   and (select count(*) from glossa) = (select count(*) from glosse_xmin),
   'e non riscrive nessuna glossa');
 
+\echo '— traslitterazioni finte'
+do $$
+declare v_id bigint := lx('it/carne');
+begin
+  -- una traslitterazione che è un pezzo di glossa (tucca, «liquid lard(?)») fa l'indirizzo; il pacchetto non la dà più
+  update lessema set translit = 'liquid lard(?)' where id = v_id;
+  perform pg_temp.verifica((select slug from lessema where id = v_id) <> 'it/carne', 'una traslitterazione finta cambia l''indirizzo');
+  perform importa_wiktionary();
+  perform pg_temp.verifica((select translit is null and slug = 'it/carne' from lessema where id = v_id),
+    'il nuovo import toglie la traslitterazione finta da un lemma in alfabeto latino, e l''indirizzo torna quello giusto');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
+
 \echo '— reimport'
 -- con gli stessi dati un nuovo import non riscrive niente: ogni riga riscritta occupa spazio fino al vacuum
 create temp table righe_prima as

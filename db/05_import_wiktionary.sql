@@ -160,7 +160,10 @@ begin
     select l.id, s.translit, slug_di(l.lingua, l.lemma, s.translit, l.omografo, l.ricostruito) as nuovo
       from lessema l join m_scelta s on s.id = l.id
      where l.provenienza = 'wiktionary' and l.stato_editoriale = 'importato'
-       and s.translit is not null and l.translit is distinct from s.translit),
+       -- una traslitterazione che il pacchetto non dà più si toglie solo da un lemma in alfabeto latino: lì era un pezzo
+       -- di glossa (tucca, «liquid lard(?)») e faceva l'indirizzo; per le altre scritture resta quella che c'è
+       and (s.translit is not null or l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿ''’ .·-]+$')
+       and l.translit is distinct from s.translit),
   libere as (
     select distinct on (n.nuovo) n.id, n.translit from nuove n
      where not exists (select 1 from lessema y where y.id <> n.id and y.slug = n.nuovo)
