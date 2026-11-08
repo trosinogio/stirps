@@ -114,6 +114,12 @@ export interface Testi {
   dataPassaggio: string;
   forma: string;
   apriStemmaDa: string;
+  famigliaDi: (radice: string) => string;
+  strumentiStemma: {
+    titolo: string; cerca: string; trovati: (n: number, nascosti: number) => string; nessuno: string; prossima: string;
+    lingue: string; tutte: string; altre: string; generazioni: string; tutteGen: string; risali: (x: string) => string;
+    paroleIn: (lingua: string) => string;
+  };
   legame: (tipo: string) => string;
   tipiConnessione: Record<string, string>;
   inLingua: (nome: string) => string;
@@ -385,6 +391,13 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     dataPassaggio: 'data del passaggio, secondo le fonti',
     forma: 'forma',
     apriStemmaDa: 'Apri la famiglia di questa parola',
+    famigliaDi: (r) => `Famiglia di ${r}`,
+    strumentiStemma: {
+      titolo: 'Strumenti dello stemma', cerca: 'Cerca nello stemma', nessuno: 'nessuna parola trovata', prossima: 'Invio: la prossima',
+      trovati: (n, h) => `${n.toLocaleString('it-IT')} ${n === 1 ? 'trovata' : 'trovate'}${h ? `, ${h} nelle liste` : ''}`,
+      lingue: 'Lingua', tutte: 'Tutte', altre: 'Altre lingue…', generazioni: 'Generazioni', tutteGen: 'tutte',
+      risali: (x) => `Risali alla famiglia di ${x}`, paroleIn: (l) => `Tutte le parole in ${l}`,
+    },
     legame: (t) => `legame ${t} con`,
     tipiConnessione: { culturale: 'culturale', semantica: 'semantico', omonimia: 'di omonimia', paronimia: 'di paronimia', falso_amico: 'di falso amico', altro: '' },
     inLingua: (n) => `in ${n}`,
@@ -638,6 +651,13 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     dataPassaggio: 'date of the step, according to the sources',
     forma: 'form',
     apriStemmaDa: 'Open the family of this word',
+    famigliaDi: (r) => `Family of ${r}`,
+    strumentiStemma: {
+      titolo: 'Tree tools', cerca: 'Search the tree', nessuno: 'no words found', prossima: 'Enter: next one',
+      trovati: (n, h) => `${n.toLocaleString('en-GB')} found${h ? `, ${h} in the lists` : ''}`,
+      lingue: 'Language', tutte: 'All', altre: 'Other languages…', generazioni: 'Generations', tutteGen: 'all',
+      risali: (x) => `Go up to the family of ${x}`, paroleIn: (l) => `All the words in ${l}`,
+    },
     legame: (t) => `${t} link with`,
     tipiConnessione: { culturale: 'cultural', semantica: 'semantic', omonimia: 'homonymy', paronimia: 'paronymy', falso_amico: 'false-friend', altro: '' },
     inLingua: (n) => `in ${n}`,

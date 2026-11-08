@@ -36,7 +36,7 @@ export default function StemmaVerticale({ lang, nodi, livelli }: { lang: Lang; n
     const { mostrati, raccolti } = dividiFigli(n.figli, dim, nascostoQui);
     const comuni = raccolti.filter((c) => !nascostoQui(c)).length;
     return (
-      <li key={n.id} className={classi(n, np)}>
+      <li key={n.id} className={classi(n, np)} data-lingua={n.lingua}>
         {riga(n)}
         {livelli != null && liv >= livelli && (dim.get(n.id) ?? 0) > PICCOLO ? quanti(n) : n.figli.length > 0 && (
           <ol>
@@ -50,7 +50,7 @@ export default function StemmaVerticale({ lang, nodi, livelli }: { lang: Lang; n
                   </summary>
                   <ul>
                     {raccolti.map((c) => (
-                      <li key={c.id} className={classi(c, nascostoQui(c))}>
+                      <li key={c.id} className={classi(c, nascostoQui(c))} data-lingua={c.lingua}>
                         {riga(c)}
                         {quanti(c)}
                       </li>
