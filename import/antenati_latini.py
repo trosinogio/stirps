@@ -16,11 +16,12 @@ primo, e la precisione per soglia di fiducia: si propone solo sopra la soglia ch
 almeno l'85% di esatte. Le proposte vanno alla redazione (lista di lavoro), mai al pubblico: le parole senza etimologia
 sono spesso derivate italiane o forme che il latino non ha, e il campione delle note è più facile.
 
-    python3 antenati_latini.py coppie.tsv latino.tsv italiano.tsv [senza.tsv proposte.tsv]
+    python3 antenati_latini.py coppie.tsv latino.tsv italiano.tsv negativi.tsv [senza.tsv proposte.tsv]
 
 coppie.tsv: id_it, lemma_it, pos_it, id_la, lemma_la, pos_la, tipo, glossa_it, glossa_la (le relazioni accolte);
 latino.tsv: id, lemma, pos, glossa, provenienza, nome_proprio; italiano.tsv: lemma, ha un'etimologia (t/f);
-senza.tsv: id, lemma, pos, glossa, rango di frequenza.
+negativi.tsv: id, lemma, pos, glossa, lingue dell'etimo (le
+parole italiane con un'etimologia che non viene dal latino); senza.tsv: id, lemma, pos, glossa, rango di frequenza.
 Il rapporto va sullo standard error.
 """
 import math, random, sys, unicodedata, zlib
@@ -274,6 +275,16 @@ def prevedi(mod, lex, it_lemma, cl, glossa=''):
     return risultati[:3]
 
 
+PRIORE = 0.25   # la parte delle parole senza etimologia che ha davvero l'etimo tra i lemmi latini (stima prudente)
+
+
+def tratti(lex, p, lemma, glossa):
+    """Fiducia (scarto sul secondo), costo per lettera e accordo delle glosse del primo candidato."""
+    fiducia = (p[1][0] - p[0][0]) if len(p) > 1 else 5.0
+    v = lex.voci[p[0][1]]
+    return fiducia, p[0][0] / len(norm(lemma)), bool(senso(glossa) & v[4])
+
+
 def main():
     coppie_raw = righe(sys.argv[1]); latino = righe(sys.argv[2])
     lex = Lessico(latino)
@@ -290,64 +301,69 @@ def main():
     mod = Modello(addestra)
     print(f'coppie: {len(ids)} parole italiane, {len(addestra)} per imparare, {len(prova)} tenute da parte; '
           f'{sum(len(c) for c in mod.finali.values())} finali, {len(mod.op)} operazioni sul tema', file=sys.stderr)
-    # prova sul 20% tenuto da parte: esatta se il primo è un etimo accolto, o lo stesso lemma in un'altra voce
-    # (lo stesso lemma da Wiktionary e dal Perseus); «variante» se differisce dall'etimo solo nella finale
-    esiti = []; trovati = 0; fuori_prova = Counter()
+    # i positivi: il 20% tenuto da parte. Esatta se il primo è un etimo accolto, o lo stesso lemma in un'altra voce
+    # (da Wiktionary e dal Perseus); una variante (una lettera di differenza) conta come errore
+    pos = []; fuori_prova = Counter(); n_pos = 0
     for i in sorted(prova):
         lemma, cl, gl = info[i]
         perche = esclusa(lemma, gl, italiani - {lemma.lower()})
         if perche: fuori_prova[perche] += 1; continue
-        veri = {forma_di.get(x) for x in per_it[i]} - {None}
-        if any(lex.voci[k][2] in veri for k in lex.candidati(mod, norm(lemma))): trovati += 1
+        n_pos += 1
         p = prevedi(mod, lex, lemma, cl, gl)
-        if not p: esiti.append((None, 'no', lemma, '')); continue
-        fiducia = (p[1][0] - p[0][0]) if len(p) > 1 else 5.0
-        relativo = p[0][0] / len(norm(lemma))
+        if not p: continue
+        veri = {forma_di.get(x) for x in per_it[i]} - {None}
         v = lex.voci[p[0][1]]
-        if v[0] in per_it[i] or v[2] in veri: e = 'esatta'
-        elif any(len(x) > 4 and una_lettera(v[2], x) for x in veri): e = 'variante'
-        else: e = 'errata'
-        esiti.append((fiducia, e, lemma, v[1], relativo))
-    n = len(esiti); c = Counter(e[1] for e in esiti)
-    print(f'tenute da parte: {n}; l\'etimo vero è tra i candidati in {trovati} ({trovati / n:.1%}); al primo posto '
-          f'{c["esatta"]} ({c["esatta"] / n:.1%}), una variante dell\'etimo {c["variante"]}, senza candidati {c["no"]}; '
-          f'non provate: ' + ', '.join(f'{k} {v}' for k, v in fuori_prova.most_common()), file=sys.stderr)
-    con = sorted((e for e in esiti if e[0] is not None), key=lambda e: -e[0])
-    soglia = None
-    for s in (0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0):
-        sopra = [e for e in con if e[0] >= s]
-        if not sopra: continue
-        k = sum(1 for e in sopra if e[1] == 'esatta')
-        var = sum(1 for e in sopra if e[1] == 'variante') / len(sopra)
-        print(f'  fiducia ≥ {s}: {len(sopra)} proposte ({len(sopra) / n:.0%} delle parole), esatte {k / len(sopra):.1%} '
-              f'(almeno {wilson(k, len(sopra)):.1%}), varianti {var:.1%}', file=sys.stderr)
-        if soglia is None and wilson(k, len(sopra)) >= PRECISIONE: soglia = s
-    # il costo assoluto per lettera del primo candidato, tra le proposte sopra la soglia di fiducia
-    if soglia is not None:
-        sopra = [e for e in con if e[0] >= soglia]
-        for t in (0.6, 0.8, 1.0, 1.2, 1.5, 2.0):
-            q = [e for e in sopra if e[4] <= t]
-            if q:
-                k = sum(1 for e in q if e[1] == 'esatta')
-                print(f'  e costo per lettera ≤ {t}: {len(q)} proposte, esatte {k / len(q):.1%} (almeno {wilson(k, len(q)):.1%})',
-                      file=sys.stderr)
-    errori = [e for e in con if e[1] == 'errata' and (soglia is None or e[0] >= soglia)]
-    random.Random(1).shuffle(errori)
-    print('  errori sopra la soglia: ' + '; '.join(f'{e[2]} → {e[3]}' for e in errori[:20]), file=sys.stderr)
-    print(f'soglia scelta: {soglia}', file=sys.stderr)
-    if len(sys.argv) > 5 and soglia is not None:
+        pos.append((*tratti(lex, p, lemma, gl), v[0] in per_it[i] or v[2] in veri, lemma, v[1]))
+    # i negativi: parole italiane con un'etimologia accolta che non viene dal latino (derivati italiani, prestiti dal
+    # francese, dal greco…), una su dieci; ogni proposta su di loro è un errore. Quelle che passano dal latino volgare
+    # o medievale restano fuori: lì un etimo latino non sarebbe del tutto sbagliato
+    neg = []; n_neg = 0
+    for r in righe(sys.argv[4]):
+        if zlib.crc32(r[0].encode()) % 10 or any(x.startswith('la') for x in r[4].split(',')): continue
+        if esclusa(r[1], r[3], italiani - {r[1].lower()}): continue
+        n_neg += 1
+        p = prevedi(mod, lex, r[1], classe(r[2]), r[3])
+        if p: neg.append((*tratti(lex, p, r[1], r[3]), r[1], lex.voci[p[0][1]][1]))
+    print(f'positivi provati {n_pos} (non provati: ' + ', '.join(f'{k} {v}' for k, v in fuori_prova.most_common())
+          + f'), al primo posto {sum(1 for e in pos if e[3])} ({sum(1 for e in pos if e[3]) / n_pos:.1%}); '
+          f'negativi provati {n_neg}', file=sys.stderr)
+    # la regola: fiducia, costo per lettera, accordo delle glosse. La precisione stimata sulle parole senza etimologia
+    # pesa i positivi con PRIORE e i negativi con 1 - PRIORE; si sceglie la regola che propone di più tenendo l'85%
+    regole = []
+    for f in (1.0, 2.0, 3.0, 4.0, 5.0):
+        for c in (0.5, 0.6, 0.8, 1.0, 1.5, 9.0):
+            for g in (False, True):
+                ok = sum(1 for e in pos if e[0] >= f and e[1] <= c and (e[2] or not g) and e[3])
+                er = sum(1 for e in pos if e[0] >= f and e[1] <= c and (e[2] or not g) and not e[3])
+                ne = sum(1 for e in neg if e[0] >= f and e[1] <= c and (e[2] or not g))
+                a, b, d = ok / n_pos, er / n_pos, ne / n_neg
+                stima = PRIORE * a / (PRIORE * (a + b) + (1 - PRIORE) * d) if a + b + d else 0
+                regole.append((stima, a, f, c, g, ok, er, ne, d))
+    buone = [x for x in regole if x[0] >= PRECISIONE]
+    for x in sorted(regole, key=lambda x: -x[0])[:8]:
+        print(f'  fiducia ≥ {x[2]}, costo ≤ {x[3]}, glosse {"sì" if x[4] else "no"}: esatte {x[5]}, errate {x[6]} sui '
+              f'positivi, proposte su {x[8]:.1%} dei negativi; precisione stimata {x[0]:.1%}, copertura {x[1]:.0%}',
+              file=sys.stderr)
+    if not buone:
+        print('nessuna regola arriva all\'85%: nessuna proposta', file=sys.stderr); return
+    stima, cop, F, C, G = max(buone, key=lambda x: x[1])[:5]
+    print(f'regola scelta: fiducia ≥ {F}, costo ≤ {C}, glosse {"sì" if G else "no"} (stima {stima:.1%}, copertura '
+          f'{cop:.0%})', file=sys.stderr)
+    falsi = [e for e in neg if e[0] >= F and e[1] <= C and (e[2] or not G)]
+    print('  proposte sui negativi: ' + '; '.join(f'{e[3]} → {e[4]}' for e in falsi[:15]), file=sys.stderr)
+    if len(sys.argv) > 6:
         mod = Modello([(norm(info[i][0]), norm(primo[i]), info[i][1]) for i in ids])
         fuori = []; scartate = Counter()
-        for r in righe(sys.argv[4]):
+        for r in righe(sys.argv[5]):
             perche = esclusa(r[1], r[3], italiani - {r[1].lower()})
             if perche: scartate[perche] += 1; continue
             p = prevedi(mod, lex, r[1], classe(r[2]), r[3])
             if not p: continue
-            fiducia = (p[1][0] - p[0][0]) if len(p) > 1 else 5.0
-            if fiducia >= soglia:
+            fiducia, relativo, glosse = tratti(lex, p, r[1], r[3])
+            if fiducia >= F and relativo <= C and (glosse or not G):
                 v = lex.voci[p[0][1]]
-                fuori.append(f'{r[0]}\t{r[1]}\t{v[0]}\t{v[1]}\t{fiducia:.2f}\t{r[4]}\t{p[0][0] / len(norm(r[1])):.2f}\n')
-        with open(sys.argv[5], 'w', encoding='utf-8') as f:
+                fuori.append(f'{r[0]}\t{r[1]}\t{v[0]}\t{v[1]}\t{fiducia:.2f}\t{r[4]}\t{relativo:.2f}\n')
+        with open(sys.argv[6], 'w', encoding='utf-8') as f:
             f.writelines(fuori)
         print(f'proposte per le parole senza etimologia: {len(fuori)}; non provate: '
               + ', '.join(f'{k} {v}' for k, v in scartate.most_common()), file=sys.stderr)
