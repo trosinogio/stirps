@@ -756,3 +756,6 @@ svg.ricerca:not(.selezione) .st-nodo:not(.evid-r){opacity:.4}
 .stemma-ctrl[data-livelli="2"] .stemma-v>li>ol>li>ol>li>ol{display:none}
 .stemma-ctrl[data-livelli="3"] .stemma-v>li>ol>li>ol>li>ol>li>ol{display:none}
 @media (max-width:600px){.st-etichetta{min-width:0;width:100%}.st-nomi{margin-left:0}}
+
+/* l'elenco di un'area delle radici: ci si arriva con #elenco */
+#elenco{scroll-margin-top:14px}

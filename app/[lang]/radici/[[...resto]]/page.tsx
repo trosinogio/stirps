@@ -134,7 +134,7 @@ async function PerAree({ lang, capo, area: chiesta, pagina }: { lang: Lang; capo
       <span className="filtri-tit">{t.aree.titolo}</span>
       {ind.aree.map((a) => (
         <Link key={a.area} className="btn-chip" prefetch={false} aria-current={area === a.area ? 'page' : undefined}
-              href={`${baseLingua}/${codiceArea(a.area)}`}>
+              href={`${baseLingua}/${codiceArea(a.area)}#elenco`}>
           {nomeArea(a.area, a.nome)} <span className="n">{a.n.toLocaleString(loc)}</span>
         </Link>
       ))}
@@ -149,7 +149,7 @@ async function PerAree({ lang, capo, area: chiesta, pagina }: { lang: Lang; capo
           <section key={s.area} className="area-sezione">
             <h2>{nomeArea(s.area, s.nome)} <span className="conta-l">{s.n.toLocaleString(loc)}</span></h2>
             <ul className="radici">{s.radici.map((r) => <Riga key={r.id} r={r} lang={lang} />)}</ul>
-            {s.n > s.radici.length && <Link className="area-tutte" href={`${baseLingua}/${codiceArea(s.area)}`} prefetch={false}>{t.aree.tutte(s.n)}</Link>}
+            {s.n > s.radici.length && <Link className="area-tutte" href={`${baseLingua}/${codiceArea(s.area)}#elenco`} prefetch={false}>{t.aree.tutte(s.n)}</Link>}
           </section>
         ))}
         <p className="nota-sez">{t.aree.nota}</p>
@@ -166,7 +166,8 @@ async function PerAree({ lang, capo, area: chiesta, pagina }: { lang: Lang; capo
     <>
       <FiltriLingue ind={ind} lang={lang} />
       {chipAree}
-      <p className="conto-radici">
+      {/* l'elenco dell'area: i pulsanti delle aree ci portano qui, perché al telefono l'elenco sta sotto venti pulsanti */}
+      <p className="conto-radici" id="elenco">
         {unicaArea ? t.radiciConto(nArea.n, false).replace(/,.*$/, '') + ' · A–Z'
                    : <><Link href={base} prefetch={false}>{t.aree.tutteLeAree}</Link> · {t.aree.conto(nArea.n, nomeArea(area, nArea.nome))}</>}
       </p>
