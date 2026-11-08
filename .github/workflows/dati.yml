@@ -75,7 +75,7 @@ jobs:
           else
             echo "::warning title=Wikizionario::dump non scaricabile: restano le etimologie del Wikizionario del pacchetto di main"
             git fetch -q --depth 1 origin main
-            (git show FETCH_HEAD:dati/etimi_dizionari.tsv.gz 2> /dev/null | zcat | grep -P '\tWikizionario(-vedi)?$' || true) \
+            (git show FETCH_HEAD:dati/etimi_dizionari.tsv.gz 2> /dev/null | zcat | grep -P '\tWikizionario(-[a-z]+)?$' || true) \
               >> dati/it/tsv/etimi_dizionari.tsv
           fi
           # i due Wiktionary a confronto: dove c'è già un'etimologia inglese, la riga del Wikizionario concorda o discorda
@@ -83,6 +83,29 @@ jobs:
             dati/it/tsv/relazioni.tsv 2> /tmp/confronto.txt
           cat /tmp/confronto.txt
           echo "::notice title=Due Wiktionary::$(head -1 /tmp/confronto.txt)"
+
+      - name: Etimologie del Wiktionnaire e confronto per il francese
+        run: |
+          cd import
+          # le etimologie francesi del Wiktionnaire (etimi_wiktionnaire.py), come per il Wikizionario. Il dump è grande:
+          # si legge mentre si scarica, e le righe entrano solo se lo scaricamento arriva in fondo
+          rm -f /tmp/etimi_fr.tsv
+          if curl -sf "https://kaikki.org/frwiktionary/All%20languages%20combined/kaikki.org-dictionary-all.jsonl" \
+               | python3 etimi_wiktionnaire.py /tmp/etimi_fr.tsv dati/it/tsv/lessemi.tsv dati/it/tsv/dizionari.tsv 2> /tmp/wiktionnaire.txt; then
+            cat /tmp/etimi_fr.tsv >> dati/it/tsv/etimi_dizionari.tsv
+            cat /tmp/wiktionnaire.txt
+            echo "::notice title=Wiktionnaire::$(head -1 /tmp/wiktionnaire.txt)"
+          else
+            cat /tmp/wiktionnaire.txt || true
+            echo "::warning title=Wiktionnaire::dump non scaricabile: restano le etimologie del Wiktionnaire del pacchetto di main"
+            git fetch -q --depth 1 origin main
+            (git show FETCH_HEAD:dati/etimi_dizionari.tsv.gz 2> /dev/null | zcat | grep -P '\tWiktionnaire(-[a-z]+)?$' || true) \
+              >> dati/it/tsv/etimi_dizionari.tsv
+          fi
+          python3 confronta_wikizionario.py dati/it/tsv/etimi_dizionari.tsv dati/it/tsv/lessemi.tsv dati/it/tsv/ipotesi.tsv \
+            dati/it/tsv/relazioni.tsv fr Wiktionnaire 2> /tmp/confronto_fr.txt
+          cat /tmp/confronto_fr.txt
+          echo "::notice title=Wiktionary e Wiktionnaire::$(head -1 /tmp/confronto_fr.txt)"
 
       - name: Voci vere per il banco di prova
         run: |

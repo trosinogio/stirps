@@ -505,7 +505,14 @@ select pg_temp.verifica(
   (select (r->>'lemmi')::int = 1 and r->'origini'->0->'esempi'->0->>'lemma' = 'piede'
      from (select analizza_testo('it', array['madre'], array[1], 'it', true) as r) x),
   'una forma che è solo una riduzione (dalla = da + la) conta per i lemmi a cui rimanda, non per la voce omonima');
-delete from forma_lemma where lingua = 'it' and forma in ('notti', 'piedi', 'madre');
+insert into lessema (lingua, lemma) values ('it', 'zzomonimo');
+insert into forma_lemma values ('it', 'zzomonimo', 'madre', false);
+select pg_temp.verifica(
+  (select (r->>'lemmi')::int = 1 and r->'origini'->0->'esempi'->0->>'lemma' = 'madre'
+     from (select analizza_testo('it', array['zzomonimo'], array[1], 'it', true) as r) x),
+  'una voce omonima senza etimologia non ruba peso al lemma della forma (ha: avere)');
+delete from lessema where lingua = 'it' and lemma = 'zzomonimo';
+delete from forma_lemma where lingua = 'it' and forma in ('notti', 'piedi', 'madre', 'zzomonimo');
 
 \echo '— indice delle radici per area'
 insert into area_radice (lessema_id, area, provenienza) values (lx('ine-pro/ped'), 'corpo', 'redazione'),

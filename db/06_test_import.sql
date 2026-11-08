@@ -328,6 +328,31 @@ select pg_temp.verifica(
   not exists (select 1 from lessema where id_esterno = 'perseus:ls:n8')
   and (select glossa from lessema where slug = 'la/abactus-2') = 'a driving away, robbing',
   'una voce del dizionario che il pacchetto non ha più si toglie, se nessuno l''ha toccata; le altre restano dove sono');
+-- una voce del dizionario che il pacchetto non ha più ma che una catena di Wiktionary usa resta, e la sua etimologia
+-- non si toglie e rimette (orbatio, etimo dell'inglese orbation). Tutto si annulla alla fine
+do $$
+begin
+  insert into lessema (lingua, lemma, provenienza, stato_editoriale, id_esterno)
+    values ('la', 'provaorbatio', 'wiktionary', 'importato', 'enwikt:la:provaorbatio');
+  with h as (insert into ipotesi (esito_id, etichetta, provenienza, stato_editoriale)
+             values (lx('la/abactus-2'), 'Lewis & Short', 'perseus', 'importato') returning id)
+  insert into relazione (ipotesi_id, esito_id, etimo_id, tipo, provenienza, stato_editoriale)
+    select id, lx('la/abactus-2'), lx('grc/akris'), 'generico', 'perseus', 'importato' from h;
+  with h as (insert into ipotesi (esito_id, etichetta, provenienza, stato_editoriale)
+             values (lx('la/provaorbatio'), 'Wiktionary', 'wiktionary', 'importato') returning id)
+  insert into relazione (ipotesi_id, esito_id, etimo_id, tipo, provenienza, stato_editoriale)
+    select id, lx('la/provaorbatio'), lx('la/abactus-2'), 'generico', 'wiktionary', 'importato' from h;
+  create temp table d_ipotesi on commit drop as
+    select id from ipotesi where esito_id = lx('la/abactus-2') and provenienza = 'perseus';
+  delete from stg_dizionario where chiave = (select id_esterno from lessema where slug = 'la/abactus-2');
+  perform importa_dizionari();
+  perform pg_temp.verifica(
+    exists (select 1 from lessema where slug = 'la/abactus-2')
+    and (select count(*) from ipotesi h join d_ipotesi d on d.id = h.id) = 1,
+    'una voce del dizionario usata da una catena di Wiktionary resta con la sua etimologia, senza riscriverla (orbatio)');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
 
 \echo '— stime della prima attestazione dai dizionari'
 select pg_temp.verifica(
@@ -518,6 +543,39 @@ begin
     (select stato from ipotesi where id_esterno = 'prova:moveo#wikt') = 'accolta'
     and not exists (select 1 from ipotesi where esito_id = lx('la/moveo') and provenienza = 'perseus'),
     'quando Wiktionary dà un''etimologia, l''analisi della forma lascia il posto e quella di Wiktionary diventa accolta');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
+do $$
+declare v_h bigint;
+begin
+  insert into lessema (lingua, lemma, provenienza, stato_editoriale, id_esterno) values
+    ('fr', 'provasolo', 'wiktionary', 'importato', 'enwikt:fr:provasolo'),
+    ('fr', 'provadiverso', 'wiktionary', 'importato', 'enwikt:fr:provadiverso'),
+    ('fr', 'provauguale', 'wiktionary', 'importato', 'enwikt:fr:provauguale');
+  -- due voci con un'etimologia di Wiktionary (< illi), una senza
+  for v_h in select id from lessema where slug in ('fr/provadiverso', 'fr/provauguale') loop
+    with h as (insert into ipotesi (esito_id, etichetta, provenienza, stato_editoriale)
+               values (v_h, 'Wiktionary', 'wiktionary', 'importato') returning id)
+    insert into relazione (ipotesi_id, esito_id, etimo_id, tipo, provenienza, stato_editoriale)
+      select id, v_h, lx('la/illi'), 'generico', 'wiktionary', 'importato' from h;
+  end loop;
+  insert into stg_etimo_dizionario values
+    ('wiktionnaire:fr:provasolo', 'fr', 'provasolo', 1, 'la', 'illi', 'generico', null, 'Wiktionnaire'),
+    ('wiktionnaire:fr:provadiverso', 'fr', 'provadiverso', 1, 'la', 'moveo', 'generico', null, 'Wiktionnaire-discorda'),
+    ('wiktionnaire:fr:provauguale', 'fr', 'provauguale', 1, 'la', 'illi', 'generico', null, 'Wiktionnaire-concorda');
+  perform importa_etimi_dizionari();
+  perform pg_temp.verifica(
+    (select h.etichetta = 'Wiktionnaire' and h.stato = 'accolta' and h.confidenza = 3
+            and exists (select 1 from rimando m join opera o on o.id = m.opera_id where m.ipotesi_id = h.id and o.sigla = 'Wiktionnaire')
+       from ipotesi h where h.esito_id = (select id from lessema where slug = 'fr/provasolo') and h.provenienza = 'wiktionnaire')
+    and (select h.stato = 'alternativa' and h.confidenza = 2
+           from ipotesi h where h.esito_id = (select id from lessema where slug = 'fr/provadiverso') and h.provenienza = 'wiktionnaire')
+    and exists (select 1 from rimando m join opera o on o.id = m.opera_id join ipotesi h on h.id = m.ipotesi_id
+                 where h.esito_id = (select id from lessema where slug = 'fr/provauguale') and h.provenienza = 'wiktionary'
+                   and o.sigla = 'Wiktionnaire' and m.nota = 'concorda con Wiktionary')
+    and not exists (select 1 from ipotesi h where h.esito_id = (select id from lessema where slug = 'fr/provauguale') and h.provenienza = 'wiktionnaire'),
+    'il Wiktionnaire fa per il francese quello che il Wikizionario fa per l''italiano: etimologia dove manca, alternativa dove discorda, rimando dove concorda');
   raise exception using errcode = 'P0098', message = 'annulla';
 exception when sqlstate 'P0098' then null;
 end $$;

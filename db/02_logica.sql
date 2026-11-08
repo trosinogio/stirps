@@ -934,7 +934,7 @@ end $$;
 -- dal tipo di quel passaggio: popolare (eredità), dotta (prestito dotto, semidotto), prestito, altro. Una forma con più
 -- lemmi possibili conta per ciascuno in parti uguali; un lemma senza un'origine nota va a parte. Una forma che è solo una
 -- riduzione o una grafia senza accento (dalla = da + la, piu = più: forma_lemma.sostituisce) conta per i lemmi a cui
--- rimanda e non per la voce omonima.
+-- rimanda e non per la voce omonima; e una voce omonima senza etimologia non conta quando la forma ha un lemma (ha: avere).
 create function analizza_testo(p_lingua text, p_forme text[], p_conteggi int[], p_lang text default 'it',
                                p_anteprima boolean default false)
 returns jsonb language sql stable as $$
@@ -948,7 +948,11 @@ lemmi as (
   select f.forma, fl.lemma from forme f join forma_lemma fl on fl.lingua = p_lingua and fl.forma = f.forma
   union
   select f.forma, f.forma from forme f
-   where not exists (select 1 from forma_lemma fl where fl.lingua = p_lingua and fl.forma = f.forma and fl.sostituisce)),
+   where not exists (select 1 from forma_lemma fl where fl.lingua = p_lingua and fl.forma = f.forma and fl.sostituisce)
+     -- una voce omonima senza etimologia non ruba peso al lemma della forma (ha: avere, non la voce ha; sono: essere)
+     and (not exists (select 1 from forma_lemma fl where fl.lingua = p_lingua and fl.forma = f.forma)
+          or exists (select 1 from lessema l join ipotesi h on h.esito_id = l.id and h.stato = 'accolta'
+                      where l.lingua = p_lingua and l.lemma = f.forma and not l.ricostruito))),
 voci as (
   select x.forma, l.id, l.lemma, l.slug
     from lemmi x

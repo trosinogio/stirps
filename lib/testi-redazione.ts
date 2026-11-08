@@ -98,6 +98,8 @@ export interface TestiRedazione {
   codaFrequenza: string;
   catene: string;
   cateneNota: string;
+  senzaEtimologia: string;
+  senzaEtimologiaNota: string;
   inLista: (titolo: string, n: number, tot: number) => string;
   altre: (n: number) => string;
 }
@@ -221,6 +223,8 @@ export const TESTI_REDAZIONE: Record<Lang, TestiRedazione> = {
     codaFrequenza: 'Coda per frequenza',
     catene: 'Catene da sistemare',
     cateneNota: 'Parole la cui catena va subito a una radice ricostruita, senza tappe: l’etimologia di Wiktionary è stata letta solo in parte. Si ricostruiscono le tappe dalle fonti; una catena sistemata esce dalla lista al deploy successivo.',
+    senzaEtimologia: 'Parole comuni senza etimologia',
+    senzaEtimologiaNota: 'Parole d’uso comune (le prime 30.000 per frequenza) di cui né Wiktionary né il Wikizionario danno un’etimologia leggibile: l’analisi di un testo le riconosce ma le mette «senza origine». Si scrive l’etimologia con la sua fonte; la parola esce dalla lista al deploy successivo.',
     inLista: (titolo, n, tot) => `${titolo} · n. ${n} di ${tot}`,
     altre: (n) => `e altre ${n}`,
   },
@@ -342,6 +346,8 @@ export const TESTI_REDAZIONE: Record<Lang, TestiRedazione> = {
     codaFrequenza: 'Queue by frequency',
     catene: 'Chains to fix',
     cateneNota: 'Words whose chain jumps straight to a reconstructed root, with no steps: Wiktionary’s etymology was read only in part. The steps are rebuilt from the sources; a fixed chain leaves the list at the next deploy.',
+    senzaEtimologia: 'Common words without an etymology',
+    senzaEtimologiaNota: 'Everyday words (the first 30,000 by frequency) for which neither Wiktionary nor the Italian Wiktionary gives a readable etymology: text analysis recognizes them but files them as “no known origin”. Write the etymology with its source; the word leaves the list at the next deploy.',
     inLista: (titolo, n, tot) => `${titolo} · no. ${n} of ${tot}`,
     altre: (n) => `and ${n} more`,
   },

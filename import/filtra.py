@@ -289,7 +289,10 @@ def testo_come_der(v):
     (der dal latino), «From domandare» o «Deverbal of domandare» (der dalla stessa lingua), «Past participle of trovare»,
     «From divertire +‎ -ente» (af). Niente se la frase confronta, dubita o parla di influssi: «From X, influenced by Y»
     tiene X, ma «Possibly from X» o «Compare X» no."""
-    if v.get('etymology_templates'):
+    # i modelli che non danno un etimo (affini, qualificatori, citazioni) non fermano la lettura del testo: il ha solo
+    # {{cog|scn|lu}}; quelli che lo danno sì
+    if any(t.get('name') in UTILI or t.get('name') in MENZIONI or t.get('name') in ('ety', 'etymon')
+           for t in v.get('etymology_templates') or []):
         return []
     testo = (v.get('etymology_text') or '').strip()
     frase = re.split(r'[.;:(]|, (?:from|and|or|but|influenced|perhaps|possibly|probably)\b', testo, maxsplit=1)[0].strip(' ,')
@@ -389,8 +392,9 @@ def forme_per_analisi(v):
         if m and not s.get('form_of'):
             righe += [(w, l, 'riduzione') for l in lemmi_puliti(m.group(1))]
     # le tavole delle forme (avere: ho, hai; suo: sua, suoi, sue), ma non quelle degli articoli, che elencano gli altri
-    # articoli (la: il) e facevano di il una forma di la; niente maiuscole (il numerale I di primo non è la forma i)
-    if not forma_flessa(v) and v.get('pos') != 'article':
+    # articoli (la: il) e facevano di il una forma di la, né quelle dei pronomi (lo: la, li, le), per la stessa ragione;
+    # niente maiuscole (il numerale I di primo non è la forma i)
+    if not forma_flessa(v) and v.get('pos') not in ('article', 'pron'):
         for f in v.get('forms') or []:
             forma, et = f.get('form') or '', set(f.get('tags') or [])
             if (et and not et & FUORI_TAVOLA and forma and forma != w and ' ' not in forma and not forma.startswith('-')

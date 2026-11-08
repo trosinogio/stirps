@@ -387,6 +387,8 @@ def lemma_valido(lingua, lemma, ricostruito=False):
         return False                    # «+univ», «+af»: il nome di un modello letto come codice di lingua
     if not (lemma or '').strip('*- '):
         return False                    # un lemma vuoto («itc-pro:» da un termine senza parola) non è una voce
+    if '/' in lemma or lemma.startswith(('Appendix', 'Reconstruction:', 'Unsupported titles')):
+        return False                    # pagine di servizio di Wiktionary (i/languages A to L), sigle (c/o), due parole
     if ricostruito:                                      # le ricostruzioni hanno la loro notazione: *(s)ker-
         return True
     if NON_LEMMA.search(lemma or ''):
@@ -544,7 +546,14 @@ class Importatore:
     # ---- lessemi ----
     def lessema(self, lingua, termine, glossa=None, translit=None, pos=None, omografo=1, ident=None):
         lingua = codice_lingua(lingua)
-        termine = nome_pagina(lingua, senza_modificatori(termine))
+        termine = senza_modificatori(termine)
+        # «xaa:زوق» dentro un {{ety}} di una voce spagnola: il codice è la lingua della parola, non parte del lemma
+        m = re.match(r'^([a-z]{2,3}(?:-[a-z]{2,4})*):(\S.*)$', termine)
+        if m and m.group(1) != lingua:
+            lingua, termine = codice_lingua(m.group(1)), m.group(2)
+        # due grafie in un rimando («minuzza//minuzzare», «lě / *li»): vale la prima
+        termine = re.split(r'\s*//\s*|\s+/\s+', termine)[0]
+        termine = nome_pagina(lingua, termine)
         ric = termine.startswith('*')
         if not ric and lingua in VARIETA_ATTESTATE:
             lingua = VARIETA_ATTESTATE[lingua]

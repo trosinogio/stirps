@@ -36,7 +36,7 @@ def main():
     analisi = sys.argv[4] if len(sys.argv) > 4 else None
     # le voci, senza le pagine di servizio di Wiktionary («i/languages A to L») e le locuzioni
     voci = {c[2] for c in leggi(lessemi) if len(c) > 4 and c[1] == 'it' and c[4] != 't' and not re.search(r'[/ ]', c[2])}
-    voci_min = {v.lower(): v for v in voci}
+    voci_min = {v.lower(): v for v in voci if v == v.lower()}      # Sara (nome) non ferma sara → sarà
     rimandi = defaultdict(set)      # forma → lemmi (voci o altre forme)
     riduzioni = set()               # le forme che sono solo riduzioni di altre parole (dalla, l')
     for c in leggi(forme):
@@ -75,25 +75,41 @@ def main():
             cand.append(forma[:-1] + SCAMBIO[forma[-1]])
         return cand
 
+    def completa(forma):
+        """Le voci di una forma che non ne ha di sue: l'accento (piu → più, sara → sarà), l'apostrofo che il lessico dei
+        sottotitoli toglie (po → po' → poco), la vocale di una forma elisa (un' → una, uno)."""
+        cand = con_accento(forma)
+        if not forma.endswith("'"):
+            cand.append(forma + "'")
+        elif len(forma) >= 2:
+            cand += [forma[:-1] + v for v in 'aoei']
+        trovate = set()
+        for x in cand:
+            if x in voci_min and x not in riduzioni:
+                trovate.add(voci_min[x])
+            trovate |= risolvi(x)
+            if trovate and not forma.endswith("'"):
+                break
+        return trovate
+
     righe = 0
     conti = defaultdict(int)
-    for c in leggi(frequenze):
-        if len(c) < 2 or c[0] != 'it':
+    viste = set()
+    frequenti = [c[1].lower() for c in leggi(frequenze) if len(c) >= 2 and c[0] == 'it']
+    # le riduzioni con l'apostrofo entrano anche se il lessico non le ha (po', un'): il lessico dei sottotitoli le scrive
+    # senza, ma chi incolla un testo no
+    for forma in frequenti + sorted(r for r in riduzioni if r.endswith("'")):
+        if forma in viste:
             continue
-        forma = c[1].lower()
+        viste.add(forma)
         lemmi, sostituisce = risolvi(forma), forma in riduzioni
         if forma in voci_min and not sostituisce:
             lemmi.discard(voci_min[forma])
-        if not lemmi and forma not in voci_min:
-            for x in con_accento(forma):
-                if x in voci_min:
-                    lemmi, sostituisce = {voci_min[x]}, True
-                    conti['accento'] += 1
-                    break
-                if risolvi(x):
-                    lemmi, sostituisce = risolvi(x), True
-                    conti['accento'] += 1
-                    break
+        if not lemmi:
+            lemmi = completa(forma)
+            if lemmi:
+                sostituisce = forma not in voci_min
+                conti['completate'] += 1
         for lemma in sorted(lemmi):
             print(f"it\t{forma}\t{lemma}\t{'t' if sostituisce else 'f'}")
             righe += 1

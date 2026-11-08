@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { isLang } from '@/lib/i18n';
+import { isLang, type Lang } from '@/lib/i18n';
 import { TESTI_REDAZIONE } from '@/lib/testi-redazione';
 import { richiediRedattore } from '@/lib/auth/redattore';
-import { codaVerifica, contatori, listaLavoro, ultimeModifiche } from '@/lib/redazione';
+import { codaVerifica, contatori, listaLavoro, ultimeModifiche, type VoceLista } from '@/lib/redazione';
 import TestataRedazione from '@/components/redazione/Testata';
 import Ricerca from '@/components/Ricerca';
 
@@ -16,7 +16,7 @@ export default async function Cruscotto({ params }: { params: Promise<{ lang: st
   if (!isLang(lang)) notFound();
   const t = TESTI_REDAZIONE[lang];
   const redattore = await richiediRedattore(lang);
-  const [c, coda, modifiche, prime, catene] = await Promise.all([contatori(), codaVerifica(lang, 60), ultimeModifiche(15), listaLavoro(lang), listaLavoro(lang, 'catene-da-sistemare')]);
+  const [c, coda, modifiche, prime, catene, senza] = await Promise.all([contatori(), codaVerifica(lang, 60), ultimeModifiche(15), listaLavoro(lang), listaLavoro(lang, 'catene-da-sistemare'), listaLavoro(lang, 'senza-etimologia')]);
   const verificate = prime.filter((v) => v.stato === 'verificato').length;
   const gruppi = [...new Set(prime.map((v) => v.gruppo))].map((g) => {
     const voci = prime.filter((v) => v.gruppo === g);
@@ -69,28 +69,8 @@ export default async function Cruscotto({ params }: { params: Promise<{ lang: st
           </div>
         </section>
       )}
-      {catene.length > 0 && (
-        <section className="red-sezione">
-          <h2>{t.catene} <span className="red-conta">{catene.length}</span></h2>
-          <p className="nota-sez">{t.cateneNota}</p>
-          <div className="red-tabella-scorre">
-            <table className="red-tabella">
-              <thead><tr><th>N.</th><th>{t.colonne.parola}</th><th>{t.colGruppo}</th><th>{t.colonne.fonti}</th></tr></thead>
-              <tbody>
-                {catene.slice(0, 50).map((v) => (
-                  <tr key={v.slug}>
-                    <td>{v.posizione}</td>
-                    <td><Link href={`/${lang}/redazione/w/${v.slug}`} className="lemma">{v.lemma}</Link>{v.glossa && <span className="gl">{v.glossa}</span>}</td>
-                    <td>{v.gruppo}</td>
-                    <td>{v.fonti}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {catene.length > 50 && <p className="vuoto">{t.altre(catene.length - 50)}</p>}
-        </section>
-      )}
+      <SezioneLista lang={lang} titolo={t.catene} nota={t.cateneNota} voci={catene} />
+      <SezioneLista lang={lang} titolo={t.senzaEtimologia} nota={t.senzaEtimologiaNota} voci={senza} />
       <section className="red-sezione">
         <h2>{prime.length ? t.codaFrequenza : t.coda}</h2>
         <p className="nota-sez">{t.codaNota}</p>
@@ -125,5 +105,33 @@ export default async function Cruscotto({ params }: { params: Promise<{ lang: st
         ) : <p className="vuoto">{t.nessunaModifica}</p>}
       </section>
     </div>
+  );
+}
+
+// una lista di lavoro ricalcolata a ogni deploy: le prime 50 voci, con il gruppo e le fonti
+function SezioneLista({ lang, titolo, nota, voci }: { lang: Lang; titolo: string; nota: string; voci: VoceLista[] }) {
+  const t = TESTI_REDAZIONE[lang];
+  if (voci.length === 0) return null;
+  return (
+    <section className="red-sezione">
+      <h2>{titolo} <span className="red-conta">{voci.length}</span></h2>
+      <p className="nota-sez">{nota}</p>
+      <div className="red-tabella-scorre">
+        <table className="red-tabella">
+          <thead><tr><th>N.</th><th>{t.colonne.parola}</th><th>{t.colGruppo}</th><th>{t.colonne.fonti}</th></tr></thead>
+          <tbody>
+            {voci.slice(0, 50).map((v) => (
+              <tr key={v.slug}>
+                <td>{v.posizione}</td>
+                <td><Link href={`/${lang}/redazione/w/${v.slug}`} className="lemma">{v.lemma}</Link>{v.glossa && <span className="gl">{v.glossa}</span>}</td>
+                <td>{v.gruppo}</td>
+                <td>{v.fonti}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {voci.length > 50 && <p className="vuoto">{t.altre(voci.length - 50)}</p>}
+    </section>
   );
 }

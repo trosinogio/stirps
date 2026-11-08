@@ -109,7 +109,7 @@ export default async function EditorVoce({ params, searchParams }: { params: Pro
 
       {posto && (
         <aside className="red-lista">
-          <p className="red-lista-testa"><b>{t.inLista(posto.lista === 'prime-100' ? t.prime : t.catene, posto.posizione, posto.totale)}</b> · {posto.gruppo}</p>
+          <p className="red-lista-testa"><b>{t.inLista(posto.lista === 'prime-100' ? t.prime : posto.lista === 'senza-etimologia' ? t.senzaEtimologia : t.catene, posto.posizione, posto.totale)}</b> · {posto.gruppo}</p>
           {posto.suggerimento && <p><b>{t.controllare}:</b> {posto.suggerimento}</p>}
           {posto.prossima && (
             <p><Link href={`/${lang}/redazione/w/${posto.prossima.slug}`}>{t.prossima}: <i>{posto.prossima.lemma}</i> →</Link></p>

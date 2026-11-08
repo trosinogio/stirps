@@ -1,6 +1,7 @@
 -- 9 novembre 2026: l'analisi di un testo riconosce più forme. forma_lemma ha la colonna «sostituisce»: la forma è solo
 -- una riduzione (dalla = da + la, l' = lo) o una grafia senza accento (piu = più), e l'analisi conta i lemmi a cui
--- rimanda, non la voce omonima. importa_forme() (stesso testo di db/05_import_wiktionary.sql) e analizza_testo() (stesso
+-- rimanda, non la voce omonima; una voce omonima senza etimologia non conta quando la forma ha un lemma (ha: avere).
+-- importa_forme() (stesso testo di db/05_import_wiktionary.sql) e analizza_testo() (stesso
 -- testo di db/02_logica.sql): se cambiano lì, si rigenerano da lì. Ripetibile senza danni.
 
 alter table forma_lemma add column if not exists sostituisce boolean not null default false;
@@ -53,7 +54,11 @@ lemmi as (
   select f.forma, fl.lemma from forme f join forma_lemma fl on fl.lingua = p_lingua and fl.forma = f.forma
   union
   select f.forma, f.forma from forme f
-   where not exists (select 1 from forma_lemma fl where fl.lingua = p_lingua and fl.forma = f.forma and fl.sostituisce)),
+   where not exists (select 1 from forma_lemma fl where fl.lingua = p_lingua and fl.forma = f.forma and fl.sostituisce)
+     -- una voce omonima senza etimologia non ruba peso al lemma della forma (ha: avere, non la voce ha; sono: essere)
+     and (not exists (select 1 from forma_lemma fl where fl.lingua = p_lingua and fl.forma = f.forma)
+          or exists (select 1 from lessema l join ipotesi h on h.esito_id = l.id and h.stato = 'accolta'
+                      where l.lingua = p_lingua and l.lemma = f.forma and not l.ricostruito))),
 voci as (
   select x.forma, l.id, l.lemma, l.slug
     from lemmi x
