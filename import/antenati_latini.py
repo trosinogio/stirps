@@ -197,6 +197,12 @@ DERIVATI = (('ato', 'are'), ('ata', 'are'), ('ati', 'are'), ('ate', 'are'), ('it
             ('ibile', 'ere'), ('ibile', 'ire'), ('atile', 'are'), ('amento', 'are'), ('imento', 'ire'),
             ('azione', 'are'), ('izione', 'ire'), ('atore', 'are'), ('itore', 'ire'), ('atrice', 'are'),
             ('anza', 'are'), ('enza', 'ere'), ('enza', 'ire'), ('a', 'are'), ('o', 'are'), ('e', 'are'))
+# i suffissi italiani che fanno una parola da un'altra parola (assistenziale da assistenza, gambale da gamba,
+# problematizzare da problematico): la base è il tema più una di queste finali
+SUFFISSI = ('izzazione', 'izzare', 'istico', 'istica', 'ismo', 'ista', 'iale', 'ale', 'ali', 'ico', 'ica', 'oso', 'osa',
+            'ino', 'ina', 'etto', 'etta', 'ello', 'ella', 'ezza', 'ità', 'ario', 'aria', 'iere', 'iera', 'eria', 'ese',
+            'iano', 'iana', 'ume', 'ata', 'one', 'ona', 'accio', 'uccio')
+FINALI_BASE = ('', 'o', 'a', 'e', 'i', 'are', 'ere', 'ire')
 
 
 def esclusa(lemma, glossa, italiani):
@@ -208,6 +214,10 @@ def esclusa(lemma, glossa, italiani):
     l = lemma.lower()
     for fin, base in DERIVATI:
         if l.endswith(fin) and len(l) - len(fin) >= 3 and l[:len(l) - len(fin)] + base in italiani:
+            return 'derivato italiano'
+    for fin in SUFFISSI:
+        tema = l[:len(l) - len(fin)]
+        if l.endswith(fin) and len(tema) >= 3 and any(tema + f in italiani for f in FINALI_BASE):
             return 'derivato italiano'
     return None
 
@@ -292,11 +302,12 @@ def main():
         p = prevedi(mod, lex, lemma, cl, gl)
         if not p: esiti.append((None, 'no', lemma, '')); continue
         fiducia = (p[1][0] - p[0][0]) if len(p) > 1 else 5.0
+        relativo = p[0][0] / len(norm(lemma))
         v = lex.voci[p[0][1]]
         if v[0] in per_it[i] or v[2] in veri: e = 'esatta'
         elif any(len(x) > 4 and una_lettera(v[2], x) for x in veri): e = 'variante'
         else: e = 'errata'
-        esiti.append((fiducia, e, lemma, v[1]))
+        esiti.append((fiducia, e, lemma, v[1], relativo))
     n = len(esiti); c = Counter(e[1] for e in esiti)
     print(f'tenute da parte: {n}; l\'etimo vero è tra i candidati in {trovati} ({trovati / n:.1%}); al primo posto '
           f'{c["esatta"]} ({c["esatta"] / n:.1%}), una variante dell\'etimo {c["variante"]}, senza candidati {c["no"]}; '
@@ -311,6 +322,15 @@ def main():
         print(f'  fiducia ≥ {s}: {len(sopra)} proposte ({len(sopra) / n:.0%} delle parole), esatte {k / len(sopra):.1%} '
               f'(almeno {wilson(k, len(sopra)):.1%}), varianti {var:.1%}', file=sys.stderr)
         if soglia is None and wilson(k, len(sopra)) >= PRECISIONE: soglia = s
+    # il costo assoluto per lettera del primo candidato, tra le proposte sopra la soglia di fiducia
+    if soglia is not None:
+        sopra = [e for e in con if e[0] >= soglia]
+        for t in (0.6, 0.8, 1.0, 1.2, 1.5, 2.0):
+            q = [e for e in sopra if e[4] <= t]
+            if q:
+                k = sum(1 for e in q if e[1] == 'esatta')
+                print(f'  e costo per lettera ≤ {t}: {len(q)} proposte, esatte {k / len(q):.1%} (almeno {wilson(k, len(q)):.1%})',
+                      file=sys.stderr)
     errori = [e for e in con if e[1] == 'errata' and (soglia is None or e[0] >= soglia)]
     random.Random(1).shuffle(errori)
     print('  errori sopra la soglia: ' + '; '.join(f'{e[2]} → {e[3]}' for e in errori[:20]), file=sys.stderr)
@@ -326,7 +346,7 @@ def main():
             fiducia = (p[1][0] - p[0][0]) if len(p) > 1 else 5.0
             if fiducia >= soglia:
                 v = lex.voci[p[0][1]]
-                fuori.append(f'{r[0]}\t{r[1]}\t{v[0]}\t{v[1]}\t{fiducia:.2f}\t{r[4]}\n')
+                fuori.append(f'{r[0]}\t{r[1]}\t{v[0]}\t{v[1]}\t{fiducia:.2f}\t{r[4]}\t{p[0][0] / len(norm(r[1])):.2f}\n')
         with open(sys.argv[5], 'w', encoding='utf-8') as f:
             f.writelines(fuori)
         print(f'proposte per le parole senza etimologia: {len(fuori)}; non provate: '
