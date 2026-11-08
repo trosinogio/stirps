@@ -56,11 +56,11 @@ NON_ETIMI = {'composé', 'composée', 'dérivé', 'dérivée', 'mot', 'terme', '
              'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'même', 'origine',
              'populaire', 'classique', 'médiéval', 'tardif', 'vulgaire', 'ecclésiastique', 'scientifique', 'savant',
              'ancien', 'moderne', 'impérial', 'chrétien', 'archaïque', 'byzantin', 'hellénistique', 'moyen', 'vieux'}
-COMPOSTO = re.compile(r"^(?:mot\s+)?composé\s+(?:de|du|d['’])\s*" + _PAROLA + r"\s*,?\s+et\s+(?:de\s+|du\s+|d['’]\s*)?"
+COMPOSTO = re.compile(r"^composée?\s+(?:de|du|d['’])\s*" + _PAROLA + r"\s*,?\s+et\s+(?:de\s+|du\s+|d['’]\s*)?"
                       + _PAROLA + r"\s*$", re.I)
 CON_AFFISSO = re.compile(r"^(?:dérivé|dérivée)\s+(?:de|du|d['’])\s*" + _PAROLA + r"\s*,?\s+avec\s+le\s+(?:suffixe|préfixe)\s+"
                          r"(-?[^\W\d_][\w-]*-?)\s*$", re.I)
-DA_PAROLA = re.compile(r"^(?:dérivé|dérivée|dérivé\s+de|dérivée\s+de|de|déverbal\s+de|diminutif\s+de|augmentatif\s+de|"
+DA_PAROLA = re.compile(r"^(?:dérivé|dérivée|dérivé\s+de|dérivée\s+de|de|déverbal\s+de|dénominal\s+de|diminutif\s+de|augmentatif\s+de|"
                        r"péjoratif\s+de|féminin\s+de|participe\s+passé\s+de|participe\s+présent\s+de|substantivation\s+de|"
                        r"nominalisation\s+de|apocope\s+de|aphérèse\s+de|abréviation\s+de|troncation\s+de)\s*(?:d['’])?\s*"
                        + _PAROLA + r"\s*$", re.I)
@@ -71,10 +71,14 @@ DUBBIO = re.compile(r"(?:peut-être|probablement|sans doute|vraisemblablement|in
 DATA = re.compile(r"^\s*(?:\((?:[^()]|\([^()]*\))*\)\s*)+")       # «(XIIe siècle)», «(1546)», «(Date à préciser)»
 
 
+# «Mot dérivé de», «Locution composée de»: Kaikki toglie lo spazio dopo il corsivo («motdérivé de»)
+NOME_INIZIALE = re.compile(r"^(?:mot|nom|locution|toponyme|adjectif|verbe|adverbe)\s*(?=(?:dérivée?|composée?)\b)", re.I)
+
+
 def pulisci(testo):
     t = ' '.join(str(testo).split()).strip()
     t = re.sub(r'\[\d+\]', '', t)                               # le note: «du latin avarus[1]»
-    return DATA.sub('', t).strip()
+    return NOME_INIZIALE.sub('', DATA.sub('', t).strip())
 
 
 def leggi(testo, parola):

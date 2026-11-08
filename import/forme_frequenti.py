@@ -8,9 +8,13 @@ dizionario e vengono da due elenchi di filtra.py:
 - forme_analisi.tsv (ANALISI), facoltativo: anche i sensi «form of» delle pagine con altri sensi (giorni), le
   riduzioni (dalla = da + la, l' = lo) e le tavole delle forme dei lemmi (avere: ho, hai, ha, hanno).
 Una forma che rimanda a un'altra forma si segue fino alla voce (dell' → di + l' → lo). Una forma che il lessico scrive
-senza accento si legge con l'accento (piu → più, puo → può → potere, perchè → perché). Una forma che è anche un lemma
-(era, porta) non ha bisogno di una riga per sé: l'analisi prova sempre anche la forma stessa; ma se quel lemma è solo
-una riduzione (dalla, l'), la quarta colonna (t) dice all'analisi di contare i lemmi a cui rimanda e non la voce.
+senza apostrofo o senza accento si legge con l'apostrofo (po → po' → poco) o con l'accento (piu → più, puo → può →
+potere, perchè → perché). Una forma che è anche un lemma (era, porta) non ha bisogno di una riga per sé: l'analisi prova
+sempre anche la forma stessa; gli altri lemmi li prende solo dalle tavole delle forme (era → essere, do → dare), mai
+dai sensi «forma di» della pagina (su non è suo) né da una variante accentata (la non è là, se non è sé). Se quel
+lemma è solo una riduzione (dalla, l'), la quarta colonna (t) dice all'analisi di contare i lemmi a cui rimanda e non la
+voce. Dove forme_analisi.tsv ha i sensi «forma di» di una forma, quelli di forme.tsv non servono: forme_analisi.tsv
+lascia fuori i sensi arcaici e poetici (po' → poi).
 
     python3 forme_frequenti.py ../dati/frequenze_it.tsv.gz dati/it/forme.tsv dati/it/tsv/lessemi.tsv \
         [dati/it/forme_analisi.tsv] > forme_it.tsv
@@ -37,16 +41,24 @@ def main():
     # le voci, senza le pagine di servizio di Wiktionary («i/languages A to L») e le locuzioni
     voci = {c[2] for c in leggi(lessemi) if len(c) > 4 and c[1] == 'it' and c[4] != 't' and not re.search(r'[/ ]', c[2])}
     voci_min = {v.lower(): v for v in voci if v == v.lower()}      # Sara (nome) non ferma sara → sarà
-    rimandi = defaultdict(set)      # forma → lemmi (voci o altre forme)
+    da_forme = defaultdict(set)     # forma → lemmi di forme.tsv (le pagine che sono solo forme)
+    da_sensi = defaultdict(set)     # forma → lemmi dei sensi «forma di» e delle riduzioni (forme_analisi.tsv)
+    da_tavole = defaultdict(set)    # forma → lemmi nelle cui tavole delle forme compare
     riduzioni = set()               # le forme che sono solo riduzioni di altre parole (dalla, l')
     for c in leggi(forme):
         if len(c) >= 2 and c[0].lower() != c[1].lower():
-            rimandi[c[0].lower()].add(c[1])
+            da_forme[c[0].lower()].add(c[1])
     for c in leggi(analisi):
         if len(c) >= 3 and c[0].lower() != c[1].lower():
-            rimandi[c[0].lower()].add(c[1])
+            (da_tavole if c[2] == 'tavola' else da_sensi)[c[0].lower()].add(c[1])
             if c[2] == 'riduzione':
                 riduzioni.add(c[0].lower())
+    rimandi = defaultdict(set)      # forma → lemmi (voci o altre forme)
+    for f in set(da_forme) | set(da_sensi) | set(da_tavole):
+        if f in voci_min and f not in riduzioni:
+            rimandi[f] = set(da_tavole.get(f, ()))           # era → essere sì, su → suo no
+        else:
+            rimandi[f] = set(da_sensi.get(f) or da_forme.get(f, ())) | da_tavole.get(f, set())
 
     def risolvi(forma, prof=0):
         """Le voci a cui una forma rimanda. Si passa per un'altra forma solo se è elisa (dell' → l' → lo): una grafia
@@ -78,10 +90,9 @@ def main():
     def completa(forma):
         """Le voci di una forma che non ne ha di sue: l'accento (piu → più, sara → sarà), l'apostrofo che il lessico dei
         sottotitoli toglie (po → po' → poco), la vocale di una forma elisa (un' → una, uno)."""
-        cand = con_accento(forma)
-        if not forma.endswith("'"):
-            cand.append(forma + "'")
-        elif len(forma) >= 2:
+        cand = [] if forma.endswith("'") else [forma + "'"]       # prima l'apostrofo: po → po', non pò
+        cand += con_accento(forma)
+        if forma.endswith("'") and len(forma) >= 2:
             cand += [forma[:-1] + v for v in 'aoei']
         trovate = set()
         for x in cand:
@@ -105,7 +116,7 @@ def main():
         lemmi, sostituisce = risolvi(forma), forma in riduzioni
         if forma in voci_min and not sostituisce:
             lemmi.discard(voci_min[forma])
-        if not lemmi:
+        if not lemmi and (forma not in voci_min or forma in riduzioni):     # la resta la, non là
             lemmi = completa(forma)
             if lemmi:
                 sostituisce = forma not in voci_min

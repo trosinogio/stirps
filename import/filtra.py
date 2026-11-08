@@ -378,6 +378,11 @@ def lemmi_puliti(testo):
     return [x for x in parti if x and x.lower() not in INGLESI]
 
 
+# i sensi che l'analisi di un testo di oggi non legge (forme_per_analisi)
+MARGINALI = {'archaic', 'obsolete', 'poetic', 'literary', 'dated', 'nonstandard', 'rare', 'dialectal', 'misspelling',
+             'uncommon', 'historical', 'proscribed'}
+
+
 def forme_per_analisi(v):
     """Le righe (forma, lemma, fonte) di una voce: i sensi «form of» anche se la pagina ha altri sensi (giorni:
     «plural of giorno» e «days»), le riduzioni (dalla: «contraction of da + la»; l': «elided form of lo»), e la
@@ -385,6 +390,9 @@ def forme_per_analisi(v):
     w = v.get('word') or ''
     righe = []
     for s in v.get('senses') or []:
+        # un senso arcaico, poetico o non standard non è la lettura di un testo di oggi: su non è suo, ne non è in
+        if set(s.get('tags') or []) & MARGINALI:
+            continue
         for fo in s.get('form_of') or []:
             righe += [(w, l, 'forma') for l in lemmi_puliti(fo.get('word'))]
         g = (s.get('glosses') or [''])[0]

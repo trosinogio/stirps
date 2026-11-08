@@ -114,7 +114,7 @@ Come cambia il database:
 - Le quattro questioni aperte delle norme: le proposte di Claude sono nel Doc (8 novembre 2026), e la pagina Norme del sito (`NORME` in `lib/contenuti.ts`) le mostra «in discussione». Quando Giovanni decide, si aggiornano il Doc e la pagina.
 - Ritocchi all’editor che emergeranno dalle prime 100: all’8 novembre lo storico della redazione è vuoto, e non ne è emerso nessuno.
 - Zenodo: Giovanni attiva l’account e salva i segreti `ZENODO_SANDBOX_TOKEN` e `ZENODO_TOKEN`; poi il workflow Zenodo deposita il pacchetto in bozza (prima sulla sandbox), e il DOI arriva con la pubblicazione. Il lavoro della redazione entra solo quando la sua licenza è decisa.
-- Il lettore del Wiktionnaire legge 13.615 etimologie: restano da leggere «Mot dérivé de» (spesso «motdérivé», senza spazio), «Locution composée de», i composti di più elementi, «Dénominal de» (`import/LEGGIMI.md`).
+- Il lettore del Wiktionnaire: restano da leggere i composti di più di due elementi (`import/LEGGIMI.md`).
 - La linea del senso per il latino, con LatinISE (fattibile: `import/LEGGIMI.md`, «La linea del senso»); per l’italiano manca un corpus storico aperto.
 - Un nuovo filtro del dump italiano che conservi i modelli di menzione (`m`, `l`), per le etimologie scritte solo nel testo («From the verb segare»).
 - Licenza, «Chi siamo», dominio, mappa del sito, «come citare questa voce».
