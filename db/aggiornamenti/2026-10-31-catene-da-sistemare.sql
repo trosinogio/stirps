@@ -118,3 +118,24 @@ select 'catene-da-sistemare', coalesce((select max(posizione) from lista_lavoro 
      order by l.id, w.id
   ) y
 on conflict do nothing;
+
+-- 8 novembre 2026: sesto gruppo, «Senza linea di senso». Gli archi accolti tra due parole ricostruite della stessa lingua
+-- (non radici né affissi) le cui glosse non hanno un legame evidente (legame_di_senso()): lì una lettura sbagliata
+-- (*tréyes «three» < *ǵómbʰos «tooth», da tryzub) si nasconde tra i passaggi di significato veri (*h₂ōwyóm «egg» <
+-- *h₂éwis «bird»). Va tracciato il passaggio di significato, o corretto l'arco.
+insert into lista_lavoro (lista, posizione, lessema_id, gruppo, suggerimento)
+select 'catene-da-sistemare', coalesce((select max(posizione) from lista_lavoro where lista = 'catene-da-sistemare'), 0)
+         + row_number() over (order by y.lingua <> 'ine-pro', y.lingua, y.lemma), y.id, 'Senza linea di senso',
+       '*' || y.lemma || ' «' || left(y.ge, 60) || '» < *' || y.etimo || ' «' || left(y.gt, 60)
+         || '»: tracciare il passaggio di significato, o correggere l''arco.'
+  from (select distinct on (e.id) e.id, e.lingua, e.lemma, e.glossa as ge, t.lemma as etimo, t.glossa as gt
+          from relazione x
+          join ipotesi h on h.id = x.ipotesi_id and h.stato = 'accolta'
+          join lessema e on e.id = x.esito_id
+          join lessema t on t.id = x.etimo_id
+         where e.ricostruito and t.ricostruito and e.lingua = t.lingua
+           and e.lemma !~ '(^-|-$)' and t.lemma !~ '(^-|-$)'
+           and e.glossa is not null and t.glossa is not null and e.glossa_lingua = 'en' and t.glossa_lingua = 'en'
+           and not legame_di_senso(e.glossa, t.glossa)
+         order by e.id, x.ordine) y
+on conflict do nothing;

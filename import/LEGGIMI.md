@@ -338,6 +338,24 @@ La regola dei due Wiktionary vale anche per il francese. `etimi_wiktionnaire.py`
 
 Il primo giro (8 novembre): 13.615 etimologie lette su 425.504 voci francesi con un’etimologia, di cui 151.776 scartate perché la parola o l’etimo non sono voci del dizionario. Dove ci sono tutte e due, il Wiktionnaire concorda con Wiktionary il 94% delle volte (11.734), discorda sull’origine il 2% (279: *seuil* dal latino *solea*, *ballon* dall’italiano *pallone*), dà un’altra analisi francese 487 volte (*ouvrage* da *ouvrer*). Nell’import di prova sulla copia della produzione 718 parole francesi senza etimologia ne ricevono una dal Wiktionnaire (*incandescence* < *incandescent*, *gliome* < γλοιός), 254 hanno l’alternativa del disaccordo, 11.158 etimologie di Wiktionary citano anche il Wiktionnaire. Gli inizi non letti più frequenti erano «Mot dérivé de» (7.365, spesso scritto «motdérivé» perché Kaikki toglie lo spazio dopo il corsivo), «Locution composée de» (9.865) e «Dénominal de» (1.120): dal secondo giro si leggono. Restano i composti di più di due elementi (18.907); «Voir à» (101.082) sono forme flesse.
 
+## Numerali, ipotesi discusse e linea del senso (8 novembre 2026)
+
+Giovanni ha segnalato che *tréyes* («tre») derivava da qualcosa. La catena dei numerali, nel pacchetto dell'8 novembre, in sette lingue:
+
+| numero | dove arrivavano | perché |
+| --- | --- | --- |
+| 3 | *tre*, *tres*, τρεῖς, *trois*, *три* → *ǵembʰ-* «dente» | *tryzub*: «три (… ultimately from *tréyes) + зуб (… ultimately from *ǵómbʰos)», letto come catena |
+| 8 | *acht*, *eight*, ὀκτώ, *восемь* → *ǵónu* «ginocchio»; *otto*, *octo*, *huit* fermi al protoitalico | *octagon* («ὀκτώ … + γωνία (… from *ǵónu)»); *oktō*@eight senza la sua pagina |
+| 7 | tutte → protosemitico *šabʕ-* | *septḿ̥*: «similar to Proto-Semitic *šabʕ-, from which it may be a borrowing», accolto come certo |
+| 1 | *uno*, *unus* → *ís* | *h₁óynos*: «perhaps built on the pronominal stem», promosso ad accolto |
+| 2, 3, 6 | *two*, *zwei*, *drei*, *three*, *шесть* fermi a metà | voci doppie con un identificativo (*þrīz* e *þrīz*@three) |
+
+Le correzioni in `wiktionary.py`: un «+» o una parentesi aperta prima di un etimo fermano la catena (`catene_ferme_al_composto`); «may», «might», «could» sono un dubbio e «similar to», «resembles» un dubbio forte; una parola PIE con un'etimologia solo dubbia non la vede promossa (`alternative_pie_non_promosse`), e una parola PIE la cui pagina non dà un etimo non lo prende dalle catene di altre pagine (`intermedi_pie_senza_etimo`); una voce citata solo con `id=` fa leggere lo stesso la sua pagina, e si unisce alla voce della pagina se è l'unica variante o se la pagina si dà lo stesso identificativo (`identificativi_uniti`; le radici omografe restano distinte).
+
+**Le ipotesi discusse.** Gli etimi introdotti da «or», «alternatively», «otherwise», «another theory», con «from» o «borrowed» e senza «compare», «cognate», «related», entrano come ipotesi alternative con certezza al massimo 2 (`ipotesi_alternative_dal_testo`): *pazzo* aveva solo *barrezzen* (antico alto tedesco, «odiare»), ora ha anche il francese *page* e il latino *patiēns* («sofferente», da *patior*, l'area del patire). A parità di certezza resta accolta l'ipotesi principale del testo. Un legame con πάθος, che Wiktionary non dà, lo aggiunge la redazione con la sua fonte.
+
+**La linea del senso** (regola di Giovanni). `controlla_sensi.py` misura sulle glosse inglesi del pacchetto: due glosse hanno un legame evidente se condividono una parola piena o una contiene l'altra (*seventh*, *seven*). Negli archi accolti il legame è evidente nel 51% dei casi (eredità 62%, prestito 51%, derivazione 54%, composizione 44%), con un etimo a caso nello 0,6%: quando c'è, la linea è quasi certa. Quando manca non prova niente: WordNet (similarità di Wu e Palmer tra le parole delle glosse) non separa gli archi veri senza parole in comune dalle coppie a caso (sotto 0,35 il 40% contro il 52%), e dei 38 archi PIE «parola < parola» senza legame evidente 35 sono passaggi di significato veri (*uovo* < *uccello*, *cavallo* < *veloce*, *regina* < *re*) e 3 errori (*oḱtṓw* < *ǵónu*, *kn̥h₂ónks* < *ǵómbʰos*, *upo* < *stéh₂tis*), tutti della lettura dei composti, corretta alla fonte. Per questo il controllo non toglie archi: `legame_di_senso()` mette nella lista di lavoro, gruppo «Senza linea di senso», gli archi tra due parole ricostruite della stessa lingua senza legame evidente (1.332 sulla copia locale, prima le parole PIE), dove va tracciato il passaggio di significato o corretto l'arco. Il passo successivo è far ipotizzare a Claude il passaggio di significato per questi archi (segnato ≈), misurato prima su un campione.
+
 ## La linea del senso: fattibilità (8 novembre 2026)
 
 Una «linea del senso» mostrerebbe, sotto la linea del tempo di una voce, come cambiano i contesti d'uso di una parola da un'epoca all'altra. Le due fonti proposte:

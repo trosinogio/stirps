@@ -211,6 +211,14 @@ jobs:
           python3 import/controlla_radici.py dati | tee /tmp/radici.txt
           echo "::notice title=Radici::$(head -6 /tmp/radici.txt | tr '\n' ' ')"
 
+      - name: Linea del senso
+        run: |
+          # tra una parola e il suo etimo una linea di senso evidente (glosse con una parola in comune) negli archi veri e
+          # nelle coppie a caso; e gli archi tra parole ricostruite della stessa lingua senza linea, da guardare
+          python3 import/controlla_sensi.py dati/lessemi.tsv.gz dati/ipotesi.tsv.gz dati/relazioni.tsv.gz 2> /tmp/sensi.txt
+          cat /tmp/sensi.txt
+          echo "::notice title=Linea del senso::$(head -1 /tmp/sensi.txt) $(grep 'stessa lingua' /tmp/sensi.txt)"
+
       - name: Stima dell'import
         continue-on-error: true
         timeout-minutes: 15

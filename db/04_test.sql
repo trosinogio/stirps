@@ -528,4 +528,10 @@ select pg_temp.verifica(
   'l''indice delle radici le divide per area, nell''ordine delle aree; un''area si legge in ordine alfabetico; le radici senza area stanno a parte');
 delete from area_radice where lessema_id in (lx('ine-pro/ped'), lx('ine-pro/meh2ter'), lx('ine-pro/gwem'));
 
+\echo '— la linea del senso'
+select pg_temp.verifica(
+  not legame_di_senso('three', 'tooth') and legame_di_senso('seventh', 'seven') and legame_di_senso('flesh, meat', 'meat')
+  and legame_di_senso('he hates', 'hated') and not legame_di_senso('the', 'the') and not legame_di_senso(null, 'three'),
+  'la linea del senso: tre e dente no; seventh e seven, flesh e meat, hates e hated sì; le parole vuote e le glosse mancanti non contano');
+
 \echo '— collaudo completato'
