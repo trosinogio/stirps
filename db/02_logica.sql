@@ -932,7 +932,9 @@ end $$;
 -- la catena accolta finché resta nella lingua del testo (o in una sua varietà: l'italiano antico è italiano), e la prima
 -- lingua diversa è l'origine, raggruppata per lingua madre (il latino volgare sotto il latino). La via d'ingresso viene
 -- dal tipo di quel passaggio: popolare (eredità), dotta (prestito dotto, semidotto), prestito, altro. Una forma con più
--- lemmi possibili conta per ciascuno in parti uguali; un lemma senza un'origine nota va a parte.
+-- lemmi possibili conta per ciascuno in parti uguali; un lemma senza un'origine nota va a parte. Una forma che è solo una
+-- riduzione o una grafia senza accento (dalla = da + la, piu = più: forma_lemma.sostituisce) conta per i lemmi a cui
+-- rimanda e non per la voce omonima.
 create function analizza_testo(p_lingua text, p_forme text[], p_conteggi int[], p_lang text default 'it',
                                p_anteprima boolean default false)
 returns jsonb language sql stable as $$
@@ -945,7 +947,8 @@ forme as (
 lemmi as (
   select f.forma, fl.lemma from forme f join forma_lemma fl on fl.lingua = p_lingua and fl.forma = f.forma
   union
-  select f.forma, f.forma from forme f),
+  select f.forma, f.forma from forme f
+   where not exists (select 1 from forma_lemma fl where fl.lingua = p_lingua and fl.forma = f.forma and fl.sostituisce)),
 voci as (
   select x.forma, l.id, l.lemma, l.slug
     from lemmi x

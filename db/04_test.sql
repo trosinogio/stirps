@@ -500,7 +500,12 @@ select pg_temp.verifica(
           and (r->>'riconosciute')::numeric = 4 and r->'sconosciute' = '["zzzq"]'::jsonb
      from (select analizza_testo('it', array['Notti', 'piedi', 'madre', 'zzzq'], array[2, 1, 1, 3], 'it', true) as r) x),
   'le forme vanno al lemma (notti → notte), le maiuscole non contano, e l''origine è la prima lingua fuori dall''italiano');
-delete from forma_lemma where lingua = 'it' and forma in ('notti', 'piedi');
+insert into forma_lemma values ('it', 'madre', 'piede', true);
+select pg_temp.verifica(
+  (select (r->>'lemmi')::int = 1 and r->'origini'->0->'esempi'->0->>'lemma' = 'piede'
+     from (select analizza_testo('it', array['madre'], array[1], 'it', true) as r) x),
+  'una forma che è solo una riduzione (dalla = da + la) conta per i lemmi a cui rimanda, non per la voce omonima');
+delete from forma_lemma where lingua = 'it' and forma in ('notti', 'piedi', 'madre');
 
 \echo '— indice delle radici per area'
 insert into area_radice (lessema_id, area, provenienza) values (lx('ine-pro/ped'), 'corpo', 'redazione'),

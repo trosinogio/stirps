@@ -19,6 +19,7 @@ WIKIZIONARIO=${WIKIZIONARIO:-1}
 INTERE=${INTERE-la,grc}   # lingue di chiusura importate intere: anche le voci che nessuna catena raggiunge
 CON_ETIMOLOGIA=${CON_ETIMOLOGIA-}   # lingue di chiusura di cui entrano tutte le voci con un'etimologia (en), senza i lemmi vuoti
 ELENCHI=${ELENCHI-}   # per quelle lingue, i soli lemmi ammessi: ELENCHI="en=../dati/frequenze_en.tsv.gz" (il lessico comune)
+COMUNI=${COMUNI-}     # nella lingua principale, anche i lemmi senza etimologia del lessico comune: COMUNI="it=../dati/frequenze_it.tsv.gz"
 ESTERNI=${ESTERNI-}   # e con l'elenco, anche le voci con l'etimo in un'altra lingua: ESTERNI=en
 PRECEDENTI=${PRECEDENTI-}   # il lessemi.tsv.gz pubblicato: le glosse non cambiano se sono ancora tra le candidate
 SOLO_ANALISI=${SOLO_ANALISI:-0}
@@ -36,7 +37,7 @@ scarica() {   # scarica <nome inglese della lingua> : stampa il dump di Kaikki
 }
 
 echo "1/4  scarico e filtro il dump di Kaikki ($NOME)"
-scarica "$NOME" | SENZA="$DATI/senza_etimologia.tsv" FORME="$DATI/forme.tsv" python3 filtra.py "$DATI/lemmi.jsonl" "$DATI/glosse.tsv"
+scarica "$NOME" | SENZA="$DATI/senza_etimologia.tsv" FORME="$DATI/forme.tsv" ANALISI="$DATI/forme_analisi.tsv" python3 filtra.py "$DATI/lemmi.jsonl" "$DATI/glosse.tsv"
 ARGOMENTI=()
 MANCANTI=()
 for voce in $(printf '%s' "$CHIUSURA" | sed 's/ \([a-z][a-z-]*:\)/\n\1/g' | tr ' ' '~'); do
@@ -81,7 +82,7 @@ fi
 echo "2/4  leggo le etimologie"
 python3 wiktionary.py "$DATI/lemmi.jsonl" "$DATI/tsv" "$DATI/glosse.tsv" ${ARGOMENTI[@]+"${ARGOMENTI[@]}"} --passi "$PASSI" \
   --forme-base "$LINGUA=$DATI/forme.tsv" \
-  ${INTERE:+--intere "$INTERE"} ${CON_ETIMOLOGIA:+--con-etimologia "$CON_ETIMOLOGIA"} \
+  ${INTERE:+--intere "$INTERE"} ${CON_ETIMOLOGIA:+--con-etimologia "$CON_ETIMOLOGIA"} ${COMUNI:+--comuni "$COMUNI"} \
   $(for e in $ELENCHI; do printf -- "--elenco %s " "$e"; done) ${ESTERNI:+--esterni "$ESTERNI"} \
   ${PRECEDENTI:+--glosse-precedenti "$PRECEDENTI"} > "$DATI/rapporto_parser.json"
 if [ "$DIZIONARI" = 1 ]; then

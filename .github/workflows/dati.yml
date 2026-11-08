@@ -35,6 +35,8 @@ jobs:
       # dell'inglese, il lessico comune (i lemmi tra le 50 mila forme più frequenti) e le parole con l'etimo fuori
       # dall'inglese (ESTERNI), senza nomi propri né locuzioni
       # la stessa regola per francese, tedesco e russo (stima del 6 novembre 2026: 114 MB invece di 239 per le lingue intere)
+      # l'italiano anche con i lemmi senza etimologia del lessico comune (referto), per l'analisi di un testo
+      COMUNI: it=../dati/frequenze_it.tsv.gz
       ELENCHI: en=../dati/frequenze_en.tsv.gz fr=../dati/frequenze_fr.tsv.gz de=../dati/frequenze_de.tsv.gz ru=../dati/frequenze_ru.tsv.gz
       ESTERNI: en,fr,de,ru
       GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
@@ -159,7 +161,7 @@ jobs:
             gzip -9 -n -c "$t/$f.tsv" > "dati/$f.tsv.gz"
           done
           # le forme flesse più frequenti e i loro lemmi, per l'analisi di un testo (forma_lemma)
-          python3 import/forme_frequenti.py dati/frequenze_it.tsv.gz import/dati/it/forme.tsv "$t/lessemi.tsv" > /tmp/forme_it.tsv
+          python3 import/forme_frequenti.py dati/frequenze_it.tsv.gz import/dati/it/forme.tsv "$t/lessemi.tsv" import/dati/it/forme_analisi.tsv > /tmp/forme_it.tsv
           gzip -9 -n -c /tmp/forme_it.tsv > dati/forme_it.tsv.gz
           # voci per lingua, prima e dopo
           conta() { awk -F'\t' '{c[$2]++} END {for (k in c) print k, c[k]}' | sort; }

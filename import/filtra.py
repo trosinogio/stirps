@@ -266,9 +266,16 @@ def menzione_come_der(v):
     frase = re.split(r'[.,;:(]', testo, maxsplit=1)[0]
     if re.search(r'\+|influenc|compare|\bcf\b', frase, re.I):
         return []
-    m = next((t for t in tpl if t.get('name') in MENZIONI and (t.get('args') or {}).get('2')), None)
-    if m is None or (m.get('expansion') or m['args']['2']) not in frase:
-        return []
+    menzioni = [t for t in tpl if t.get('name') in MENZIONI and (t.get('args') or {}).get('2')]
+    # «From earlier 'l, a reduced form of lo» (il): la forma più antica non è una voce, l'etimo è la parola di cui è
+    # una riduzione
+    rid = re.match(r"From earlier\s+[^,]+,\s+an?\s+(?:reduced|shortened|apocopic|apocopated|contracted|syncopated|variant)"
+                   r"\s+form\s+of\s+([^\s.,;]+)", testo)
+    m = next((t for t in menzioni if rid and rid.group(1) in (t.get('expansion'), t['args']['2'])), None)
+    if m is None:
+        m = menzioni[0] if menzioni else None
+        if m is None or (m.get('expansion') or m['args']['2']) not in frase:
+            return []
     a = m['args']
     return [{'n': 'der', 'a': {'1': v.get('lang_code'), '2': a['1'], '3': a['2'], **({'t': a['4']} if a.get('4') else {})},
              'e': m.get('expansion', '')}]
@@ -347,12 +354,49 @@ def surf_come_af(v):
     return [{'n': 'af', 'a': {'1': a.get('1') or LINGUA, **parti}, 'e': t.get('expansion', '')}]
 
 
+# ---- le forme per l'analisi di un testo (ANALISI): tutte, non solo le pagine che sono soltanto forme ----
+# forme.tsv lega le forme citate nelle catene e resta com'è; forme_analisi.tsv serve solo a forme_frequenti.py
+RIDUZIONE = re.compile(r'\b(?:apocopic|apocopated|elided|elision|contraction|contracted|apheretic|aphetic|syncopated|truncated)'
+                       r'\b[^;:()]*?\bof\s+([^,;:()]+)', re.I)
+FUORI_TAVOLA = {'table-tags', 'inflection-template', 'class', 'romanization', 'canonical', 'auxiliary'}
+
+
+def lemmi_puliti(testo):
+    """I lemmi di un rimando: «avere,havere<l:obsolete>» → avere, havere; «[[in]] [[il]]» e «da + la» → in, il; da, la.
+    L'apostrofo resta: l' è una parola."""
+    testo = re.sub(r'<[^>]*>', '', testo or '').replace('[[', ' ').replace(']]', ' ')
+    return [x.strip('“”".') for x in re.split(r'[,+/]|\s+', testo) if x.strip('“”".')]
+
+
+def forme_per_analisi(v):
+    """Le righe (forma, lemma, fonte) di una voce: i sensi «form of» anche se la pagina ha altri sensi (giorni:
+    «plural of giorno» e «days»), le riduzioni (dalla: «contraction of da + la»; l': «elided form of lo»), e la
+    tavola delle forme del lemma (avere: ho, hai, ha, hanno…)."""
+    w = v.get('word') or ''
+    righe = []
+    for s in v.get('senses') or []:
+        for fo in s.get('form_of') or []:
+            righe += [(w, l, 'forma') for l in lemmi_puliti(fo.get('word'))]
+        g = (s.get('glosses') or [''])[0]
+        m = RIDUZIONE.search(g)
+        if m and not s.get('form_of'):
+            righe += [(w, l, 'riduzione') for l in lemmi_puliti(m.group(1))]
+    if not forma_flessa(v):
+        for f in v.get('forms') or []:
+            forma, et = f.get('form') or '', set(f.get('tags') or [])
+            if et and not et & FUORI_TAVOLA and forma and forma != w and ' ' not in forma and not forma.startswith('-'):
+                righe.append((forma, w, 'tavola'))
+    return [r for r in righe if r[0] and r[1] and r[0] != r[1]]
+
+
 if __name__ == '__main__':
     n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = non_parole = dal_testo = 0
     esempi_testo = 0
     out = open(sys.argv[1], 'w', encoding='utf-8')
     glosse = open(sys.argv[2], 'w', encoding='utf-8')
     forme = open(os.environ['FORME'], 'w', encoding='utf-8') if os.environ.get('FORME') else None
+    analisi_f = open(os.environ['ANALISI'], 'w', encoding='utf-8') if os.environ.get('ANALISI') else None
+    righe_analisi = Counter()
     # VARIANTI: le ricostruzioni alternative della stessa forma (*gʰeh₁bʰ- e *gʰebʰ-), una riga «variante, principale»
     varianti_f = open(os.environ['VARIANTI'], 'w', encoding='utf-8') if os.environ.get('VARIANTI') else None
     varianti, esempi_varianti = Counter(), 0
@@ -391,6 +435,10 @@ if __name__ == '__main__':
                 if esempi_varianti < 10:
                     esempi_varianti += 1
                     print(f'  variante ({fonte}): *{variante} → *{principale}', file=sys.stderr)
+        if analisi_f:
+            for forma, lemma, fonte in forme_per_analisi(v):
+                analisi_f.write(f'{forma}\t{lemma}\t{fonte}\n')
+                righe_analisi[fonte] += 1
         if forma_flessa(v):
             flesse += 1
             flesse_dalla_glossa += not marcata(v)
@@ -462,6 +510,8 @@ if __name__ == '__main__':
           f'lemmi senza etimologia utile {senza}, sigle e simboli esclusi {non_parole}', file=sys.stderr)
     if varianti_f:
         print(f'  ricostruzioni alternative: {dict(varianti)}', file=sys.stderr)
+    if analisi_f:
+        print(f"  forme per l'analisi: {dict(righe_analisi)}", file=sys.stderr)
     if senza:
         print(f'  senza etimologia utile, per causa: {dict(cause)}; modelli non letti più frequenti: '
               f'{modelli_ignoti.most_common(25)}', file=sys.stderr)

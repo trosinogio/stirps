@@ -535,6 +535,8 @@ class Importatore:
                                      # il lessico comune, senza nomi propri né locuzioni; le voci raggiunte entrano sempre
         self.esterni = set()         # con l'elenco, anche le voci con l'etimo in un'altra lingua (--esterni en): hound < enm
         self.glosse_precedenti = {}  # chiave → glossa del pacchetto pubblicato (--glosse-precedenti dati/lessemi.tsv.gz)
+        self.comuni = {}             # nella lingua principale, i lemmi senza etimologia che entrano lo stesso (--comuni it=…):
+                                     # quelli del lessico di frequenza, perché l'analisi di un testo li riconosca
         self.con_etimologia = set()  # lingue di chiusura di cui entrano tutte le voci con un'etimologia, ma non i lemmi
                                      # senza (--con-etimologia en): l'inglese ha centinaia di migliaia di lemmi vuoti
         self.stat = Counter()
@@ -1019,25 +1021,37 @@ class Importatore:
         completa, non solo le sue famiglie. Le forme ricostruite (sesta colonna di glosse.tsv) restano fuori."""
         for lingua in sorted(self.intere):
             percorso = (self.chiusura.get(lingua) or {}).get('file_glosse')
-            if not percorso or not os.path.exists(percorso):
+            if percorso and os.path.exists(percorso):
+                self.lemmi_da_glosse(lingua, percorso)
+
+    def aggiungi_lemmi_comuni(self, lingua, percorso):
+        """Nella lingua principale (--comuni it=frequenze_it.tsv.gz) entrano anche i lemmi senza etimologia del lessico
+        comune: referto non ha un'etimologia su Wiktionary, ma è una parola dell'italiano, e l'analisi di un testo deve
+        riconoscerla. Solo parole del lessico di frequenza, minuscole, di una parola sola."""
+        elenco = self.comuni.get(lingua)
+        if elenco and percorso and os.path.exists(percorso):
+            prima = len(self.lessemi)
+            self.lemmi_da_glosse(lingua, percorso, lambda p: p.lower() in elenco and not p[:1].isupper() and ' ' not in p)
+            self.stat['lemmi comuni senza etimologia'] += len(self.lessemi) - prima
+
+    def lemmi_da_glosse(self, lingua, percorso, ammesso=None):
+        for riga in open(percorso, encoding='utf-8'):
+            c = riga.rstrip('\n').split('\t') + ['', '', '', '', '', '', '', '']
+            parola, etimn, pos, glossa, ricostruita = c[0], c[1], c[2], c[3], c[5]
+            if not parola or ricostruita == '1' or parola.startswith('*') or (ammesso and not ammesso(parola)):
                 continue
-            for riga in open(percorso, encoding='utf-8'):
-                c = riga.rstrip('\n').split('\t') + ['', '', '', '', '', '', '', '']
-                parola, etimn, pos, glossa, ricostruita = c[0], c[1], c[2], c[3], c[5]
-                if not parola or ricostruita == '1' or parola.startswith('*'):
-                    continue
-                omo = int(etimn) if etimn.isdigit() else 1
-                pagina = nome_pagina(lingua, parola)
-                if chiave(lingua, pagina, omo) in self.lessemi:
-                    continue
-                kl = self.lessema(lingua, pagina, glossa=glossa[:200] if glossa else None,
-                                  pos=POS.get(pos) or ('s.' if pos == 'noun' else None), omografo=omo)
-                if glossa:
-                    self.lessemi[kl].setdefault('propria', glossa[:200])
-                if c[6] and not self.lessemi[kl].get('pronuncia'):
-                    self.lessemi[kl]['pronuncia'] = json.loads(c[6])
-                if c[7] and not self.lessemi[kl].get('sensi'):
-                    self.lessemi[kl]['sensi'] = json.loads(c[7])
+            omo = int(etimn) if etimn.isdigit() else 1
+            pagina = nome_pagina(lingua, parola)
+            if chiave(lingua, pagina, omo) in self.lessemi:
+                continue
+            kl = self.lessema(lingua, pagina, glossa=glossa[:200] if glossa else None,
+                              pos=POS.get(pos) or ('s.' if pos == 'noun' else None), omografo=omo)
+            if glossa:
+                self.lessemi[kl].setdefault('propria', glossa[:200])
+            if c[6] and not self.lessemi[kl].get('pronuncia'):
+                self.lessemi[kl]['pronuncia'] = json.loads(c[6])
+            if c[7] and not self.lessemi[kl].get('sensi'):
+                self.lessemi[kl]['sensi'] = json.loads(c[7])
                 self.stat[f'lemmi_interi_{lingua}'] += 1
 
     def collega_participi(self):
@@ -1514,7 +1528,7 @@ if __name__ == '__main__':
     #               [--forme-base it=forme.tsv]
     #               [--intere la,grc] [--con-etimologia en] [--elenco en=../dati/frequenze_en.tsv.gz] [--esterni en]
     #               [--glosse-precedenti ../dati/lessemi.tsv.gz]
-    args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti = [], [], 1, set(), set(), {}, set(), {}
+    args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti, comuni = [], [], 1, set(), set(), {}, set(), {}, {}
     forme_base = None   # --forme-base it=forme.tsv: le forme flesse della lingua di partenza (filtra.py con FORME)
     it_ = iter(sys.argv[1:])
     for x in it_:
@@ -1529,6 +1543,10 @@ if __name__ == '__main__':
             with (gzip.open(percorso_e, 'rt', encoding='utf-8') if percorso_e.endswith('.gz') else open(percorso_e, encoding='utf-8')) as f:
                 # le colonne di dati/frequenze_*.tsv.gz: lingua, forma, rango, conteggio, fonte
                 elenchi[lingua_e] = {r.split('\t')[1].lower() for r in f if r.count('\t') >= 1}
+        elif x == '--comuni':
+            lingua_c, percorso_c = next(it_).split('=', 1)
+            with (gzip.open(percorso_c, 'rt', encoding='utf-8') if percorso_c.endswith('.gz') else open(percorso_c, encoding='utf-8')) as f:
+                comuni[lingua_c] = {r.split('\t')[1].lower() for r in f if r.count('\t') >= 1}
         elif x == '--glosse-precedenti':
             with gzip.open(next(it_), 'rt', encoding='utf-8') as f:
                 for r in f:
@@ -1547,6 +1565,7 @@ if __name__ == '__main__':
     imp.intere = intere
     imp.con_etimologia = con_etimologia
     imp.elenco = elenchi
+    imp.comuni = comuni
     imp.esterni = esterni
     imp.glosse_precedenti = precedenti
     for c in chiusure:
@@ -1576,6 +1595,8 @@ if __name__ == '__main__':
     imp.chiudi_su_radici()
     imp.togli_cicli()
     imp.aggiungi_lemmi_interi()
+    if len(args) > 2:
+        imp.aggiungi_lemmi_comuni(LINGUA, args[2])
     imp.togli_archi_impossibili()
     imp.togli_non_validi()
     st = imp.scrivi(args[1])
