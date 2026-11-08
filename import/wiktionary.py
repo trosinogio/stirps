@@ -258,7 +258,10 @@ MAIUSCOLA_DEI_NOMI = {'de', 'gsw', 'lb', 'bar', 'pdc', 'ksh'}
 # segni che scrivono suoni o parole diverse: il norreno háls, il francese dé, il protogermanico berô, ё e й in russo
 SEGNI_DELLA_PAGINA = {'ang': '\u0304\u0306\u0307',             # macron, breve, punto: sæterdæġ → sæterdæg, iċ → ic
                       'enm': '\u0304\u0306',                     # fōtmāl → fotmal
-                      'ru': '\u0301\u0300', 'uk': '\u0301\u0300', 'be': '\u0301\u0300', 'rue': '\u0301\u0300'}   # accento tonico
+                      'ru': '\u0301\u0300', 'uk': '\u0301\u0300', 'be': '\u0301\u0300', 'rue': '\u0301\u0300',   # accento tonico
+                      # protoslavo: gli accenti (acuto, grave, doppio grave, breve rovesciata, circonflesso, tilde) non
+                      # stanno nel titolo, che tiene invece pipa e ogonek: *šȅstь → *šestь, *pę̑tь → *pętь
+                      'sla-pro': '\u0301\u0300\u030f\u0311\u0302\u0303'}
 
 
 def nome_pagina(lingua, termine):

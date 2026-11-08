@@ -136,7 +136,12 @@ jobs:
           cat dati/it/tsv/lessemi.tsv dati/it/tsv/dizionari.tsv > voci.tsv
           python3 - <<'PY'
           import gzip
-          wz = {tuple(r.split('\t')[:2]) for r in gzip.open('../dati/glosse_it.tsv.gz', 'rt', encoding='utf-8')}
+          from collections import Counter
+          # le glosse del Wikizionario che l'import usa davvero: niente segnaposto, niente parole con omografi
+          # (importa_glosse_wikizionario()); le voci con omografi si traducono dalla loro glossa inglese
+          omografi = Counter(tuple(r.split('\t')[1:3]) for r in open('voci.tsv', encoding='utf-8'))
+          wz = {tuple(c[:2]) for c in (r.rstrip('\n').split('\t') for r in gzip.open('../dati/glosse_it.tsv.gz', 'rt', encoding='utf-8'))
+                if len(c) > 4 and 'definizione mancante' not in c[4].lower() and omografi[tuple(c[:2])] <= 1}
           # già tentate: la stessa voce con la stessa glossa inglese, confermata o scartata (terza colonna vuota)
           gia = {tuple(r.rstrip('\n').split('\t')[:2]) for r in gzip.open('../dati/glosse_tradotte.tsv.gz', 'rt', encoding='utf-8')}
           n = 0

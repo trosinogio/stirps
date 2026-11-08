@@ -174,6 +174,27 @@ create temp table glosse_prima as select count(*) as n from glossa where proveni
 select importa_glosse_wikizionario();
 select pg_temp.verifica((select count(*) from glossa where provenienza = 'wikizionario') = (select n from glosse_prima),
   'reimport delle glosse idempotente');
+do $$
+declare v_v bigint; v_s bigint; v_u bigint;
+begin
+  -- due omografi inglesi di parte del discorso diversa (brew: verbo e sostantivo) e una parola senza omografi
+  insert into lessema (lingua, lemma, omografo, pos, glossa, glossa_lingua, provenienza, stato_editoriale, id_esterno)
+    values ('en', 'provabrew', 1, 'v.', 'to make beer', 'en', 'wiktionary', 'importato', 'enwikt:en:provabrew') returning id into v_v;
+  insert into lessema (lingua, lemma, omografo, pos, glossa, glossa_lingua, provenienza, stato_editoriale, id_esterno)
+    values ('en', 'provabrew', 2, 's.', 'an overhanging hill', 'en', 'wiktionary', 'importato', 'enwikt:en:provabrew:2') returning id into v_s;
+  insert into lessema (lingua, lemma, omografo, pos, glossa, glossa_lingua, provenienza, stato_editoriale, id_esterno)
+    values ('en', 'provavuota', 1, 's.', 'something', 'en', 'wiktionary', 'importato', 'enwikt:en:provavuota') returning id into v_u;
+  insert into stg_wikizionario values ('en', 'provabrew', 'noun', 1, 'fermentazione, infusione'),
+    ('en', 'provavuota', 'noun', 1, 'definizione mancante; se vuoi, aggiungila tu');
+  -- una glossa del Wikizionario già scritta che non vale più
+  insert into glossa (lessema_id, lingua, testo, provenienza, stato_editoriale) values (v_s, 'it', 'fermentazione, infusione', 'wikizionario', 'importato');
+  perform importa_glosse_wikizionario();
+  perform pg_temp.verifica(
+    not exists (select 1 from glossa where lessema_id in (v_v, v_s, v_u) and provenienza = 'wikizionario'),
+    'niente glossa del Wikizionario a una parola con omografi (brew², «ciglio di un colle», non è «infusione»), né il segnaposto «definizione mancante»; una glossa vecchia che non vale più se ne va');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
 select pg_temp.verifica(
   (select anno_da = 1590 and precisione = 'esatta' and provenienza = 'wiktionary' from attestazione where lessema_id = lx('it/pizza')),
   'pizza: prima attestazione 1590, secondo Wiktionary');
