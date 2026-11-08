@@ -15,7 +15,7 @@ una riduzione (dalla, l'), la quarta colonna (t) dice all'analisi di contare i l
     python3 forme_frequenti.py ../dati/frequenze_it.tsv.gz dati/it/forme.tsv dati/it/tsv/lessemi.tsv \
         [dati/it/forme_analisi.tsv] > forme_it.tsv
 """
-import os, sys
+import os, re, sys
 from collections import defaultdict
 import gzip
 
@@ -34,7 +34,8 @@ def leggi(percorso):
 def main():
     frequenze, forme, lessemi = sys.argv[1:4]
     analisi = sys.argv[4] if len(sys.argv) > 4 else None
-    voci = {c[2] for c in leggi(lessemi) if len(c) > 4 and c[1] == 'it' and c[4] != 't'}
+    # le voci, senza le pagine di servizio di Wiktionary («i/languages A to L») e le locuzioni
+    voci = {c[2] for c in leggi(lessemi) if len(c) > 4 and c[1] == 'it' and c[4] != 't' and not re.search(r'[/ ]', c[2])}
     voci_min = {v.lower(): v for v in voci}
     rimandi = defaultdict(set)      # forma → lemmi (voci o altre forme)
     riduzioni = set()               # le forme che sono solo riduzioni di altre parole (dalla, l')
@@ -48,17 +49,17 @@ def main():
                 riduzioni.add(c[0].lower())
 
     def risolvi(forma, prof=0):
-        """Le voci a cui una forma rimanda, seguendo le forme intermedie (dell' → l' → lo); una riduzione che è anche
-        una voce (l') si segue lo stesso, perché la voce non dice da dove viene."""
+        """Le voci a cui una forma rimanda. Si passa per un'altra forma solo se è elisa (dell' → l' → lo): una grafia
+        antica come tramite porterebbe fuori strada (hai → ai, che è a + i). Una forma elisa che è anche una voce (l')
+        si segue lo stesso, perché la voce non dice da dove viene."""
         out = set()
         for l in rimandi.get(forma, ()):
             lm = l.lower()
-            if l in voci and lm not in riduzioni:
+            elisa = lm.endswith("'")
+            if l in voci and not (elisa and lm in riduzioni and lm in rimandi):
                 out.add(l)
-            elif lm in rimandi and prof < 3:
+            elif elisa and lm in rimandi and prof < 3:
                 out |= risolvi(lm, prof + 1)
-            elif l in voci:
-                out.add(l)
         return out
 
     def con_accento(forma):

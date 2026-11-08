@@ -277,7 +277,7 @@ def menzione_come_der(v):
         if m is None or (m.get('expansion') or m['args']['2']) not in frase:
             return []
     a = m['args']
-    return [{'n': 'der', 'a': {'1': v.get('lang_code'), '2': a['1'], '3': a['2'], **({'t': a['4']} if a.get('4') else {})},
+    return [{'n': 'der', 'a': {'1': v.get('lang_code'), '2': a['1'], '3': a['2'].split('#')[0], **({'t': a['4']} if a.get('4') else {})},
              'e': m.get('expansion', '')}]
 
 
@@ -359,13 +359,17 @@ def surf_come_af(v):
 RIDUZIONE = re.compile(r'\b(?:apocopic|apocopated|elided|elision|contraction|contracted|apheretic|aphetic|syncopated|truncated)'
                        r'\b[^;:()]*?\bof\s+([^,;:()]+)', re.I)
 FUORI_TAVOLA = {'table-tags', 'inflection-template', 'class', 'romanization', 'canonical', 'auxiliary'}
+# le parole inglesi che una glossa mette dopo «of» («contraction of the plural article gli»): non sono lemmi italiani
+INGLESI = {'the', 'of', 'form', 'forms', 'plural', 'singular', 'masculine', 'feminine', 'article', 'definite',
+           'indefinite', 'and', 'or', 'word', 'words', 'literally', 'preposition', 'pronoun', 'with', 'before'}
 
 
 def lemmi_puliti(testo):
     """I lemmi di un rimando: «avere,havere<l:obsolete>» → avere, havere; «[[in]] [[il]]» e «da + la» → in, il; da, la.
     L'apostrofo resta: l' è una parola."""
     testo = re.sub(r'<[^>]*>', '', testo or '').replace('[[', ' ').replace(']]', ' ')
-    return [x.strip('“”".') for x in re.split(r'[,+/]|\s+', testo) if x.strip('“”".')]
+    parti = [x.strip('“”".').split('#')[0] for x in re.split(r'[,+/]|\s+', testo)]
+    return [x for x in parti if x and x.lower() not in INGLESI]
 
 
 def forme_per_analisi(v):
@@ -381,7 +385,9 @@ def forme_per_analisi(v):
         m = RIDUZIONE.search(g)
         if m and not s.get('form_of'):
             righe += [(w, l, 'riduzione') for l in lemmi_puliti(m.group(1))]
-    if not forma_flessa(v):
+    # le tavole solo per i verbi: le coniugazioni non hanno una pagina per forma; le tavole degli articoli e dei nomi
+    # elencano anche le parole dell'altro genere (la: il), che non sono forme di quella voce
+    if not forma_flessa(v) and v.get('pos') == 'verb':
         for f in v.get('forms') or []:
             forma, et = f.get('form') or '', set(f.get('tags') or [])
             if et and not et & FUORI_TAVOLA and forma and forma != w and ' ' not in forma and not forma.startswith('-'):
