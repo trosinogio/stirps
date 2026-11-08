@@ -1,0 +1,23 @@
+# Controllo del sito pubblicato, da un ramo di servizio (la sandbox non raggiunge Vercel): stato, peso e contenuto di
+# alcune pagine, come pagina intera e come richiesta RSC (quella di un clic su un collegamento interno).
+name: Controllo del sito
+on:
+  push:
+    branches: ['controllo-sito']
+jobs:
+  controllo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pagine
+        run: |
+          S=https://dizionario-etimologico.vercel.app
+          for u in /it/radici /it/radici/ine-pro/corpo /it/radici/ine-pro/vita /it/radici/ine-pro/senza-area /en/radici/ine-pro/corpo /it/radici/gem-pro; do
+            echo "== $u"
+            curl -s -o /tmp/p.html -w 'pagina: %{http_code} %{size_download} B %{time_total}s\n' "$S$u"
+            grep -o 'conto-radici[^<]*<[^<]*<[^<]*' /tmp/p.html | head -2 || true
+            grep -o 'href="/it/radici/ine-pro/[a-z-]*"' /tmp/p.html | sort -u | head -5 || true
+            grep -o '<title>[^<]*' /tmp/p.html | head -1
+            curl -s -o /tmp/r.txt -w 'rsc: %{http_code} %{size_download} B %{content_type}\n' -H 'RSC: 1' -H 'Next-Url: /it/radici' "$S$u?_rsc=prova"
+            head -c 300 /tmp/r.txt; echo
+          done
+          curl -sI "$S/it/radici/ine-pro/corpo" | grep -i 'x-vercel-cache\|x-nextjs\|cache-control\|age:' || true
