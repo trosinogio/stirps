@@ -569,6 +569,10 @@ class Importatore:
         if not ric and lingua in VARIETA_ATTESTATE:
             lingua = VARIETA_ATTESTATE[lingua]
         lemma = termine[1:] if ric else termine
+        # un lemma già in alfabeto latino non ha traslitterazione: quella che arriva è un pezzo di glossa o di codice
+        # («liquid lard(?)» per tucca, «ablative of <i …>manus</i>» per manu) e finirebbe nell'indirizzo della voce
+        if translit and re.fullmatch(r"[\sA-Za-zÀ-ɏḀ-ỿ'’·.\-]+", lemma or ''):
+            translit = None
         if not ric and base_lingua(lingua) == 'grc' and lemma and all(c in CIPRIOTA for c in lemma):
             lingua = 'grc-arp'          # sillabario cipriota: greco arcadocipriota, con il suo indice
         k = chiave(lingua, termine.lstrip('*') if not ric else termine, omografo)
