@@ -276,13 +276,51 @@ def prevedi(mod, lex, it_lemma, cl, glossa=''):
 
 
 PRIORE = 0.25   # la parte delle parole senza etimologia che ha davvero l'etimo tra i lemmi latini (stima prudente)
+RITORNO_MAX = 1.0   # la prova a rovescio si fa solo per le proposte con un costo per lettera fino a qui
 
 
-def tratti(lex, p, lemma, glossa):
-    """Fiducia (scarto sul secondo), costo per lettera e accordo delle glosse del primo candidato."""
+class Ritorno:
+    """La prova a rovescio: dal candidato latino si cerca, con lo stesso modello, la parola italiana più vicina tra
+    tutte quelle del dizionario. La proposta regge solo se torna la parola di partenza: tabula torna a tavola, e non è
+    l'etimo che il modello deve proporre per tavolo, che da tavola deriva."""
+    def __init__(self, italiani, mod):
+        self.per_iniziale = defaultdict(list)
+        for w in italiani:
+            if ' ' in w or w.startswith('-') or w.endswith('-'): continue
+            f = norm(w)
+            if len(f) < 3: continue
+            g = comune(f, ITALIANO_COMUNE)
+            self.per_iniziale[g[:1]].append((f, trigrammi(g)))
+        self.inverse = defaultdict(set)        # iniziale latina -> iniziali italiane che le corrispondono
+        for it2, c in mod.iniziali.items():
+            for l, n in c.items():
+                if n >= 2: self.inverse[l].add(it2[:1])
+
+    def torna(self, mod, f_la, it):
+        g = comune(f_la, LATINO_COMUNE)
+        t = trigrammi(g)
+        scelti = []
+        for l in self.inverse.get(g[:1], set()) | {g[:1]}:
+            for f, ti in self.per_iniziale.get(l, ()):
+                if f == it or not LUNGHEZZA[0] <= len(f_la) / len(f) <= LUNGHEZZA[1]: continue
+                c = len(t & ti)
+                if c >= 2: scelti.append((c / len(t | ti), f))
+        scelti.sort(reverse=True)
+        mio = mod.costo(it, f_la, '?')
+        if mio is None: return False
+        for _, f in scelti[:CANDIDATI]:
+            c = mod.costo(f, f_la, '?')
+            if c is not None and c < mio - 1e-9: return False
+        return True
+
+
+def tratti(lex, p, lemma, glossa, mod=None, rit=None):
+    """Fiducia (scarto sul secondo), costo per lettera, accordo delle glosse del primo candidato e prova a rovescio."""
     fiducia = (p[1][0] - p[0][0]) if len(p) > 1 else 5.0
     v = lex.voci[p[0][1]]
-    return fiducia, p[0][0] / len(norm(lemma)), bool(senso(glossa) & v[4])
+    relativo = p[0][0] / len(norm(lemma))
+    torna = bool(rit and relativo <= RITORNO_MAX and rit.torna(mod, v[2], norm(lemma)))
+    return fiducia, relativo, bool(senso(glossa) & v[4]), torna
 
 
 def main():
@@ -299,6 +337,7 @@ def main():
     prova = {i for i in ids if zlib.crc32(i.encode()) % 5 == 0}
     addestra = [(norm(info[i][0]), norm(primo[i]), info[i][1]) for i in ids if i not in prova]
     mod = Modello(addestra)
+    rit = Ritorno(italiani, mod)
     print(f'coppie: {len(ids)} parole italiane, {len(addestra)} per imparare, {len(prova)} tenute da parte; '
           f'{sum(len(c) for c in mod.finali.values())} finali, {len(mod.op)} operazioni sul tema', file=sys.stderr)
     # i positivi: il 20% tenuto da parte. Esatta se il primo è un etimo accolto, o lo stesso lemma in un'altra voce
@@ -313,7 +352,7 @@ def main():
         if not p: continue
         veri = {forma_di.get(x) for x in per_it[i]} - {None}
         v = lex.voci[p[0][1]]
-        pos.append((*tratti(lex, p, lemma, gl), v[0] in per_it[i] or v[2] in veri, lemma, v[1]))
+        pos.append((*tratti(lex, p, lemma, gl, mod, rit), v[0] in per_it[i] or v[2] in veri, lemma, v[1]))
     # i negativi: parole italiane con un'etimologia accolta che non viene dal latino (derivati italiani, prestiti dal
     # francese, dal greco…), una su dieci; ogni proposta su di loro è un errore. Quelle che passano dal latino volgare
     # o medievale restano fuori: lì un etimo latino non sarebbe del tutto sbagliato
@@ -323,44 +362,51 @@ def main():
         if esclusa(r[1], r[3], italiani - {r[1].lower()}): continue
         n_neg += 1
         p = prevedi(mod, lex, r[1], classe(r[2]), r[3])
-        if p: neg.append((*tratti(lex, p, r[1], r[3]), r[1], lex.voci[p[0][1]][1]))
+        if p: neg.append((*tratti(lex, p, r[1], r[3], mod, rit), r[1], lex.voci[p[0][1]][1]))
     print(f'positivi provati {n_pos} (non provati: ' + ', '.join(f'{k} {v}' for k, v in fuori_prova.most_common())
-          + f'), al primo posto {sum(1 for e in pos if e[3])} ({sum(1 for e in pos if e[3]) / n_pos:.1%}); '
+          + f'), al primo posto {sum(1 for e in pos if e[4])} ({sum(1 for e in pos if e[4]) / n_pos:.1%}); '
           f'negativi provati {n_neg}', file=sys.stderr)
     # la regola: fiducia, costo per lettera, accordo delle glosse. La precisione stimata sulle parole senza etimologia
     # pesa i positivi con PRIORE e i negativi con 1 - PRIORE; si sceglie la regola che propone di più tenendo l'85%
+    # la prova a rovescio (R) è un quarto criterio; vale solo fino a RITORNO_MAX di costo per lettera
+    def passa(e, f, c, g, r): return e[0] >= f and e[1] <= c and (e[2] or not g) and (e[3] or not r)
     regole = []
-    for f in (1.0, 2.0, 3.0, 4.0, 5.0):
+    for f in (0.0, 1.0, 2.0, 3.0, 4.0, 5.0):
         for c in (0.5, 0.6, 0.8, 1.0, 1.5, 9.0):
             for g in (False, True):
-                ok = sum(1 for e in pos if e[0] >= f and e[1] <= c and (e[2] or not g) and e[3])
-                er = sum(1 for e in pos if e[0] >= f and e[1] <= c and (e[2] or not g) and not e[3])
-                ne = sum(1 for e in neg if e[0] >= f and e[1] <= c and (e[2] or not g))
-                a, b, d = ok / n_pos, er / n_pos, ne / n_neg
-                stima = PRIORE * a / (PRIORE * (a + b) + (1 - PRIORE) * d) if a + b + d else 0
-                regole.append((stima, a, f, c, g, ok, er, ne, d))
+                for r in (False, True):
+                    if r and c > RITORNO_MAX: continue
+                    ok = sum(1 for e in pos if passa(e, f, c, g, r) and e[4])
+                    er = sum(1 for e in pos if passa(e, f, c, g, r) and not e[4])
+                    ne = sum(1 for e in neg if passa(e, f, c, g, r))
+                    a, b, d = ok / n_pos, er / n_pos, ne / n_neg
+                    stima = PRIORE * a / (PRIORE * (a + b) + (1 - PRIORE) * d) if a + b + d else 0
+                    regole.append((stima, a, f, c, g, r, ok, er, ne, d))
+    print(f'prova a rovescio: torna per {sum(1 for e in pos if e[3] and e[4])} esatte e {sum(1 for e in pos if e[3] and not e[4])} '
+          f'errate sui positivi, per {sum(1 for e in neg if e[3])} dei {len(neg)} negativi con una proposta', file=sys.stderr)
     buone = [x for x in regole if x[0] >= PRECISIONE]
-    for x in sorted(regole, key=lambda x: -x[0])[:8]:
-        print(f'  fiducia ≥ {x[2]}, costo ≤ {x[3]}, glosse {"sì" if x[4] else "no"}: esatte {x[5]}, errate {x[6]} sui '
-              f'positivi, proposte su {x[8]:.1%} dei negativi; precisione stimata {x[0]:.1%}, copertura {x[1]:.0%}',
-              file=sys.stderr)
+    for x in sorted(regole, key=lambda x: -x[0])[:10]:
+        print(f'  fiducia ≥ {x[2]}, costo ≤ {x[3]}, glosse {"sì" if x[4] else "no"}, ritorno {"sì" if x[5] else "no"}: '
+              f'esatte {x[6]}, errate {x[7]} sui positivi, proposte su {x[9]:.1%} dei negativi ({x[8]}); precisione stimata '
+              f'{x[0]:.1%}, copertura {x[1]:.0%}', file=sys.stderr)
     if not buone:
         print('nessuna regola arriva all\'85%: nessuna proposta', file=sys.stderr); return
-    stima, cop, F, C, G = max(buone, key=lambda x: x[1])[:5]
-    print(f'regola scelta: fiducia ≥ {F}, costo ≤ {C}, glosse {"sì" if G else "no"} (stima {stima:.1%}, copertura '
-          f'{cop:.0%})', file=sys.stderr)
-    falsi = [e for e in neg if e[0] >= F and e[1] <= C and (e[2] or not G)]
-    print('  proposte sui negativi: ' + '; '.join(f'{e[3]} → {e[4]}' for e in falsi[:15]), file=sys.stderr)
+    stima, cop, F, C, G, R = max(buone, key=lambda x: x[1])[:6]
+    print(f'regola scelta: fiducia ≥ {F}, costo ≤ {C}, glosse {"sì" if G else "no"}, ritorno {"sì" if R else "no"} '
+          f'(stima {stima:.1%}, copertura {cop:.0%})', file=sys.stderr)
+    falsi = [e for e in neg if passa(e, F, C, G, R)]
+    print('  proposte sui negativi: ' + '; '.join(f'{e[4]} → {e[5]}' for e in falsi[:15]), file=sys.stderr)
     if len(sys.argv) > 6:
         mod = Modello([(norm(info[i][0]), norm(primo[i]), info[i][1]) for i in ids])
+        rit = Ritorno(italiani, mod)
         fuori = []; scartate = Counter()
         for r in righe(sys.argv[5]):
             perche = esclusa(r[1], r[3], italiani - {r[1].lower()})
             if perche: scartate[perche] += 1; continue
             p = prevedi(mod, lex, r[1], classe(r[2]), r[3])
             if not p: continue
-            fiducia, relativo, glosse = tratti(lex, p, r[1], r[3])
-            if fiducia >= F and relativo <= C and (glosse or not G):
+            fiducia, relativo, glosse, torna = tratti(lex, p, r[1], r[3], mod, rit)
+            if fiducia >= F and relativo <= C and (glosse or not G) and (torna or not R):
                 v = lex.voci[p[0][1]]
                 fuori.append(f'{r[0]}\t{r[1]}\t{v[0]}\t{v[1]}\t{fiducia:.2f}\t{r[4]}\t{relativo:.2f}\n')
         with open(sys.argv[6], 'w', encoding='utf-8') as f:
