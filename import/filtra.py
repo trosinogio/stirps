@@ -272,6 +272,9 @@ def menzione_come_der(v):
     rid = re.match(r"From earlier\s+[^,]+,\s+an?\s+(?:reduced|shortened|apocopic|apocopated|contracted|syncopated|variant)"
                    r"\s+form\s+of\s+([^\s.,;]+)", testo)
     m = next((t for t in menzioni if rid and rid.group(1) in (t.get('expansion'), t['args']['2'])), None)
+    if m is None and rid:
+        # Kaikki non sempre conserva i modelli di menzione (il ha solo {{cog|scn|lu}}): la parola si legge dal testo
+        return [{'n': 'der', 'a': {'1': v.get('lang_code'), '2': v.get('lang_code'), '3': rid.group(1)}, 'e': rid.group(1)}]
     if m is None:
         m = menzioni[0] if menzioni else None
         if m is None or (m.get('expansion') or m['args']['2']) not in frase:
@@ -385,12 +388,13 @@ def forme_per_analisi(v):
         m = RIDUZIONE.search(g)
         if m and not s.get('form_of'):
             righe += [(w, l, 'riduzione') for l in lemmi_puliti(m.group(1))]
-    # le tavole solo per i verbi: le coniugazioni non hanno una pagina per forma; le tavole degli articoli e dei nomi
-    # elencano anche le parole dell'altro genere (la: il), che non sono forme di quella voce
-    if not forma_flessa(v) and v.get('pos') == 'verb':
+    # le tavole delle forme (avere: ho, hai; suo: sua, suoi, sue), ma non quelle degli articoli, che elencano gli altri
+    # articoli (la: il) e facevano di il una forma di la; niente maiuscole (il numerale I di primo non è la forma i)
+    if not forma_flessa(v) and v.get('pos') != 'article':
         for f in v.get('forms') or []:
             forma, et = f.get('form') or '', set(f.get('tags') or [])
-            if et and not et & FUORI_TAVOLA and forma and forma != w and ' ' not in forma and not forma.startswith('-'):
+            if (et and not et & FUORI_TAVOLA and forma and forma != w and ' ' not in forma and not forma.startswith('-')
+                    and forma == forma.lower()):
                 righe.append((forma, w, 'tavola'))
     return [r for r in righe if r[0] and r[1] and r[0] != r[1]]
 
