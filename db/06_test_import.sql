@@ -607,6 +607,8 @@ truncate stg_lingua_wikt, stg_famiglia_wikt;
 do $$
 declare v_l bigint := (select id from lessema where ricostruito and id_esterno is not null order by id limit 1);
         v_k text := (select id_esterno from lessema where id = v_l);
+        v_primo boolean;
+        v_secondo boolean;
 begin
   truncate stg_area_radice;
   insert into stg_area_radice values (v_k, 'x', 'movimento', '', 'claude-prova'), ('chiave:che:non:esiste', 'x', 'corpo', '', 'claude-prova');
@@ -618,6 +620,14 @@ begin
   perform importa_aree();
   perform pg_temp.verifica((select area = 'corpo' and provenienza = 'redazione' from area_radice where lessema_id = v_l),
     'l''area scelta dalla redazione non cambia con un nuovo import');
+  update area_radice set area = 'movimento', provenienza = 'claude' where lessema_id = v_l;
+  v_primo := imposta_area_radice(v_l, 'movimento');
+  v_secondo := imposta_area_radice(v_l, 'movimento');
+  perform pg_temp.verifica(v_primo and not v_secondo
+    and (select provenienza = 'redazione' and modello is null from area_radice where lessema_id = v_l)
+    and exists (select 1 from storico where tabella = 'area_radice' and record_id = v_l and operazione = 'U'
+                   and prima->>'provenienza' = 'claude' and dopo->>'area' = 'movimento'),
+    'la redazione conferma l''area di Claude: diventa sua, con la riga prima e dopo nello storico, e confermarla di nuovo non scrive niente');
   raise exception using errcode = 'P0098', message = 'annulla';
 exception when sqlstate 'P0098' then null;
 end $$;

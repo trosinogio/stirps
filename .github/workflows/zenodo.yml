@@ -1,0 +1,36 @@
+# Il pacchetto dati su Zenodo, a mano dalla scheda Actions: scripts/pacchetto_zenodo.py prepara lo zip (i file di dati/,
+# le colonne, la licenza, CITATION.cff), scripts/deposito_zenodo.py lo deposita con i metadati di .zenodo.json. Per
+# default sulla sandbox e in bozza: si pubblica solo dopo aver controllato la bozza. Segreti: ZENODO_TOKEN e
+# ZENODO_SANDBOX_TOKEN (token personali con deposit:write e deposit:actions).
+name: Zenodo
+on:
+  workflow_dispatch:
+    inputs:
+      sandbox:
+        description: 'Prova su sandbox.zenodo.org'
+        type: boolean
+        default: true
+      pubblica:
+        description: 'Pubblica subito (altrimenti resta una bozza da controllare)'
+        type: boolean
+        default: false
+      versione_di:
+        description: 'Id di un deposito già pubblicato, per farne una nuova versione (vuoto: il primo deposito)'
+        type: string
+        default: ''
+permissions:
+  contents: read
+jobs:
+  deposito:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pacchetto
+        run: python3 scripts/pacchetto_zenodo.py /tmp | tee /tmp/nome.txt
+      - name: Deposito
+        env:
+          ZENODO_TOKEN: ${{ inputs.sandbox && secrets.ZENODO_SANDBOX_TOKEN || secrets.ZENODO_TOKEN }}
+          BASE: ${{ inputs.sandbox && 'https://sandbox.zenodo.org' || 'https://zenodo.org' }}
+          PUBBLICA: ${{ inputs.pubblica }}
+          VERSIONE_DI: ${{ inputs.versione_di }}
+        run: python3 scripts/deposito_zenodo.py "$(cat /tmp/nome.txt)"

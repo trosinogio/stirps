@@ -1,0 +1,20 @@
+{
+  "title": "Stirps — dizionario etimologico per radici: pacchetto dati",
+  "upload_type": "dataset",
+  "description": "<p>Il pacchetto dati di <a href=\"https://dizionario-etimologico.vercel.app\">Stirps</a>, dizionario etimologico per radici: per ogni parola la catena degli etimi fino alla radice, la famiglia, le fonti.</p><p>Contiene voci, ipotesi etimologiche e passaggi tratti da Wiktionary (en.wiktionary.org) e dal Wikizionario (it.wiktionary.org) via Kaikki/wiktextract; i lemmi del Lewis &amp; Short e del Liddell–Scott–Jones che Wiktionary non ha, dalla Perseus Digital Library; glosse italiane del Wikizionario, di Wikidata e tradotte in automatico; definizioni e aree di significato delle radici scritte da Claude (Anthropic); stime della prima attestazione; le forme flesse italiane più frequenti; frequenze d'uso da FrequencyWords. Ogni file è un TSV compresso: COLONNE.txt ne descrive le colonne, LEGGIMI.txt le fonti.</p><p>I dati sono automatici e non verificati: la redazione di Stirps li rivede sulle fonti, e le voci rivedute non sono in questo pacchetto.</p>",
+  "creators": [
+    {"name": "Trosino, Giovanni"}
+  ],
+  "license": "cc-by-sa-4.0",
+  "access_right": "open",
+  "language": "ita",
+  "keywords": ["etimologia", "lessicografia", "linguistica storica", "indoeuropeo", "latino", "greco antico", "italiano", "Wiktionary"],
+  "related_identifiers": [
+    {"identifier": "https://dizionario-etimologico.vercel.app", "relation": "isSupplementTo", "resource_type": "other"},
+    {"identifier": "https://github.com/trosinogio/stirps", "relation": "isSupplementTo", "resource_type": "software"},
+    {"identifier": "https://en.wiktionary.org", "relation": "isDerivedFrom", "resource_type": "dataset"},
+    {"identifier": "https://it.wiktionary.org", "relation": "isDerivedFrom", "resource_type": "dataset"},
+    {"identifier": "https://github.com/PerseusDL/lexica", "relation": "isDerivedFrom", "resource_type": "dataset"}
+  ],
+  "notes": "Licenza CC BY-SA 4.0 (le glosse di Wikidata sono CC0 1.0). Chi riusa i dati deve citare Stirps, Wiktionary, il Wikizionario e la Perseus Digital Library."
+}

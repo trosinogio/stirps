@@ -61,6 +61,7 @@ export default async function Layout({ children, params }: { children: React.Rea
             <nav aria-label={t.piede.progetto}>
               <h2>{t.piede.progetto}</h2>
               <Link href={`/${lang}/metodo`}>{t.nav.metodo}</Link>
+              <Link href={`/${lang}/norme`}>{t.nav.norme}</Link>
               <Link href={`/${lang}/bibliografia`}>{t.bibliografia}</Link>
               <Link href={`/${lang}/chi-siamo`}>{t.nav.chiSiamo}</Link>
               <Link href={`/${lang}/redazione`}>{lang === 'it' ? 'Redazione' : 'Editorial'}</Link>

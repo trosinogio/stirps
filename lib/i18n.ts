@@ -162,7 +162,7 @@ export interface Testi {
   datiTitolo: string;
   datiTesto: (parole: number, lingue: number, radici: number) => string;
   sottotitolo: string;
-  nav: { radici: string; lingue: string; storie: string; metodo: string; chiSiamo: string; analisi: string; analisiBreve: string };
+  nav: { radici: string; lingue: string; storie: string; metodo: string; norme: string; chiSiamo: string; analisi: string; analisiBreve: string };
   analisi: {
     titolo: string; intro: string; segnaposto: string; pulsante: string; inCorso: string; limite: (n: number) => string;
     errore: string; vuoto: string; riepilogo: (riconosciute: number, occorrenze: number, lemmi: number) => string;
@@ -449,7 +449,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     tutteLeLingue: (n) => `Tutte le lingue (${n})`,
     datiTitolo: 'Da dove vengono i dati',
     sottotitolo: 'Dizionario etimologico per radici',
-    nav: { radici: 'Radici', lingue: 'Lingue', storie: 'Storie', metodo: 'Metodo', chiSiamo: 'Chi siamo', analisi: 'Analizza un testo', analisiBreve: 'Analizza' },
+    nav: { radici: 'Radici', lingue: 'Lingue', storie: 'Storie', metodo: 'Metodo', norme: 'Norme redazionali', chiSiamo: 'Chi siamo', analisi: 'Analizza un testo', analisiBreve: 'Analizza' },
     analisi: {
       titolo: 'Analizza un testo',
       intro: 'Incolla un testo italiano: Stirps riconosce le parole, le riconduce al loro lemma e mostra da quali lingue vengono, risalendo le catene del dizionario.',
@@ -699,7 +699,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     tutteLeLingue: (n) => `All languages (${n})`,
     datiTitolo: 'Where the data comes from',
     sottotitolo: 'An etymological dictionary by roots',
-    nav: { radici: 'Roots', lingue: 'Languages', storie: 'Stories', metodo: 'Method', chiSiamo: 'About', analisi: 'Analyse a text', analisiBreve: 'Analyse' },
+    nav: { radici: 'Roots', lingue: 'Languages', storie: 'Stories', metodo: 'Method', norme: 'Editorial guidelines', chiSiamo: 'About', analisi: 'Analyse a text', analisiBreve: 'Analyse' },
     analisi: {
       titolo: 'Analyse a text',
       intro: 'Paste an Italian text: Stirps recognises the words, brings them back to their lemma and shows which languages they come from, following the chains in the dictionary.',

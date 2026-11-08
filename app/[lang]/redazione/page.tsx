@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { isLang, type Lang } from '@/lib/i18n';
 import { TESTI_REDAZIONE } from '@/lib/testi-redazione';
 import { richiediRedattore } from '@/lib/auth/redattore';
-import { codaVerifica, contatori, listaLavoro, ultimeModifiche, type VoceLista } from '@/lib/redazione';
+import { codaVerifica, contatori, listaLavoro, misuraAree, ultimeModifiche, type VoceLista } from '@/lib/redazione';
 import TestataRedazione from '@/components/redazione/Testata';
 import Ricerca from '@/components/Ricerca';
 
@@ -16,7 +16,7 @@ export default async function Cruscotto({ params }: { params: Promise<{ lang: st
   if (!isLang(lang)) notFound();
   const t = TESTI_REDAZIONE[lang];
   const redattore = await richiediRedattore(lang);
-  const [c, coda, modifiche, prime, catene, senza] = await Promise.all([contatori(), codaVerifica(lang, 60), ultimeModifiche(15), listaLavoro(lang), listaLavoro(lang, 'catene-da-sistemare'), listaLavoro(lang, 'senza-etimologia')]);
+  const [c, coda, modifiche, prime, catene, senza, aree, misura] = await Promise.all([contatori(), codaVerifica(lang, 60), ultimeModifiche(15), listaLavoro(lang), listaLavoro(lang, 'catene-da-sistemare'), listaLavoro(lang, 'senza-etimologia'), listaLavoro(lang, 'aree-da-rivedere'), misuraAree()]);
   const verificate = prime.filter((v) => v.stato === 'verificato').length;
   const gruppi = [...new Set(prime.map((v) => v.gruppo))].map((g) => {
     const voci = prime.filter((v) => v.gruppo === g);
@@ -71,6 +71,7 @@ export default async function Cruscotto({ params }: { params: Promise<{ lang: st
       )}
       <SezioneLista lang={lang} titolo={t.catene} nota={t.cateneNota} voci={catene} />
       <SezioneLista lang={lang} titolo={t.senzaEtimologia} nota={t.senzaEtimologiaNota} voci={senza} />
+      <SezioneLista lang={lang} titolo={t.areeDaRivedere} nota={t.areeDaRivedereNota} voci={aree} misura={t.misuraAree(misura.riviste, misura.totale, misura.confermate)} />
       <section className="red-sezione">
         <h2>{prime.length ? t.codaFrequenza : t.coda}</h2>
         <p className="nota-sez">{t.codaNota}</p>
@@ -109,13 +110,14 @@ export default async function Cruscotto({ params }: { params: Promise<{ lang: st
 }
 
 // una lista di lavoro ricalcolata a ogni deploy: le prime 50 voci, con il gruppo e le fonti
-function SezioneLista({ lang, titolo, nota, voci }: { lang: Lang; titolo: string; nota: string; voci: VoceLista[] }) {
+function SezioneLista({ lang, titolo, nota, voci, misura }: { lang: Lang; titolo: string; nota: string; voci: VoceLista[]; misura?: string }) {
   const t = TESTI_REDAZIONE[lang];
   if (voci.length === 0) return null;
   return (
     <section className="red-sezione">
       <h2>{titolo} <span className="red-conta">{voci.length}</span></h2>
       <p className="nota-sez">{nota}</p>
+      {misura && <p className="red-contatori">{misura}</p>}
       <div className="red-tabella-scorre">
         <table className="red-tabella">
           <thead><tr><th>N.</th><th>{t.colonne.parola}</th><th>{t.colGruppo}</th><th>{t.colonne.fonti}</th></tr></thead>
