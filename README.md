@@ -49,7 +49,11 @@ Le etimologie hanno cinque provenienze, e la scheda dice quale: Wiktionary (con 
 
 L’indice di una lingua ha due sezioni: le parole, e i nomi propri e derivati, cioè i nomi e ogni altra voce con la maiuscola nelle lingue che scrivono i nomi comuni con la minuscola (*Romanus*, *Danish*; non il tedesco).
 
-La lista di lavoro `catene-da-sistemare` si ricalcola a ogni deploy e ha tre gruppi: le parole la cui catena salta subito a una radice, i passaggi sospetti (*torre*: τύρρις < φιλία) e le catene che arrivano a una radice diversa da quella che Wiktionary dichiara.
+La lista di lavoro `catene-da-sistemare` si ricalcola a ogni deploy e ha cinque gruppi: le parole la cui catena salta subito a una radice, i passaggi sospetti (*torre*: τύρρις < φιλία), le catene che arrivano a una radice diversa da quella che Wiktionary dichiara, e le parole italiane e francesi su cui Wiktionary e il Wikizionario, o il Wiktionnaire, discordano. Si ricalcolano anche `senza-etimologia` (le parole comuni senza nessuna etimologia) e `aree-da-rivedere` (cinque radici per area, sempre le stesse: l’editor di una radice ha la sezione «Area di significato», e il cruscotto conta quante aree di Claude la redazione conferma).
+
+Le norme redazionali hanno una pagina sul sito (`/it/norme`, testi in `NORME` di `lib/contenuti.ts`), versione per il lettore della bozza nel Claude Doc; le questioni aperte vi stanno «in discussione».
+
+Il pacchetto dati va su Zenodo con il workflow Zenodo (a mano): `scripts/pacchetto_zenodo.py` fa lo zip dei file di `dati/` con le colonne (`COLONNE.txt`), la licenza e le impronte, `scripts/deposito_zenodo.py` lo deposita con i metadati di `.zenodo.json`, in bozza e per default sulla sandbox. Servono i segreti `ZENODO_SANDBOX_TOKEN` e `ZENODO_TOKEN`; la citazione è in `CITATION.cff`.
 
 L’indice delle radici (`elenco_radici()`) mostra sotto ogni radice fino a quattro parole della lingua del lettore che ne discendono, le più usate per prime. La pagina di una famiglia si apre sulla sintesi: le parole della lingua del lettore, i rami principali (i figli diretti della radice, con quante parole portano) e le parole più vicine alla radice in ogni altra lingua; lo stemma si disegna fino a 150 parole (`LIMITE_DISEGNO`), oltre mostra i primi due livelli e ogni ramo ha la sua pagina.
 
