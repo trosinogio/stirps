@@ -1,5 +1,5 @@
-# Controllo del sito pubblicato, da un ramo di servizio (la sandbox non raggiunge Vercel): i pulsanti delle aree delle
-# radici, cliccati da un browser vero, al telefono e su schermo largo, con gli errori della console.
+# Controllo del sito pubblicato, da un ramo di servizio (la sandbox non raggiunge Vercel): le pagine toccate dall'ultima
+# pubblicazione, con lo stato e un pezzo del contenuto.
 name: Controllo del sito
 on:
   push:
@@ -8,36 +8,18 @@ jobs:
   controllo:
     runs-on: ubuntu-latest
     steps:
-      - name: Browser
+      - name: Pagine
         run: |
-          mkdir prova && cd prova && npm init -y > /dev/null && npm i -s playwright@1.49.1 > /dev/null && npx playwright install --with-deps chromium > /dev/null
-          cat > prova.js <<'JS'
-          const { chromium, devices } = require('playwright');
-          (async () => {
-            const b = await chromium.launch();
-            for (const [nome, opz] of [['telefono', devices['iPhone 13']], ['largo', { viewport: { width: 1200, height: 900 } }]]) {
-              const ctx = await b.newContext(opz);
-              const p = await ctx.newPage();
-              p.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log(nome, 'console', m.type(), m.text().slice(0, 300)); });
-              p.on('pageerror', (e) => console.log(nome, 'pageerror', e.message.slice(0, 300)));
-              p.on('requestfailed', (r) => console.log(nome, 'richiesta fallita', r.url().slice(0, 120), r.failure()?.errorText));
-              p.on('response', (r) => { if (r.status() >= 400) console.log(nome, 'risposta', r.status(), r.url().slice(0, 120)); });
-              await p.goto('https://dizionario-etimologico.vercel.app/it/radici', { waitUntil: 'networkidle' });
-              const chip = p.locator('.aree-radici a').nth(3);
-              const box = await chip.boundingBox();
-              const sotto = await p.evaluate(({ x, y }) => { const e = document.elementFromPoint(x, y); return e ? e.tagName + '.' + e.className : null; }, { x: box.x + box.width / 2, y: box.y + box.height / 2 });
-              console.log(nome, 'pulsante:', await chip.textContent(), '→', await chip.getAttribute('href'), '| sotto il dito:', sotto);
-              if (nome === 'telefono') await chip.tap(); else await chip.click();
-              await p.waitForTimeout(4000);
-              console.log(nome, 'dopo il clic:', p.url(), '|', await p.$eval('.conto-radici', (e) => e.textContent).catch(() => 'nessun conto'));
-              await p.locator('.aree-radici a').nth(0).click();
-              await p.waitForTimeout(4000);
-              console.log(nome, 'seconda area:', p.url(), '|', await p.$eval('.conto-radici', (e) => e.textContent).catch(() => 'nessun conto'));
-              await p.goBack(); await p.waitForTimeout(2500);
-              console.log(nome, 'indietro:', p.url(), '|', await p.$eval('.conto-radici', (e) => e.textContent).catch(() => 'nessun conto'));
-              await ctx.close();
-            }
-            await b.close();
-          })();
-          JS
-          node prova.js
+          S=https://dizionario-etimologico.vercel.app
+          prova() { curl -s -o /tmp/p.html -w "%{http_code} %{size_download}B" "$S$1"; printf ' %s | ' "$1"; grep -o "$2" /tmp/p.html | head -${3:-2} | tr '\n' ' '; echo; }
+          prova /it/w/en/brew-2 'glossa-g[^<]*<[^<]*<[^<]*'
+          prova /it/w/la/tucca '<title>[^<]*'
+          prova /it/w/la/liquid-lard '<title>[^<]*'
+          prova /it/w/ine-pro/treyes 'Discende da\|discende da\|capostipite[^<]*' 3
+          prova /it/r/ine-pro/treyes/stemma 'st-cerca\|Cerca nello stemma' 1
+          prova /it/w/it/tre 'azioni-voce.\{0,300\}' 1
+          prova /it/w/it/pazzo 'patiēns\|patiens' 2
+          prova /it/norme '<title>[^<]*'
+          prova /it/radici 'ine-pro/corpo#elenco' 1
+          prova /it/w/it/telo-2 'glossa-g[^<]*<[^<]*' 1
+          prova /it/analisi '<title>[^<]*'
