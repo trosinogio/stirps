@@ -6,7 +6,7 @@ import { SITO, VOCI_PER_MAPPA } from '@/lib/sito';
 // lingue; gli altri le voci, 40 mila per blocco. Ogni indirizzo italiano ha l'alternativa inglese. Elenco in robots.txt.
 export const revalidate = 86400;
 
-const PAGINE = ['', '/radici', '/lingue', '/storie', '/metodo', '/chi-siamo', '/bibliografia'];
+const PAGINE = ['', '/radici', '/lingue', '/storie', '/metodo', '/norme', '/chi-siamo', '/bibliografia'];
 
 function voce(percorso: string, agg?: string): MetadataRoute.Sitemap[number] {
   return {

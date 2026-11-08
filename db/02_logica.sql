@@ -932,7 +932,9 @@ end $$;
 -- la catena accolta finché resta nella lingua del testo (o in una sua varietà: l'italiano antico è italiano), e la prima
 -- lingua diversa è l'origine, raggruppata per lingua madre (il latino volgare sotto il latino). La via d'ingresso viene
 -- dal tipo di quel passaggio: popolare (eredità), dotta (prestito dotto, semidotto), prestito, altro. Una forma con più
--- lemmi possibili conta per ciascuno in parti uguali; un lemma senza un'origine nota va a parte.
+-- lemmi possibili conta per ciascuno in parti uguali; un lemma senza un'origine nota va a parte. Una forma che è solo una
+-- riduzione o una grafia senza accento (dalla = da + la, piu = più: forma_lemma.sostituisce) conta per i lemmi a cui
+-- rimanda e non per la voce omonima; e una voce omonima senza etimologia non conta quando la forma ha un lemma (ha: avere).
 create function analizza_testo(p_lingua text, p_forme text[], p_conteggi int[], p_lang text default 'it',
                                p_anteprima boolean default false)
 returns jsonb language sql stable as $$
@@ -945,7 +947,12 @@ forme as (
 lemmi as (
   select f.forma, fl.lemma from forme f join forma_lemma fl on fl.lingua = p_lingua and fl.forma = f.forma
   union
-  select f.forma, f.forma from forme f),
+  select f.forma, f.forma from forme f
+   where not exists (select 1 from forma_lemma fl where fl.lingua = p_lingua and fl.forma = f.forma and fl.sostituisce)
+     -- una voce omonima senza etimologia non ruba peso al lemma della forma (ha: avere, non la voce ha; sono: essere)
+     and (not exists (select 1 from forma_lemma fl where fl.lingua = p_lingua and fl.forma = f.forma)
+          or exists (select 1 from lessema l join ipotesi h on h.esito_id = l.id and h.stato = 'accolta'
+                      where l.lingua = p_lingua and l.lemma = f.forma and not l.ricostruito))),
 voci as (
   select x.forma, l.id, l.lemma, l.slug
     from lemmi x
@@ -1081,3 +1088,50 @@ select jsonb_build_object(
 $$;
 comment on function indice_radici(text, boolean, text, text, int, int, int) is
   'L''indice delle radici ricostruite di una protolingua, per area di significato e, dentro un''area, in ordine alfabetico.';
+
+-- L'area di significato di una radice scelta dalla redazione (editor, sezione «Area di significato»): confermare l'area
+-- di Claude o sceglierne un'altra la rende della redazione, e l'import non la tocca più. area_radice non ha un id: la
+-- modifica entra nello storico con l'id della voce. Si tolgono solo con la voce: senza area, l'import rimetterebbe
+-- quella di Claude.
+create or replace function imposta_area_radice(p_lessema bigint, p_area text) returns boolean
+language plpgsql as $$
+declare
+  v_prima jsonb;
+  v_dopo jsonb;
+begin
+  if not exists (select 1 from lessema where id = p_lessema and ricostruito) then
+    raise exception 'un''area di significato ce l''hanno solo le forme ricostruite' using errcode = 'P0001';
+  end if;
+  select to_jsonb(a) into v_prima from area_radice a where a.lessema_id = p_lessema;
+  insert into area_radice (lessema_id, area, provenienza, modello) values (p_lessema, p_area, 'redazione', null)
+  on conflict (lessema_id) do update set area = excluded.area, provenienza = 'redazione', modello = null;
+  select to_jsonb(a) into v_dopo from area_radice a where a.lessema_id = p_lessema;
+  if v_prima is distinct from v_dopo then
+    insert into storico (tabella, record_id, operazione, prima, dopo)
+    values ('area_radice', p_lessema, case when v_prima is null then 'I' else 'U' end, v_prima, v_dopo);
+    return true;
+  end if;
+  return false;
+end $$;
+comment on function imposta_area_radice(bigint, text) is
+  'L’area di una radice scelta o confermata dalla redazione: provenienza redazione, con la riga prima e dopo nello storico.';
+
+-- La linea del senso tra una parola e il suo etimo (regola di Giovanni, 8 novembre 2026: «la lezione del tre e del
+-- dente»). Due glosse inglesi hanno un legame di senso evidente se condividono una parola piena, o una contiene l'altra
+-- (seventh e seven), dopo la stessa riduzione grezza delle desinenze di import/controlla_sensi.py. Misura sul pacchetto
+-- dell'8 novembre: 51% degli archi accolti, 0,6% delle coppie a caso. L'assenza di un legame evidente non prova un
+-- errore (*h₂ōwyóm «egg» < *h₂éwis «bird» è giusto): serve a far guardare l'arco, mai a toglierlo.
+create or replace function parole_glossa(p_glossa text) returns text[]
+language sql immutable as $$
+  select coalesce(array_agg(distinct regexp_replace(w, '^(.{3,}?)(ingly|edly|ings|ing|ness|ment|ers|ied|ies|est|ed|er|es|ly|s)$', '\1')), '{}')
+    from regexp_split_to_table(lower(regexp_replace(coalesce(p_glossa, ''), '\([^)]*\)', ' ', 'g')), '[^a-z]+') w
+   where length(w) >= 3 and w <> all ('{a,ablative,about,accusative,act,action,adjective,adverb,all,also,alternative,an,and,another,any,archaic,are,as,at,be,being,belonging,between,by,certain,characteristic,condition,dative,do,does,done,down,e.g,esp,especially,etc,feminine,first,for,form,from,generally,genitive,get,go,got,having,he,her,him,his,i.e,imperative,in,indicative,infinitive,instrumental,into,is,it,its,just,kind,less,like,locative,made,make,manner,masculine,me,more,most,much,my,name,neuter,no,nominative,not,noun,obsolete,of,often,on,oneself,only,or,other,our,out,over,participle,particle,particular,past,people,person,pertaining,place,plural,prefix,present,quality,related,relating,same,second,she,singular,some,somebody,someone,something,sort,specific,state,subjunctive,such,suffix,term,that,the,their,them,these,they,thing,things,third,this,those,through,to,type,under,up,upon,us,use,used,usually,variant,verb,very,via,vocative,was,way,we,were,what,where,which,who,whom,whose,with,within,without,word,you,your}'::text[])
+$$;
+
+create or replace function legame_di_senso(p_glossa_a text, p_glossa_b text) returns boolean
+language sql immutable as $$
+  select exists (select 1 from unnest(parole_glossa(p_glossa_a)) x, unnest(parole_glossa(p_glossa_b)) y
+                  where x = y or (length(x) >= 3 and strpos(y, x) > 0) or (length(y) >= 3 and strpos(x, y) > 0))
+$$;
+comment on function legame_di_senso(text, text) is
+  'Le due glosse condividono una parola piena, o una contiene l’altra: la linea del senso tra una parola e il suo etimo è evidente.';

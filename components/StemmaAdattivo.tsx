@@ -13,10 +13,25 @@ const CHIAVE_NOMI = 'stirps.stemma.nomi';   // la scelta del lettore sui nomi pr
 // su schermo largo, se la famiglia non supera LIMITE_DISEGNO parole (nodi non nullo), lo sostituisce con lo stemma orizzontale disegnato qui. Sopra, gli strumenti dello stemma:
 // i nomi propri sono nascosti finché il lettore non chiede di vederli.
 // nodi è null per una famiglia oltre LIMITE_DISEGNO: non si disegna, e le parole non viaggiano fino al browser.
-export default function StemmaAdattivo({ lang, nodi, nascosti, children }: { lang: Lang; nodi: NodoPiatto[] | null; nascosti: number; children: ReactNode }) {
+// Gli strumenti: cercare una parola (lemma o glossa: le trovate si evidenziano con il loro percorso dalla radice, Invio
+// passa alla prossima), tenere solo i rami che portano a una lingua, fermarsi a una generazione. Valgono per tutti e due
+// gli stemmi: quello orizzontale li riceve, nel verticale (generato sul server) si applicano agli elementi della pagina.
+const piano = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
+export default function StemmaAdattivo({ lang, nodi, nascosti, lingue, base, children }: {
+  lang: Lang; nodi: NodoPiatto[] | null; nascosti: number; lingue: [string, string, number][]; base: string; children: ReactNode;
+}) {
   const t = TESTI[lang];
+  const s = t.strumentiStemma;
   const [largo, setLargo] = useState(false);
   const [nomi, setNomi] = useState(false);
+  const [q, setQ] = useState('');
+  const [lingua, setLingua] = useState<string | null>(null);
+  const [livelli, setLivelli] = useState<number | null>(null);
+  const [conta, setConta] = useState<[number, number] | null>(null);
+  const [indice, setIndice] = useState(0);
+  const ctrl = useRef<HTMLDivElement>(null);
+  const orizzontale = largo && !!nodi;
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 760px)');
     const f = () => setLargo(mq.matches);
@@ -30,17 +45,91 @@ export default function StemmaAdattivo({ lang, nodi, nascosti, children }: { lan
     setNomi(v);
     try { localStorage.setItem(CHIAVE_NOMI, v ? '1' : '0'); } catch { /* idem */ }
   };
+  // lo stemma verticale: le classi e gli attributi sugli elementi della pagina
+  useEffect(() => {
+    const box = ctrl.current;
+    if (!box || orizzontale) return;
+    box.querySelectorAll('.trovato, .tieni, .attuale').forEach((e) => e.classList.remove('trovato', 'tieni', 'attuale'));
+    const cerca = piano(q.trim());
+    let trovati = 0;
+    const apriSopra = (el: Element) => {
+      for (let x: Element | null = el.parentElement; x && x !== box; x = x.parentElement) {
+        if (x.tagName === 'DETAILS') (x as HTMLDetailsElement).open = true;
+        if (lingua && x.tagName === 'LI') x.classList.add('tieni');
+      }
+    };
+    box.querySelectorAll<HTMLLIElement>('li[data-lingua]').forEach((li) => {
+      const riga = li.querySelector(':scope > .riga');
+      if (lingua && li.dataset.lingua === lingua) { li.classList.add('tieni'); apriSopra(li); }
+      if (cerca && riga && piano(riga.textContent ?? '').includes(cerca)) {
+        riga.classList.add('trovato');
+        trovati++;
+        apriSopra(li);
+      }
+    });
+    box.dataset.filtro = lingua ? 'si' : 'no';
+    box.dataset.livelli = livelli == null ? '' : String(livelli);
+    setConta(cerca ? [trovati, 0] : null);
+    setIndice(0);
+  }, [q, lingua, livelli, orizzontale]);
+  // Invio: la prossima parola trovata, al centro dello schermo
+  const prossima = () => {
+    const box = ctrl.current;
+    if (!box) return;
+    const tutte = [...box.querySelectorAll('.trovato')];
+    if (!tutte.length) return;
+    tutte.forEach((e) => e.classList.remove('attuale'));
+    const el = tutte[indice % tutte.length];
+    el.classList.add('attuale');
+    el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+    setIndice(indice + 1);
+  };
+  const principali = lingue.slice(0, 7);
+  const altre = lingue.slice(7);
+  const nomeLingua = lingue.find((l) => l[0] === lingua)?.[1];
   return (
     <>
-      {nascosti > 0 && (
-        <div className="stemma-strumenti">
-          <button type="button" className="btn-chip" aria-pressed={nomi} onClick={cambia}>
-            {nomi ? t.nomiPropriNascondi : t.nomiPropriMostra(nascosti)}
-          </button>
+      <div className="stemma-strumenti" role="group" aria-label={s.titolo}>
+        <div className="st-riga">
+          <input type="search" className="st-cerca" placeholder={s.cerca} aria-label={s.cerca} value={q}
+            onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); prossima(); } }} />
+          {conta && <span className="st-conta" aria-live="polite">{conta[0] + conta[1] ? s.trovati(conta[0], conta[1]) : s.nessuno}{conta[0] > 1 && <span className="st-nota"> · {s.prossima}</span>}</span>}
         </div>
-      )}
-      <div className="stemma-ctrl" data-nomi={nomi ? 'si' : 'no'}>
-        {largo && nodi ? <StemmaOrizzontale lang={lang} nodi={nodi} nomi={nomi} /> : children}
+        {lingue.length > 1 && (
+          <div className="st-riga">
+            <span className="st-etichetta">{s.lingue}</span>
+            <button type="button" className="btn-chip" aria-pressed={!lingua} onClick={() => setLingua(null)}>{s.tutte}</button>
+            {principali.map(([c, nome, n]) => (
+              <button key={c} type="button" className="btn-chip" aria-pressed={lingua === c} onClick={() => setLingua(lingua === c ? null : c)}>
+                {nome} <span className="n">{n}</span>
+              </button>
+            ))}
+            {altre.length > 0 && (
+              <select className="st-altre" aria-label={s.altre} value={altre.some((l) => l[0] === lingua) ? lingua! : ''}
+                onChange={(e) => setLingua(e.target.value || null)}>
+                <option value="">{s.altre}</option>
+                {altre.map(([c, nome, n]) => <option key={c} value={c}>{nome} ({n})</option>)}
+              </select>
+            )}
+            {lingua && nomeLingua && <a className="st-link" href={`${base}/lingue#l-${lingua}`}>{s.paroleIn(nomeLingua)}</a>}
+          </div>
+        )}
+        <div className="st-riga">
+          <span className="st-etichetta">{s.generazioni}</span>
+          {[1, 2, 3].map((l) => (
+            <button key={l} type="button" className="btn-chip" aria-pressed={livelli === l} onClick={() => setLivelli(livelli === l ? null : l)}>{l}</button>
+          ))}
+          <button type="button" className="btn-chip" aria-pressed={livelli == null} onClick={() => setLivelli(null)}>{s.tutteGen}</button>
+          {nascosti > 0 && (
+            <button type="button" className="btn-chip st-nomi" aria-pressed={nomi} onClick={cambia}>
+              {nomi ? t.nomiPropriNascondi : t.nomiPropriMostra(nascosti)}
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="stemma-ctrl" ref={ctrl} data-nomi={nomi ? 'si' : 'no'}>
+        {orizzontale ? <StemmaOrizzontale lang={lang} nodi={nodi!} nomi={nomi} q={q} lingua={lingua} livelli={livelli}
+          onConta={(a, b) => { setConta(q.trim() ? [a, b] : null); setIndice(0); }} /> : children}
       </div>
     </>
   );
@@ -49,7 +138,10 @@ export default function StemmaAdattivo({ lang, nodi, nascosti, children }: { lan
 // Un nodo disegnato: una parola, o il gruppo dei figli raccolti nella lista a tendina («+ 190 parole»)
 interface Disegnato { id: number; n: NodoAlbero | null; padre: Disegnato | null; membri: NodoAlbero[]; figli: Disegnato[]; x: number; y: number; w: number }
 
-function StemmaOrizzontale({ lang, nodi, nomi }: { lang: Lang; nodi: NodoPiatto[]; nomi: boolean }) {
+function StemmaOrizzontale({ lang, nodi, nomi, q, lingua, livelli, onConta }: {
+  lang: Lang; nodi: NodoPiatto[]; nomi: boolean; q: string; lingua: string | null; livelli: number | null;
+  onConta: (visibili: number, nelleListe: number) => void;
+}) {
   const t = TESTI[lang];
   const router = useRouter();
   const wrap = useRef<HTMLDivElement>(null);
@@ -84,15 +176,26 @@ function StemmaOrizzontale({ lang, nodi, nomi }: { lang: Lang; nodi: NodoPiatto[
     const { radice, tutti } = costruisciAlbero(nodi);
     const nascosti = nomi ? new Set<number>() : nomiNascondibili(radice);
     const dim = dimensioni(radice);
-    // l'albero da disegnare: senza i nomi propri nascosti, con i figli minori raccolti in un gruppo
-    const costruisci = (n: NodoAlbero, padre: Disegnato | null): Disegnato => {
+    // con una lingua scelta restano le sue parole e i rami che ci portano
+    let tieni: Set<number> | null = null;
+    if (lingua) {
+      tieni = new Set<number>();
+      for (const n of tutti.values()) {
+        if (n.lingua !== lingua) continue;
+        for (let x: NodoAlbero | null | undefined = n; x && !tieni.has(x.id); x = x.padreNodo) tieni.add(x.id);
+      }
+    }
+    // l'albero da disegnare: senza i nomi propri nascosti, con i figli minori raccolti in un gruppo; oltre l'ultima
+    // generazione scelta, tutti i figli stanno nel gruppo
+    const costruisci = (n: NodoAlbero, padre: Disegnato | null, liv: number): Disegnato => {
       const d: Disegnato = { id: n.id, n, padre, membri: [], figli: [], x: 0, y: 0, w: 0 };
-      const { mostrati, raccolti } = dividiFigli(n.figli.filter((c) => !nascosti.has(c.id)), dim);
-      d.figli = mostrati.map((c) => costruisci(c, d));
+      const figli = n.figli.filter((c) => !nascosti.has(c.id) && (!tieni || tieni.has(c.id)));
+      const { mostrati, raccolti } = livelli != null && liv >= livelli ? { mostrati: [], raccolti: figli } : dividiFigli(figli, dim);
+      d.figli = mostrati.map((c) => costruisci(c, d, liv + 1));
       if (raccolti.length) d.figli.push({ id: -n.id, n: null, padre: d, membri: raccolti, figli: [], x: 0, y: 0, w: 0 });
       return d;
     };
-    const cima = costruisci(radice, null);
+    const cima = costruisci(radice, null, 0);
     const posati: Disegnato[] = [];
     let maxFoglia = 0, prof = 0, foglie = 0;
     const maxPerLivello: number[] = [];
@@ -118,7 +221,24 @@ function StemmaOrizzontale({ lang, nodi, nomi }: { lang: Lang; nodi: NodoPiatto[
     const W = Math.ceil(mx * 2 + inizio[prof] + maxFoglia + 10), H = Math.ceil(my + Math.max(0, foglie - 1) * rigaH + 24);
     const X = (d: Disegnato) => mx + inizio[d.x], Y = (d: Disegnato) => my + d.y * rigaH;
     return { cima, tutti, posati, dim, W, H, X, Y };
-  }, [larg, font, nodi, nomi, t]);
+  }, [larg, font, nodi, nomi, t, lingua, livelli]);
+
+  // la ricerca: le parole trovate tra quelle disegnate, il loro percorso dalla radice, e quante stanno nelle liste
+  const ricerca = useMemo(() => {
+    const trovati = new Set<number>(), percorso = new Set<number>();
+    let nelleListe = 0;
+    const cerca = piano(q.trim());
+    if (!cerca || !disegno) return { trovati, percorso, nelleListe };
+    const va = (n: NodoAlbero) => piano(n.lemma).includes(cerca) || (!!n.glossa && piano(n.glossa).includes(cerca));
+    for (const d of disegno.posati) {
+      if (d.n && va(d.n)) {
+        trovati.add(d.id);
+        for (let x: NodoAlbero | null | undefined = d.n; x; x = x.padreNodo) percorso.add(x.id);
+      } else if (!d.n) nelleListe += d.membri.filter(va).length;
+    }
+    return { trovati, percorso, nelleListe };
+  }, [q, disegno]);
+  useEffect(() => { onConta(ricerca.trovati.size, ricerca.nelleListe); }, [ricerca]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cammino = useMemo(() => {
     const s = new Set<number>();
@@ -145,19 +265,20 @@ function StemmaOrizzontale({ lang, nodi, nomi }: { lang: Lang; nodi: NodoPiatto[
       <div className="stemma-wrap" ref={wrap}>
         {disegno && (
           <div className="stemma-tela" style={{ width: disegno.W, minHeight: disegno.H }}>
-            <svg className={`stemma cresce${sel != null ? ' selezione' : ''}`} width={disegno.W} height={disegno.H}
+            <svg className={`stemma cresce${sel != null ? ' selezione' : ''}${ricerca.trovati.size ? ' ricerca' : ''}`} width={disegno.W} height={disegno.H}
               viewBox={`0 0 ${disegno.W} ${disegno.H}`} role="group" aria-label={t.stemmaDi(fmt(disegno.cima.n!))}>
               <g>
                 {disegno.posati.filter((d) => d.padre).map((d) => {
                   const p = d.padre!, xm = disegno.X(d) - 14;
                   const evid = d.n ? cammino.has(d.id) : false;
-                  return <path key={'a' + d.id} className={`st-arco ${d.n ? classeArco(d.n.tipo) : 'e-gruppo'}${evid ? ' evid' : ''}`}
+                  const evidR = d.n ? ricerca.percorso.has(d.id) : false;
+                  return <path key={'a' + d.id} className={`st-arco ${d.n ? classeArco(d.n.tipo) : 'e-gruppo'}${evid ? ' evid' : ''}${evidR ? ' evid-r' : ''}`}
                     d={`M${disegno.X(p) + 4},${disegno.Y(p)}H${xm}V${disegno.Y(d)}H${disegno.X(d) - 4}`} />;
                 })}
               </g>
               <g>
                 {disegno.posati.map((d) => d.n ? (
-                  <g key={'n' + d.id} className={`st-nodo ${classeRamo(d.n.ramo)}${d.n.ricostruito ? ' ric' : ''}${cammino.has(d.id) ? ' evid' : ''}`}
+                  <g key={'n' + d.id} className={`st-nodo ${classeRamo(d.n.ramo)}${d.n.ricostruito ? ' ric' : ''}${cammino.has(d.id) ? ' evid' : ''}${ricerca.percorso.has(d.id) ? ' evid-r' : ''}${ricerca.trovati.has(d.id) ? ' trovato' : ''}`}
                     tabIndex={0} role="link" aria-label={`${fmt(d.n)}, ${d.n.lingua_nome}${d.n.glossa ? ': ' + d.n.glossa : ''}`}
                     onMouseEnter={() => setSel(d.id)} onMouseLeave={() => setSel(null)}
                     onFocus={() => setSel(d.id)} onBlur={() => setSel(null)}

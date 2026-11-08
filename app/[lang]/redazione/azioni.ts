@@ -350,3 +350,22 @@ export async function togliAttestazione(fd: FormData) {
   } catch (e) { esito = esitoDa(e); }
   chiudi(lang, slug, esito, false);
 }
+
+// l'area di significato di una radice: confermata o scelta dalla redazione (imposta_area_radice(), con lo storico)
+export async function salvaArea(fd: FormData) {
+  const lang = lingua(fd);
+  const r = await richiediRedattore(lang);
+  const id = Number(fd.get('lessema'));
+  const slug = String(fd.get('slug'));
+  const area = String(fd.get('area') ?? '');
+  let esito = 'salvato';
+  try {
+    await transazione(r.email, async (q) => {
+      const [l] = await q<{ id: number }>(`select id from lessema where id = $1 and slug = $2 and ricostruito`, [id, slug]);
+      if (!l || !area) throw new Error('dati non validi');
+      await q(`select imposta_area_radice($1, $2)`, [id, area]);
+    });
+    for (const l of ['it', 'en']) revalidatePath(`/${l}/radici`, 'layout');
+  } catch { esito = 'errore'; }
+  chiudi(lang, slug, esito, false);
+}

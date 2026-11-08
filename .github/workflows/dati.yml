@@ -35,6 +35,8 @@ jobs:
       # dell'inglese, il lessico comune (i lemmi tra le 50 mila forme più frequenti) e le parole con l'etimo fuori
       # dall'inglese (ESTERNI), senza nomi propri né locuzioni
       # la stessa regola per francese, tedesco e russo (stima del 6 novembre 2026: 114 MB invece di 239 per le lingue intere)
+      # l'italiano anche con i lemmi senza etimologia del lessico comune (referto), per l'analisi di un testo
+      COMUNI: it=../dati/frequenze_it.tsv.gz
       ELENCHI: en=../dati/frequenze_en.tsv.gz fr=../dati/frequenze_fr.tsv.gz de=../dati/frequenze_de.tsv.gz ru=../dati/frequenze_ru.tsv.gz
       ESTERNI: en,fr,de,ru
       GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
@@ -73,7 +75,7 @@ jobs:
           else
             echo "::warning title=Wikizionario::dump non scaricabile: restano le etimologie del Wikizionario del pacchetto di main"
             git fetch -q --depth 1 origin main
-            (git show FETCH_HEAD:dati/etimi_dizionari.tsv.gz 2> /dev/null | zcat | grep -P '\tWikizionario(-vedi)?$' || true) \
+            (git show FETCH_HEAD:dati/etimi_dizionari.tsv.gz 2> /dev/null | zcat | grep -P '\tWikizionario(-[a-z]+)?$' || true) \
               >> dati/it/tsv/etimi_dizionari.tsv
           fi
           # i due Wiktionary a confronto: dove c'è già un'etimologia inglese, la riga del Wikizionario concorda o discorda
@@ -81,6 +83,29 @@ jobs:
             dati/it/tsv/relazioni.tsv 2> /tmp/confronto.txt
           cat /tmp/confronto.txt
           echo "::notice title=Due Wiktionary::$(head -1 /tmp/confronto.txt)"
+
+      - name: Etimologie del Wiktionnaire e confronto per il francese
+        run: |
+          cd import
+          # le etimologie francesi del Wiktionnaire (etimi_wiktionnaire.py), come per il Wikizionario. Il dump è grande:
+          # si legge mentre si scarica, e le righe entrano solo se lo scaricamento arriva in fondo
+          rm -f /tmp/etimi_fr.tsv
+          if curl -sf "https://kaikki.org/frwiktionary/All%20languages%20combined/kaikki.org-dictionary-all.jsonl" \
+               | python3 etimi_wiktionnaire.py /tmp/etimi_fr.tsv dati/it/tsv/lessemi.tsv dati/it/tsv/dizionari.tsv 2> /tmp/wiktionnaire.txt; then
+            cat /tmp/etimi_fr.tsv >> dati/it/tsv/etimi_dizionari.tsv
+            cat /tmp/wiktionnaire.txt
+            echo "::notice title=Wiktionnaire::$(head -1 /tmp/wiktionnaire.txt)"
+          else
+            cat /tmp/wiktionnaire.txt || true
+            echo "::warning title=Wiktionnaire::dump non scaricabile: restano le etimologie del Wiktionnaire del pacchetto di main"
+            git fetch -q --depth 1 origin main
+            (git show FETCH_HEAD:dati/etimi_dizionari.tsv.gz 2> /dev/null | zcat | grep -P '\tWiktionnaire(-[a-z]+)?$' || true) \
+              >> dati/it/tsv/etimi_dizionari.tsv
+          fi
+          python3 confronta_wikizionario.py dati/it/tsv/etimi_dizionari.tsv dati/it/tsv/lessemi.tsv dati/it/tsv/ipotesi.tsv \
+            dati/it/tsv/relazioni.tsv fr Wiktionnaire 2> /tmp/confronto_fr.txt
+          cat /tmp/confronto_fr.txt
+          echo "::notice title=Wiktionary e Wiktionnaire::$(head -1 /tmp/confronto_fr.txt)"
 
       - name: Voci vere per il banco di prova
         run: |
@@ -111,7 +136,12 @@ jobs:
           cat dati/it/tsv/lessemi.tsv dati/it/tsv/dizionari.tsv > voci.tsv
           python3 - <<'PY'
           import gzip
-          wz = {tuple(r.split('\t')[:2]) for r in gzip.open('../dati/glosse_it.tsv.gz', 'rt', encoding='utf-8')}
+          from collections import Counter
+          # le glosse del Wikizionario che l'import usa davvero: niente segnaposto, niente parole con omografi
+          # (importa_glosse_wikizionario()); le voci con omografi si traducono dalla loro glossa inglese
+          omografi = Counter(tuple(r.split('\t')[1:3]) for r in open('voci.tsv', encoding='utf-8'))
+          wz = {tuple(c[:2]) for c in (r.rstrip('\n').split('\t') for r in gzip.open('../dati/glosse_it.tsv.gz', 'rt', encoding='utf-8'))
+                if len(c) > 4 and 'definizione mancante' not in c[4].lower() and omografi[tuple(c[:2])] <= 1}
           # già tentate: la stessa voce con la stessa glossa inglese, confermata o scartata (terza colonna vuota)
           gia = {tuple(r.rstrip('\n').split('\t')[:2]) for r in gzip.open('../dati/glosse_tradotte.tsv.gz', 'rt', encoding='utf-8')}
           n = 0
@@ -159,7 +189,7 @@ jobs:
             gzip -9 -n -c "$t/$f.tsv" > "dati/$f.tsv.gz"
           done
           # le forme flesse più frequenti e i loro lemmi, per l'analisi di un testo (forma_lemma)
-          python3 import/forme_frequenti.py dati/frequenze_it.tsv.gz import/dati/it/forme.tsv "$t/lessemi.tsv" > /tmp/forme_it.tsv
+          python3 import/forme_frequenti.py dati/frequenze_it.tsv.gz import/dati/it/forme.tsv "$t/lessemi.tsv" import/dati/it/forme_analisi.tsv > /tmp/forme_it.tsv
           gzip -9 -n -c /tmp/forme_it.tsv > dati/forme_it.tsv.gz
           # voci per lingua, prima e dopo
           conta() { awk -F'\t' '{c[$2]++} END {for (k in c) print k, c[k]}' | sort; }
@@ -185,6 +215,14 @@ jobs:
         run: |
           python3 import/controlla_radici.py dati | tee /tmp/radici.txt
           echo "::notice title=Radici::$(head -6 /tmp/radici.txt | tr '\n' ' ')"
+
+      - name: Linea del senso
+        run: |
+          # tra una parola e il suo etimo una linea di senso evidente (glosse con una parola in comune) negli archi veri e
+          # nelle coppie a caso; e gli archi tra parole ricostruite della stessa lingua senza linea, da guardare
+          python3 import/controlla_sensi.py dati/lessemi.tsv.gz dati/ipotesi.tsv.gz dati/relazioni.tsv.gz 2> /tmp/sensi.txt
+          cat /tmp/sensi.txt
+          echo "::notice title=Linea del senso::$(head -1 /tmp/sensi.txt) $(grep 'stessa lingua' /tmp/sensi.txt)"
 
       - name: Stima dell'import
         continue-on-error: true

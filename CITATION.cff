@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "Se usi i dati di Stirps, citali così, insieme alle fonti elencate in LICENZA.txt (Wiktionary, Wikizionario, Perseus Digital Library)."
+type: dataset
+title: "Stirps — dizionario etimologico per radici: pacchetto dati"
+abstract: >-
+  Catene etimologiche dalle parole alle radici, per l'italiano, il latino, il greco antico, l'inglese e le altre lingue
+  del dizionario Stirps: voci, ipotesi e passaggi tratti da Wiktionary e dal Wikizionario, lemmi del Lewis & Short e
+  del Liddell–Scott–Jones, glosse italiane, prime attestazioni stimate, frequenze d'uso. I dati automatici non sono
+  verificati dalla redazione.
+authors:
+  - family-names: Trosino
+    given-names: Giovanni
+license: CC-BY-SA-4.0
+url: "https://dizionario-etimologico.vercel.app"
+repository-code: "https://github.com/trosinogio/stirps"
+keywords:
+  - etimologia
+  - lessicografia
+  - linguistica storica
+  - indoeuropeo
+  - Wiktionary

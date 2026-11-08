@@ -4,12 +4,12 @@ import { notFound } from 'next/navigation';
 import { isLang, TESTI } from '@/lib/i18n';
 import { etichetteEtimo, TESTI_REDAZIONE, type TestiRedazione } from '@/lib/testi-redazione';
 import { richiediRedattore } from '@/lib/auth/redattore';
-import { attestazioniRedazione, ipotesiRedazione, lingueScelta, opereScelta, postoInLista, tipiRelazione, voceRedazione } from '@/lib/redazione';
+import { areaRadice, attestazioniRedazione, ipotesiRedazione, lingueScelta, opereScelta, postoInLista, tipiRelazione, voceRedazione } from '@/lib/redazione';
 import { classeRamo, datazione, fmt } from '@/lib/forme';
 import TestataRedazione from '@/components/redazione/Testata';
 import SceltaEtimo from '@/components/redazione/SceltaEtimo';
 import {
-  aggiungiArco, aggiungiAttestazione, aggiungiFonte, modificaArco, nuovaIpotesi, salvaIpotesi, salvaVoce,
+  aggiungiArco, aggiungiAttestazione, aggiungiFonte, modificaArco, nuovaIpotesi, salvaArea, salvaIpotesi, salvaVoce,
   togliArco, togliAttestazione, togliFonte, verificaIpotesi,
 } from '../../azioni';
 
@@ -77,8 +77,9 @@ export default async function EditorVoce({ params, searchParams }: { params: Pro
   const slug = parti.map(decodeURIComponent).join('/');
   const v = await voceRedazione(slug, lang);
   if (!v) notFound();
-  const [ipotesi, opere, tipi, lingue, attestazioni, posto] = await Promise.all([
+  const [ipotesi, opere, tipi, lingue, attestazioni, posto, area] = await Promise.all([
     ipotesiRedazione(v.id, lang), opereScelta(), tipiRelazione(lang), lingueScelta(lang), attestazioniRedazione(v.id), postoInLista(v.id),
+    v.ricostruito ? areaRadice(v.id, lang) : null,
   ]);
   const ambiti = [...new Set(opere.map((o) => o.ambito ?? ''))];
   const negativi = new Set(['errore', 'servono-fonti', 'servono-due-fonti', 'ciclo', 'gia-presente', 'etimo-mancante', 'etichetta-usata', 'dati-non-validi']);
@@ -109,7 +110,7 @@ export default async function EditorVoce({ params, searchParams }: { params: Pro
 
       {posto && (
         <aside className="red-lista">
-          <p className="red-lista-testa"><b>{t.inLista(posto.lista === 'prime-100' ? t.prime : t.catene, posto.posizione, posto.totale)}</b> · {posto.gruppo}</p>
+          <p className="red-lista-testa"><b>{t.inLista(posto.lista === 'prime-100' ? t.prime : posto.lista === 'senza-etimologia' ? t.senzaEtimologia : posto.lista === 'aree-da-rivedere' ? t.areeDaRivedere : t.catene, posto.posizione, posto.totale)}</b> · {posto.gruppo}</p>
           {posto.suggerimento && <p><b>{t.controllare}:</b> {posto.suggerimento}</p>}
           {posto.prossima && (
             <p><Link href={`/${lang}/redazione/w/${posto.prossima.slug}`}>{t.prossima}: <i>{posto.prossima.lemma}</i> →</Link></p>
@@ -132,6 +133,23 @@ export default async function EditorVoce({ params, searchParams }: { params: Pro
           <button className="btn btn-pieno">{t.salva}</button>
         </form>
       </section>
+
+      {area && area.aree?.length > 0 && (
+        <section className="red-sezione">
+          <h2>{t.area}</h2>
+          <p className="nota-sez">{t.areaNota}{area.provenienza && <> · <b>{t.areaDi(area.provenienza === 'redazione' ? 'redazione' : area.modello ?? area.provenienza)}</b></>}</p>
+          <form action={salvaArea} className="red-modulo red-modulo-riga">
+            {nascosti({ lessema: v.id })}
+            <label>{t.area}
+              <select name="area" defaultValue={area.area ?? ''} required>
+                {!area.area && <option value="" disabled>—</option>}
+                {area.aree.map((a) => <option key={a.codice} value={a.codice}>{a.nome}</option>)}
+              </select>
+            </label>
+            <button className="btn btn-pieno">{area.area && area.provenienza !== 'redazione' ? t.conferma : t.salva}</button>
+          </form>
+        </section>
+      )}
 
       <section className="red-sezione">
         <h2>{t.ipotesi}</h2>

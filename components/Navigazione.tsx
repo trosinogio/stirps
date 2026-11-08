@@ -8,7 +8,7 @@ export default function Navigazione({ lang }: { lang: Lang }) {
   const t = TESTI[lang];
   const via = usePathname() ?? '';
   const voci: [string, string][] = [
-    ['radici', t.nav.radici], ['lingue', t.nav.lingue], ['storie', t.nav.storie], ['metodo', t.nav.metodo], ['chi-siamo', t.nav.chiSiamo],
+    ['radici', t.nav.radici], ['lingue', t.nav.lingue], ['storie', t.nav.storie], ['analisi', t.nav.analisiBreve], ['metodo', t.nav.metodo], ['chi-siamo', t.nav.chiSiamo],
   ];
   const attiva = (seg: string) =>
     via.startsWith(`/${lang}/${seg}`) || (seg === 'radici' && via.startsWith(`/${lang}/r/`)) || (seg === 'lingue' && via.startsWith(`/${lang}/l/`));

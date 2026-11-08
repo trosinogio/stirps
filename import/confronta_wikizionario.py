@@ -13,8 +13,9 @@ Le righe delle parole senza etimologia in Wiktionary restano come sono («Wikizi
 righe «vedi» delle parole che un'etimologia ce l'hanno vanno via. Due Wiktionary non sono fonti indipendenti: l'accordo
 non rende «verificata» un'ipotesi.
 
-    python3 confronta_wikizionario.py etimi.tsv lessemi.tsv ipotesi.tsv relazioni.tsv
+    python3 confronta_wikizionario.py etimi.tsv lessemi.tsv ipotesi.tsv relazioni.tsv [lingua fonte]
 
+Per il francese, con le righe del Wiktionnaire (etimi_wiktionnaire.py): «fr Wiktionnaire»; per default «it Wikizionario».
 Riscrive etimi.tsv (non compresso); gli altri possono essere compressi. Il rapporto va sullo standard error.
 """
 import gzip, sys, unicodedata
@@ -80,17 +81,18 @@ def distanza_uno(a, b):
     return a[i + (len(a) == len(b)):] == b[i + 1:]
 
 
-def classifica(elementi, catena, formazione_italiana=False):
+def classifica(elementi, catena, formazione_italiana=False, propria='it'):
     """elementi: [(lingua, etimo)] del Wikizionario; catena: {(famiglia di lingua, forma normalizzata)} di Wiktionary.
     'concorda', 'discorda' o 'analisi': due analisi italiane diverse, o una formazione italiana per Wiktionary
-    (ottaedro = otta- + -edro, formazione_italiana) e un prestito dotto per il Wikizionario (ὀκτάεδρος)."""
+    (ottaedro = otta- + -edro, formazione_italiana) e un prestito dotto per il Wikizionario (ὀκτάεδρος). propria è la
+    lingua della parola (it; fr per il Wiktionnaire, dove l'antico francese conta come francese)."""
     def trovato(lingua, e):
         fl = famiglia_lingua(lingua)
-        candidati = [f for (l2, f) in catena if l2 == fl or 'it' in (l2, fl)]
+        candidati = [f for (l2, f) in catena if l2 == fl or propria in (l2, fl)]
         return any(f in forme(lingua, e) or any(simili(x, f) for x in forme(lingua, e)) for f in candidati)
     if all(trovato(l, e) for l, e in elementi):
         return 'concorda'
-    if all(famiglia_lingua(l) == 'it' for l, e in elementi):
+    if all(famiglia_lingua(l) == propria for l, e in elementi):
         return 'analisi'
     if formazione_italiana and all(famiglia_lingua(l) in ('la', 'grc') for l, e in elementi):
         return 'analisi'
@@ -99,10 +101,11 @@ def classifica(elementi, catena, formazione_italiana=False):
 
 def main():
     etimi_p, lessemi_p, ipotesi_p, relazioni_p = sys.argv[1:5]
+    propria, fonte = (sys.argv[5], sys.argv[6]) if len(sys.argv) > 6 else ('it', 'Wikizionario')
     lessemi = {c[0]: (c[1], c[2]) for c in righe(lessemi_p) if len(c) > 2}
-    italiane = defaultdict(list)
+    italiane = defaultdict(list)                 # le voci della lingua della parola, per lemma
     for k, (lingua, lemma) in lessemi.items():
-        if lingua == 'it':
+        if lingua == propria:
             italiane[lemma].append(k)
     accolte = {c[0]: c[1] for c in righe(ipotesi_p) if len(c) > 3 and c[3] == 'accolta'}
     etimi_di = defaultdict(list)                 # esito → [(etimo, affisso, forma citata)] delle ipotesi accolte
@@ -135,7 +138,7 @@ def main():
     tutte = righe(etimi_p)
     per_parola = defaultdict(list)
     for c in tutte:
-        if len(c) > 8 and c[8] in ('Wikizionario', 'Wikizionario-vedi'):
+        if len(c) > 8 and c[8] in (fonte, fonte + '-vedi'):
             per_parola[c[0]].append(c)
     esito, conta, esempi = {}, Counter(), defaultdict(list)
     for chiave, rr in per_parola.items():
@@ -143,15 +146,16 @@ def main():
         if len(voci) != 1 or voci[0] not in etimi_di:
             conta['senza etimologia in Wiktionary'] += 1
             continue
-        if rr[0][8] == 'Wikizionario-vedi':
+        if rr[0][8] == fonte + '-vedi':
             esito[chiave] = None                 # un rimando non è un'etimologia da confrontare
             conta['rimandi tolti'] += 1
             continue
         primi = [lessemi[e][0] for e, _, _ in etimi_di[voci[0]] if e in lessemi]
         verdetto = classifica([(c[4], c[5]) for c in rr], catena(voci[0]),
-                              formazione_italiana=bool(primi) and all(l == 'it' for l in primi))
+                              formazione_italiana=bool(primi) and all(famiglia_lingua(l) == propria for l in primi),
+                              propria=propria)
         conta[verdetto] += 1
-        esito[chiave] = {'concorda': 'Wikizionario-concorda', 'discorda': 'Wikizionario-discorda'}.get(verdetto)
+        esito[chiave] = {'concorda': fonte + '-concorda', 'discorda': fonte + '-discorda'}.get(verdetto)
         if len(esempi[verdetto]) < 15:
             esempi[verdetto].append(f"{rr[0][2]}: {' + '.join(c[4] + ':' + c[5] for c in rr)}")
     with open(etimi_p, 'w', encoding='utf-8') as out:
@@ -162,9 +166,9 @@ def main():
                 c = c[:8] + [esito[c[0]]] + c[9:]
             out.write('\t'.join(c) + '\n')
     confrontabili = conta['concorda'] + conta['discorda'] + conta['analisi']
-    print(f"Wikizionario e Wiktionary: {conta['concorda']} concordano ({conta['concorda'] / max(1, confrontabili):.0%}), "
+    print(f"{fonte} e Wiktionary: {conta['concorda']} concordano ({conta['concorda'] / max(1, confrontabili):.0%}), "
           f"{conta['discorda']} discordano sull'origine ({conta['discorda'] / max(1, confrontabili):.0%}), "
-          f"{conta['analisi']} analisi italiane diverse; {conta['senza etimologia in Wiktionary']} parole senza etimologia "
+          f"{conta['analisi']} analisi diverse nella lingua della parola; {conta['senza etimologia in Wiktionary']} parole senza etimologia "
           f"in Wiktionary, {conta['rimandi tolti']} rimandi tolti", file=sys.stderr)
     for v in ('discorda', 'analisi'):
         print(f'  {v}: ' + '; '.join(esempi[v]), file=sys.stderr)

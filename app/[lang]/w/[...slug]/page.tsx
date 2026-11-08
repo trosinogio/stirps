@@ -177,6 +177,11 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
 
   const accById = new Map(sc.accezioni.map((a) => [a.id, a]));
   const disc = nodiUnici(sc.discendenti).sort(perLingua);
+  // le famiglie da aprire in cima alla pagina: quella della parola, se ha discendenti, e quella della radice (o delle
+  // radici, per un composto) in cima alla sua catena
+  const conGenitori = new Set(sc.catena.map((n) => n.esito));
+  const cimeCatena = nodiUnici(sc.catena.filter((n) => !conGenitori.has(n.id)));
+  const cimeFamiglia = [...cimeCatena.filter((n) => n.ricostruito), ...cimeCatena.filter((n) => !n.ricostruito)].slice(0, 2);
   const perLinguaDisc = new Map<string, typeof disc>();
   for (const d of disc) { if (!perLinguaDisc.has(d.lingua_nome)) perLinguaDisc.set(d.lingua_nome, []); perLinguaDisc.get(d.lingua_nome)!.push(d); }
   const stretti = sc.cognati.filter((g) => g.tipo === 'stretto').sort(perLingua);
@@ -206,6 +211,20 @@ export default async function Voce({ params }: { params: Promise<{ lang: string;
         )}
         <Definizione L={L} lang={lang} />
         {L.nota && <p className="origine"><Nota testo={L.nota} sc={sc} t={t} /></p>}
+        {(disc.length > 0 || cimeFamiglia.length > 0) && (
+          <p className="azioni-voce">
+            {disc.length > 0 && (
+              <Link className="btn btn-primario" href={`/${lang}/r/${L.slug}`}>
+                {t.apriStemmaDa}<span className="n">{t.paroleN(disc.length)}</span>
+              </Link>
+            )}
+            {cimeFamiglia.map((c, i) => (
+              <Link key={c.id} className={`btn${!disc.length && i === 0 ? ' btn-primario' : ''}`} href={`/${lang}/r/${c.slug}`} prefetch={false}>
+                {t.famigliaDi(fmt(c))}
+              </Link>
+            ))}
+          </p>
+        )}
       </header>
 
       <InBreve sc={sc} t={t} lang={lang} />

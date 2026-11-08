@@ -114,6 +114,12 @@ export interface Testi {
   dataPassaggio: string;
   forma: string;
   apriStemmaDa: string;
+  famigliaDi: (radice: string) => string;
+  strumentiStemma: {
+    titolo: string; cerca: string; trovati: (n: number, nascosti: number) => string; nessuno: string; prossima: string;
+    lingue: string; tutte: string; altre: string; generazioni: string; tutteGen: string; risali: (x: string) => string;
+    paroleIn: (lingua: string) => string;
+  };
   legame: (tipo: string) => string;
   tipiConnessione: Record<string, string>;
   inLingua: (nome: string) => string;
@@ -162,7 +168,7 @@ export interface Testi {
   datiTitolo: string;
   datiTesto: (parole: number, lingue: number, radici: number) => string;
   sottotitolo: string;
-  nav: { radici: string; lingue: string; storie: string; metodo: string; chiSiamo: string; analisi: string };
+  nav: { radici: string; lingue: string; storie: string; metodo: string; norme: string; chiSiamo: string; analisi: string; analisiBreve: string };
   analisi: {
     titolo: string; intro: string; segnaposto: string; pulsante: string; inCorso: string; limite: (n: number) => string;
     errore: string; vuoto: string; riepilogo: (riconosciute: number, occorrenze: number, lemmi: number) => string;
@@ -385,6 +391,13 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     dataPassaggio: 'data del passaggio, secondo le fonti',
     forma: 'forma',
     apriStemmaDa: 'Apri la famiglia di questa parola',
+    famigliaDi: (r) => `Famiglia di ${r}`,
+    strumentiStemma: {
+      titolo: 'Strumenti dello stemma', cerca: 'Cerca nello stemma', nessuno: 'nessuna parola trovata', prossima: 'Invio: la prossima',
+      trovati: (n, h) => `${n.toLocaleString('it-IT')} ${n === 1 ? 'trovata' : 'trovate'}${h ? `, ${h} nelle liste` : ''}`,
+      lingue: 'Lingua', tutte: 'Tutte', altre: 'Altre lingue…', generazioni: 'Generazioni', tutteGen: 'tutte',
+      risali: (x) => `Risali alla famiglia di ${x}`, paroleIn: (l) => `Tutte le parole in ${l}`,
+    },
     legame: (t) => `legame ${t} con`,
     tipiConnessione: { culturale: 'culturale', semantica: 'semantico', omonimia: 'di omonimia', paronimia: 'di paronimia', falso_amico: 'di falso amico', altro: '' },
     inLingua: (n) => `in ${n}`,
@@ -449,7 +462,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     tutteLeLingue: (n) => `Tutte le lingue (${n})`,
     datiTitolo: 'Da dove vengono i dati',
     sottotitolo: 'Dizionario etimologico per radici',
-    nav: { radici: 'Radici', lingue: 'Lingue', storie: 'Storie', metodo: 'Metodo', chiSiamo: 'Chi siamo', analisi: 'Analizza un testo' },
+    nav: { radici: 'Radici', lingue: 'Lingue', storie: 'Storie', metodo: 'Metodo', norme: 'Norme redazionali', chiSiamo: 'Chi siamo', analisi: 'Analizza un testo', analisiBreve: 'Analizza' },
     analisi: {
       titolo: 'Analizza un testo',
       intro: 'Incolla un testo italiano: Stirps riconosce le parole, le riconduce al loro lemma e mostra da quali lingue vengono, risalendo le catene del dizionario.',
@@ -638,6 +651,13 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     dataPassaggio: 'date of the step, according to the sources',
     forma: 'form',
     apriStemmaDa: 'Open the family of this word',
+    famigliaDi: (r) => `Family of ${r}`,
+    strumentiStemma: {
+      titolo: 'Tree tools', cerca: 'Search the tree', nessuno: 'no words found', prossima: 'Enter: next one',
+      trovati: (n, h) => `${n.toLocaleString('en-GB')} found${h ? `, ${h} in the lists` : ''}`,
+      lingue: 'Language', tutte: 'All', altre: 'Other languages…', generazioni: 'Generations', tutteGen: 'all',
+      risali: (x) => `Go up to the family of ${x}`, paroleIn: (l) => `All the words in ${l}`,
+    },
     legame: (t) => `${t} link with`,
     tipiConnessione: { culturale: 'cultural', semantica: 'semantic', omonimia: 'homonymy', paronimia: 'paronymy', falso_amico: 'false-friend', altro: '' },
     inLingua: (n) => `in ${n}`,
@@ -699,7 +719,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     tutteLeLingue: (n) => `All languages (${n})`,
     datiTitolo: 'Where the data comes from',
     sottotitolo: 'An etymological dictionary by roots',
-    nav: { radici: 'Roots', lingue: 'Languages', storie: 'Stories', metodo: 'Method', chiSiamo: 'About', analisi: 'Analyse a text' },
+    nav: { radici: 'Roots', lingue: 'Languages', storie: 'Stories', metodo: 'Method', norme: 'Editorial guidelines', chiSiamo: 'About', analisi: 'Analyse a text', analisiBreve: 'Analyse' },
     analisi: {
       titolo: 'Analyse a text',
       intro: 'Paste an Italian text: Stirps recognises the words, brings them back to their lemma and shows which languages they come from, following the chains in the dictionary.',

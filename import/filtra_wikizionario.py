@@ -20,12 +20,15 @@ FLESSE = re.compile(
     r'genitivo|dativo|accusativo|ablativo|vocativo|nominativo|caso|declinazione|coniugazione)\b', re.I)
 ETICHETTA = re.compile(r'^\s*\((?:[^()]|\([^()]*\))*\)\s*')
 SPAZI = re.compile(r'\s+')
+SEGNAPOSTO = re.compile(r'definizione mancante|aggiungila tu', re.I)
 
 
 def pulisci(gl, parola):
     g = SPAZI.sub(' ', gl or '').strip()
     if not g or 'approfondimento' in g or g.lower().startswith(parola.lower() + ' '):
         return None                          # «casa ( approfondimento) f sing»: residuo d'intestazione
+    if SEGNAPOSTO.search(g):
+        return None                          # «definizione mancante; se vuoi, aggiungila tu»: la pagina non ha definizione
     while ETICHETTA.match(g):
         g = ETICHETTA.sub('', g, count=1)    # «(botanica) pianta …» → «pianta …»
     g = re.sub(r'\(\s*\)', '', g).strip(' ;:.,')

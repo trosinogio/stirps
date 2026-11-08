@@ -156,3 +156,37 @@ export async function postoInLista(lessemaId: number, lista?: string): Promise<P
     return null;
   }
 }
+
+// l'area di significato di una radice, con le aree tra cui scegliere (solo per le forme ricostruite)
+export interface AreaRadice { area: string | null; provenienza: string | null; modello: string | null; aree: { codice: string; nome: string }[] }
+export async function areaRadice(lessemaId: number, lang: Lang): Promise<AreaRadice | null> {
+  try {
+    const [r] = await query<AreaRadice>(
+      `select a.area, a.provenienza, a.modello,
+              (select jsonb_agg(jsonb_build_object('codice', g.codice, 'nome', case when $2 = 'en' then g.en else g.it end) order by g.ordine)
+                 from area_semantica g) as aree
+         from (select 1) x left join area_radice a on a.lessema_id = $1`, [lessemaId, lang]);
+    return r ?? null;
+  } catch {
+    return null;        // database senza aree (prima dell'aggiornamento)
+  }
+}
+
+// la misura delle aree di Claude: delle radici del campione riviste dalla redazione, quante hanno l'area di prima
+export async function misuraAree(): Promise<{ riviste: number; confermate: number; totale: number }> {
+  try {
+    const [r] = await query<{ riviste: number; confermate: number; totale: number }>(
+      `with prime as (
+         select distinct on (s.record_id) s.record_id, s.prima->>'area' as prima, s.dopo->>'area' as dopo
+           from storico s where s.tabella = 'area_radice' and s.prima->>'provenienza' is distinct from 'redazione'
+          order by s.record_id, s.id)
+       select (select count(*)::int from lista_lavoro w join area_radice a on a.lessema_id = w.lessema_id
+                where w.lista = 'aree-da-rivedere' and a.provenienza = 'redazione') as riviste,
+              (select count(*)::int from lista_lavoro w join prime p on p.record_id = w.lessema_id
+                where w.lista = 'aree-da-rivedere' and p.prima = p.dopo) as confermate,
+              (select count(*)::int from lista_lavoro where lista = 'aree-da-rivedere') as totale`);
+    return r;
+  } catch {
+    return { riviste: 0, confermate: 0, totale: 0 };
+  }
+}

@@ -14,6 +14,8 @@ insert into strato (codice, nome, licenza, share_alike, attribuzione, url) value
                'Contiene dati tratti da Wiktionary, distribuiti con licenza CC BY-SA 4.0.', 'https://kaikki.org'),
 ('wikizionario', 'Wikizionario, via Kaikki/wiktextract',  'CC BY-SA 4.0',                    true,
                'Contiene glosse tratte dal Wikizionario, distribuite con licenza CC BY-SA 4.0.', 'https://it.wiktionary.org'),
+('wiktionnaire', 'Wiktionnaire, via Kaikki/wiktextract', 'CC BY-SA 4.0',                    true,
+               'Contiene etimologie tratte dal Wiktionnaire, distribuite con licenza CC BY-SA 4.0.', 'https://fr.wiktionary.org'),
 ('frequencywords', 'FrequencyWords (OpenSubtitles 2018)', 'CC BY-SA 4.0',                    true,
                'Contiene frequenze d''uso tratte da FrequencyWords di Hermit Dave, distribuite con licenza CC BY-SA 4.0.', 'https://github.com/hermitdave/FrequencyWords'),
 ('rew',        'Meyer-Lübke, REW, 3ª ed. 1935',           'Pubblico dominio (UE)',           false, null, null),
@@ -134,6 +136,8 @@ insert into opera (sigla, autore, titolo, edizione, anno, editore, url, pubblico
 ('REW', 'Wilhelm Meyer-Lübke', 'Romanisches etymologisches Wörterbuch', '3ª ed.', 1935, 'Winter', null, true, 'romanzo', '{la,la-vul,it,fr,fro,es,pt,ca,oc,pro,ro}', null, 'etimologico', null),
 ('FEW', 'Walther von Wartburg', 'Französisches etymologisches Wörterbuch', null, 1922, 'Klopp, Teubner, Zbinden', null, false, 'romanzo', '{fr,fro,frm,oc,pro}', null, 'etimologico', '25 volumi, 1922–2002'),
 ('TLFi', 'ATILF – CNRS e Université de Lorraine', 'Trésor de la langue française informatisé', null, null, 'CNRTL', 'https://www.cnrtl.fr', false, 'romanzo', '{fr}', 'https://www.cnrtl.fr/etymologie/{lemma}', 'lessico', 'sezione «étymologie»'),
+('DMF', 'ATILF – CNRS e Université de Lorraine', 'Dictionnaire du Moyen Français (1330–1500)', null, null, 'ATILF', 'http://www.atilf.fr/dmf', false, 'romanzo', '{frm}', null, 'lessico', 'in rete'),
+('DEAF', 'Kurt Baldinger, Frankwalt Möhren, Thomas Städtler', 'Dictionnaire étymologique de l''ancien français', null, 1971, 'Niemeyer, De Gruyter; Heidelberger Akademie der Wissenschaften', 'https://deaf-server.adw.uni-heidelberg.de', false, 'romanzo', '{fro}', null, 'etimologico', 'a stampa dal 1971, poi DEAFél in rete'),
 ('DCECH', 'Joan Corominas, José A. Pascual', 'Diccionario crítico etimológico castellano e hispánico', null, 1980, 'Gredos', null, false, 'romanzo', '{es}', null, 'etimologico', '6 volumi, 1980–1991'),
 ('DLE', 'Real Academia Española', 'Diccionario de la lengua española', '23ª ed.', 2014, 'Espasa', 'https://dle.rae.es', false, 'romanzo', '{es}', 'https://dle.rae.es/{lemma}', 'lessico', null),
 ('Machado', 'José Pedro Machado', 'Dicionário etimológico da língua portuguesa', '3ª ed.', 1977, 'Livros Horizonte', null, false, 'romanzo', '{pt}', null, 'etimologico', null),
@@ -174,6 +178,7 @@ insert into opera (sigla, autore, titolo, edizione, anno, editore, url, pubblico
 -- risorse in rete
 ('Logeion', 'University of Chicago', 'Logeion', null, null, 'University of Chicago', 'https://logeion.uchicago.edu', false, 'rete', '{la,grc}', 'https://logeion.uchicago.edu/{lemma}', 'in_rete', 'raccoglie Lewis & Short, LSJ e altri lessici'),
 ('Wikizionario', null, 'Wikizionario', null, null, 'Wikimedia Foundation', 'https://it.wiktionary.org', false, 'rete', '{it,la}', 'https://it.wiktionary.org/wiki/{lemma}', 'in_rete', 'CC BY-SA 4.0; fonte delle glosse italiane'),
+('Wiktionnaire', null, 'Wiktionnaire', null, null, 'Wikimedia Foundation', 'https://fr.wiktionary.org', false, 'rete', '{fr}', 'https://fr.wiktionary.org/wiki/{lemma}', 'in_rete', 'CC BY-SA 4.0; fonte delle etimologie francesi, a confronto con Wiktionary'),
 ('Wiktionary', null, 'Wiktionary', null, null, 'Wikimedia Foundation', 'https://en.wiktionary.org', false, 'rete', '{}', null, 'in_rete', 'CC BY-SA 4.0; fonte delle etimologie importate'),
 ('Etymonline', 'Douglas Harper', 'Online Etymology Dictionary', null, null, null, 'https://www.etymonline.com', false, 'rete', '{en}', 'https://www.etymonline.com/word/{lemma}', 'in_rete', 'divulgativo'),
 ('FrequencyWords', 'Hermit Dave', 'FrequencyWords', null, 2018, null, 'https://github.com/hermitdave/FrequencyWords', false, 'rete', '{}', null, 'in_rete', 'CC BY-SA 4.0; frequenze d''uso da OpenSubtitles 2018');

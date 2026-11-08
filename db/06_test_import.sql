@@ -174,6 +174,27 @@ create temp table glosse_prima as select count(*) as n from glossa where proveni
 select importa_glosse_wikizionario();
 select pg_temp.verifica((select count(*) from glossa where provenienza = 'wikizionario') = (select n from glosse_prima),
   'reimport delle glosse idempotente');
+do $$
+declare v_v bigint; v_s bigint; v_u bigint;
+begin
+  -- due omografi inglesi di parte del discorso diversa (brew: verbo e sostantivo) e una parola senza omografi
+  insert into lessema (lingua, lemma, omografo, pos, glossa, glossa_lingua, provenienza, stato_editoriale, id_esterno)
+    values ('en', 'provabrew', 1, 'v.', 'to make beer', 'en', 'wiktionary', 'importato', 'enwikt:en:provabrew') returning id into v_v;
+  insert into lessema (lingua, lemma, omografo, pos, glossa, glossa_lingua, provenienza, stato_editoriale, id_esterno)
+    values ('en', 'provabrew', 2, 's.', 'an overhanging hill', 'en', 'wiktionary', 'importato', 'enwikt:en:provabrew:2') returning id into v_s;
+  insert into lessema (lingua, lemma, omografo, pos, glossa, glossa_lingua, provenienza, stato_editoriale, id_esterno)
+    values ('en', 'provavuota', 1, 's.', 'something', 'en', 'wiktionary', 'importato', 'enwikt:en:provavuota') returning id into v_u;
+  insert into stg_wikizionario values ('en', 'provabrew', 'noun', 1, 'fermentazione, infusione'),
+    ('en', 'provavuota', 'noun', 1, 'definizione mancante; se vuoi, aggiungila tu');
+  -- una glossa del Wikizionario già scritta che non vale più
+  insert into glossa (lessema_id, lingua, testo, provenienza, stato_editoriale) values (v_s, 'it', 'fermentazione, infusione', 'wikizionario', 'importato');
+  perform importa_glosse_wikizionario();
+  perform pg_temp.verifica(
+    not exists (select 1 from glossa where lessema_id in (v_v, v_s, v_u) and provenienza = 'wikizionario'),
+    'niente glossa del Wikizionario a una parola con omografi (brew², «ciglio di un colle», non è «infusione»), né il segnaposto «definizione mancante»; una glossa vecchia che non vale più se ne va');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
 select pg_temp.verifica(
   (select anno_da = 1590 and precisione = 'esatta' and provenienza = 'wiktionary' from attestazione where lessema_id = lx('it/pizza')),
   'pizza: prima attestazione 1590, secondo Wiktionary');
@@ -203,6 +224,20 @@ select pg_temp.verifica(
   (select count(*) from glosse_xmin p join glossa g on g.id = p.id and g.xmin::text = p.x) = (select count(*) from glosse_xmin)
   and (select count(*) from glossa) = (select count(*) from glosse_xmin),
   'e non riscrive nessuna glossa');
+
+\echo '— traslitterazioni finte'
+do $$
+declare v_id bigint := lx('it/carne');
+begin
+  -- una traslitterazione che è un pezzo di glossa (tucca, «liquid lard(?)») fa l'indirizzo; il pacchetto non la dà più
+  update lessema set translit = 'liquid lard(?)' where id = v_id;
+  perform pg_temp.verifica((select slug from lessema where id = v_id) <> 'it/carne', 'una traslitterazione finta cambia l''indirizzo');
+  perform importa_wiktionary();
+  perform pg_temp.verifica((select translit is null and slug = 'it/carne' from lessema where id = v_id),
+    'il nuovo import toglie la traslitterazione finta da un lemma in alfabeto latino, e l''indirizzo torna quello giusto');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
 
 \echo '— reimport'
 -- con gli stessi dati un nuovo import non riscrive niente: ogni riga riscritta occupa spazio fino al vacuum
@@ -328,6 +363,31 @@ select pg_temp.verifica(
   not exists (select 1 from lessema where id_esterno = 'perseus:ls:n8')
   and (select glossa from lessema where slug = 'la/abactus-2') = 'a driving away, robbing',
   'una voce del dizionario che il pacchetto non ha più si toglie, se nessuno l''ha toccata; le altre restano dove sono');
+-- una voce del dizionario che il pacchetto non ha più ma che una catena di Wiktionary usa resta, e la sua etimologia
+-- non si toglie e rimette (orbatio, etimo dell'inglese orbation). Tutto si annulla alla fine
+do $$
+begin
+  insert into lessema (lingua, lemma, provenienza, stato_editoriale, id_esterno)
+    values ('la', 'provaorbatio', 'wiktionary', 'importato', 'enwikt:la:provaorbatio');
+  with h as (insert into ipotesi (esito_id, etichetta, provenienza, stato_editoriale)
+             values (lx('la/abactus-2'), 'Lewis & Short', 'perseus', 'importato') returning id)
+  insert into relazione (ipotesi_id, esito_id, etimo_id, tipo, provenienza, stato_editoriale)
+    select id, lx('la/abactus-2'), lx('grc/akris'), 'generico', 'perseus', 'importato' from h;
+  with h as (insert into ipotesi (esito_id, etichetta, provenienza, stato_editoriale)
+             values (lx('la/provaorbatio'), 'Wiktionary', 'wiktionary', 'importato') returning id)
+  insert into relazione (ipotesi_id, esito_id, etimo_id, tipo, provenienza, stato_editoriale)
+    select id, lx('la/provaorbatio'), lx('la/abactus-2'), 'generico', 'wiktionary', 'importato' from h;
+  create temp table d_ipotesi on commit drop as
+    select id from ipotesi where esito_id = lx('la/abactus-2') and provenienza = 'perseus';
+  delete from stg_dizionario where chiave = (select id_esterno from lessema where slug = 'la/abactus-2');
+  perform importa_dizionari();
+  perform pg_temp.verifica(
+    exists (select 1 from lessema where slug = 'la/abactus-2')
+    and (select count(*) from ipotesi h join d_ipotesi d on d.id = h.id) = 1,
+    'una voce del dizionario usata da una catena di Wiktionary resta con la sua etimologia, senza riscriverla (orbatio)');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
 
 \echo '— stime della prima attestazione dai dizionari'
 select pg_temp.verifica(
@@ -521,6 +581,39 @@ begin
   raise exception using errcode = 'P0098', message = 'annulla';
 exception when sqlstate 'P0098' then null;
 end $$;
+do $$
+declare v_h bigint;
+begin
+  insert into lessema (lingua, lemma, provenienza, stato_editoriale, id_esterno) values
+    ('fr', 'provasolo', 'wiktionary', 'importato', 'enwikt:fr:provasolo'),
+    ('fr', 'provadiverso', 'wiktionary', 'importato', 'enwikt:fr:provadiverso'),
+    ('fr', 'provauguale', 'wiktionary', 'importato', 'enwikt:fr:provauguale');
+  -- due voci con un'etimologia di Wiktionary (< illi), una senza
+  for v_h in select id from lessema where slug in ('fr/provadiverso', 'fr/provauguale') loop
+    with h as (insert into ipotesi (esito_id, etichetta, provenienza, stato_editoriale)
+               values (v_h, 'Wiktionary', 'wiktionary', 'importato') returning id)
+    insert into relazione (ipotesi_id, esito_id, etimo_id, tipo, provenienza, stato_editoriale)
+      select id, v_h, lx('la/illi'), 'generico', 'wiktionary', 'importato' from h;
+  end loop;
+  insert into stg_etimo_dizionario values
+    ('wiktionnaire:fr:provasolo', 'fr', 'provasolo', 1, 'la', 'illi', 'generico', null, 'Wiktionnaire'),
+    ('wiktionnaire:fr:provadiverso', 'fr', 'provadiverso', 1, 'la', 'moveo', 'generico', null, 'Wiktionnaire-discorda'),
+    ('wiktionnaire:fr:provauguale', 'fr', 'provauguale', 1, 'la', 'illi', 'generico', null, 'Wiktionnaire-concorda');
+  perform importa_etimi_dizionari();
+  perform pg_temp.verifica(
+    (select h.etichetta = 'Wiktionnaire' and h.stato = 'accolta' and h.confidenza = 3
+            and exists (select 1 from rimando m join opera o on o.id = m.opera_id where m.ipotesi_id = h.id and o.sigla = 'Wiktionnaire')
+       from ipotesi h where h.esito_id = (select id from lessema where slug = 'fr/provasolo') and h.provenienza = 'wiktionnaire')
+    and (select h.stato = 'alternativa' and h.confidenza = 2
+           from ipotesi h where h.esito_id = (select id from lessema where slug = 'fr/provadiverso') and h.provenienza = 'wiktionnaire')
+    and exists (select 1 from rimando m join opera o on o.id = m.opera_id join ipotesi h on h.id = m.ipotesi_id
+                 where h.esito_id = (select id from lessema where slug = 'fr/provauguale') and h.provenienza = 'wiktionary'
+                   and o.sigla = 'Wiktionnaire' and m.nota = 'concorda con Wiktionary')
+    and not exists (select 1 from ipotesi h where h.esito_id = (select id from lessema where slug = 'fr/provauguale') and h.provenienza = 'wiktionnaire'),
+    'il Wiktionnaire fa per il francese quello che il Wikizionario fa per l''italiano: etimologia dove manca, alternativa dove discorda, rimando dove concorda');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
 
 \echo '— lingue: famiglia, ramo, antenato e nome da Wiktionary'
 do $$
@@ -549,6 +642,8 @@ truncate stg_lingua_wikt, stg_famiglia_wikt;
 do $$
 declare v_l bigint := (select id from lessema where ricostruito and id_esterno is not null order by id limit 1);
         v_k text := (select id_esterno from lessema where id = v_l);
+        v_primo boolean;
+        v_secondo boolean;
 begin
   truncate stg_area_radice;
   insert into stg_area_radice values (v_k, 'x', 'movimento', '', 'claude-prova'), ('chiave:che:non:esiste', 'x', 'corpo', '', 'claude-prova');
@@ -560,6 +655,14 @@ begin
   perform importa_aree();
   perform pg_temp.verifica((select area = 'corpo' and provenienza = 'redazione' from area_radice where lessema_id = v_l),
     'l''area scelta dalla redazione non cambia con un nuovo import');
+  update area_radice set area = 'movimento', provenienza = 'claude' where lessema_id = v_l;
+  v_primo := imposta_area_radice(v_l, 'movimento');
+  v_secondo := imposta_area_radice(v_l, 'movimento');
+  perform pg_temp.verifica(v_primo and not v_secondo
+    and (select provenienza = 'redazione' and modello is null from area_radice where lessema_id = v_l)
+    and exists (select 1 from storico where tabella = 'area_radice' and record_id = v_l and operazione = 'U'
+                   and prima->>'provenienza' = 'claude' and dopo->>'area' = 'movimento'),
+    'la redazione conferma l''area di Claude: diventa sua, con la riga prima e dopo nello storico, e confermarla di nuovo non scrive niente');
   raise exception using errcode = 'P0098', message = 'annulla';
 exception when sqlstate 'P0098' then null;
 end $$;

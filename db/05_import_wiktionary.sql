@@ -160,7 +160,10 @@ begin
     select l.id, s.translit, slug_di(l.lingua, l.lemma, s.translit, l.omografo, l.ricostruito) as nuovo
       from lessema l join m_scelta s on s.id = l.id
      where l.provenienza = 'wiktionary' and l.stato_editoriale = 'importato'
-       and s.translit is not null and l.translit is distinct from s.translit),
+       -- una traslitterazione che il pacchetto non dà più si toglie solo da un lemma in alfabeto latino: lì era un pezzo
+       -- di glossa (tucca, «liquid lard(?)») e faceva l'indirizzo; per le altre scritture resta quella che c'è
+       and (s.translit is not null or l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿ''’ .·-]+$')
+       and l.translit is distinct from s.translit),
   libere as (
     select distinct on (n.nuovo) n.id, n.translit from nuove n
      where not exists (select 1 from lessema y where y.id <> n.id and y.slug = n.nuovo)
@@ -356,6 +359,9 @@ create or replace function importa_glosse_wikizionario() returns jsonb
 language plpgsql as $$
 declare n int; r jsonb;
 begin
+  if not exists (select 1 from stg_wikizionario) then
+    return jsonb_build_object('saltato', 'tabella di appoggio vuota');
+  end if;
   perform set_config('app.import', 'on', true);
   create temp table cand on commit drop as
   with tutti as (
@@ -367,7 +373,6 @@ begin
                 when l.pos = 'suff.' then 'suffix' when l.pos = 'pref.' then 'prefix' end as wpos
     from lessema l
   ),
-  fratelli as (select lingua, lemma, wpos, count(*) as n from tutti group by 1, 2, 3),
   omografi as (select lingua, lemma, count(*) as n from tutti group by 1, 2),
   lx as (
     select t.* from tutti t
@@ -381,12 +386,24 @@ begin
   from lx x
   join stg_wikizionario w on w.lingua = x.lingua and w.parola = x.lemma
   join omografi o on o.lingua = x.lingua and o.lemma = x.lemma
-  join fratelli f on f.lingua = x.lingua and f.lemma = x.lemma and f.wpos is not distinct from x.wpos
-  where (x.wpos is not null and w.pos = x.wpos and f.n = 1)            -- stessa parte del discorso, senza omografi
-     or (x.wpos is null and o.n = 1                                    -- etimo senza parte del discorso e senza omografi:
-         and (select count(distinct w2.pos) from stg_wikizionario w2   -- il Wikizionario deve darne una sola
-               where w2.lingua = x.lingua and w2.parola = x.lemma) = 1)
+  -- il segnaposto di una pagina senza definizione non è una glossa
+  where w.glossa !~* '(definizione mancante|aggiungila tu)'
+    -- una parola con omografi no: il Wikizionario ha una pagina per parola, Wiktionary una voce per etimologia, e la
+    -- parte del discorso non dice quale omografo è quale (brew², «ciglio di un colle», prendeva «fermentazione,
+    -- infusione» di brew¹, che è registrato come verbo); vale la traduzione della glossa della voce
+    and o.n = 1
+    and ((x.wpos is not null and w.pos = x.wpos)                       -- stessa parte del discorso
+         or (x.wpos is null                                            -- voce senza parte del discorso:
+             and (select count(distinct w2.pos) from stg_wikizionario w2   -- il Wikizionario deve darne una sola
+                   where w2.lingua = x.lingua and w2.parola = x.lemma) = 1))
   order by x.id, w.ordine;
+
+  -- le glosse del Wikizionario importate che non valgono più (omografi, segnaposto, pagine cambiate) se ne vanno:
+  -- al loro posto, con importa_glosse_aggiuntive(), la traduzione della glossa della voce
+  delete from glossa g
+   where g.provenienza = 'wikizionario' and g.stato_editoriale = 'importato' and g.lingua = 'it' and g.accezione_id is null
+     and not exists (select 1 from cand c where c.id = g.lessema_id);
+  get diagnostics n = row_count;
 
   delete from glossa g using cand c
    where g.lessema_id = c.id and g.lingua = 'it' and g.accezione_id is null
@@ -398,6 +415,7 @@ begin
   where glossa.provenienza = 'wikizionario' and glossa.stato_editoriale = 'importato' and glossa.testo <> excluded.testo;
 
   select jsonb_build_object(
+    'tolte', n,
     'glosse_italiane', (select count(*) from glossa where provenienza = 'wikizionario'),
     'per_lingua', (select jsonb_object_agg(lingua, quante) from (
         select l.lingua, count(*) as quante from glossa g join lessema l on l.id = g.lessema_id
@@ -515,7 +533,8 @@ create unlogged table if not exists stg_glossa_tradotta (chiave text, originale 
 create unlogged table if not exists stg_definizione (chiave text, originale text, traduzione text, definizione text, modello text);
 create unlogged table if not exists stg_pronuncia (chiave text, dati text);   -- pronunce.tsv: chiave, JSON
 create unlogged table if not exists stg_sensi (chiave text, dati text);   -- sensi.tsv: chiave, JSON
-create unlogged table if not exists stg_forma (lingua text, forma text, lemma text);   -- forme_it.tsv: forma flessa e lemma
+create unlogged table if not exists stg_forma (lingua text, forma text, lemma text, sostituisce text);   -- forme_it.tsv: forma flessa, lemma, t se è solo una riduzione
+alter table stg_forma add column if not exists sostituisce text;
 
 -- Dopo il Wikizionario: definizioni di Wikidata per le parole italiane che non ne hanno (stessa parte del discorso,
 -- niente omografi), poi traduzioni automatiche per gli etimi che non hanno una glossa italiana. Per differenza: le
@@ -636,19 +655,38 @@ begin
 
   -- 2. voci che il pacchetto non ha più (perché ora le ha Wiktionary, o perché il filtro le scarta), se intatte; prima
   --    vanno via le etimologie dei dizionari che le toccano, se nessuno le ha toccate (le rifà importa_etimi_dizionari)
+  drop table if exists d_via, d_vere;
   create temp table d_via on commit drop as
   select l.id from lessema l
    where l.provenienza = 'perseus' and l.stato_editoriale = 'importato'
      and (not exists (select 1 from stg_dizionario s where s.chiave = l.id_esterno)
           or exists (select 1 from lessema w where w.lingua = l.lingua and w.lemma = l.lemma and not w.ricostruito
                                               and w.provenienza <> 'perseus'));
+  -- solo le voci che se ne vanno davvero perdono le etimologie: una voce che una catena di Wiktionary usa (orbatio,
+  -- etimo dell'inglese orbation) o che la redazione ha toccato resta, e le sue etimologie con lei; prima si toglievano
+  -- e importa_etimi_dizionari le rimetteva uguali a ogni import (576 ipotesi riscritte)
+  create temp table d_vere on commit drop as
+  select v.id from d_via v
+   where not exists (select 1 from relazione x join ipotesi h on h.id = x.ipotesi_id
+                      where (x.etimo_id = v.id or x.esito_id = v.id)
+                        and not (h.provenienza = 'perseus' and h.stato_editoriale = 'importato'
+                                 and x.provenienza = 'perseus' and x.stato_editoriale = 'importato'))
+     and not exists (select 1 from ipotesi h where h.esito_id = v.id
+                      and not (h.provenienza = 'perseus' and h.stato_editoriale = 'importato'))
+     and not exists (select 1 from attestazione a where a.lessema_id = v.id)
+     and not exists (select 1 from accezione c where c.lessema_id = v.id)
+     and not exists (select 1 from connessione c where c.da_id = v.id or c.a_id = v.id)
+     and not exists (select 1 from rimando m where m.lessema_id = v.id)
+     and not exists (select 1 from glossa g where g.lessema_id = v.id
+                      and not (g.provenienza in ('wikizionario', 'wikidata', 'traduzione-automatica')
+                               and g.stato_editoriale = 'importato'));
   delete from ipotesi h
    where h.provenienza = 'perseus' and h.stato_editoriale = 'importato'
-     and (h.esito_id in (select id from d_via)
-          or exists (select 1 from relazione x where x.ipotesi_id = h.id and x.etimo_id in (select id from d_via)))
+     and (h.esito_id in (select id from d_vere)
+          or exists (select 1 from relazione x where x.ipotesi_id = h.id and x.etimo_id in (select id from d_vere)))
      and not exists (select 1 from relazione x where x.ipotesi_id = h.id
                       and (x.provenienza <> 'perseus' or x.stato_editoriale <> 'importato'));
-  delete from lessema l using d_via v where l.id = v.id and voce_intatta(l.id);
+  delete from lessema l using d_vere v where l.id = v.id and voce_intatta(l.id);
   get diagnostics n = row_count;
   r := r || jsonb_build_object('voci_tolte', n);
 
@@ -695,7 +733,8 @@ comment on function importa_dizionari() is 'Lemmi del Lewis & Short e dell’LSJ
 -- ipotesi con la loro fonte, solo per le voci che non hanno altre etimologie, e solo dove esito ed etimi sono voci certe:
 -- un lemma con più voci nella sua lingua (caro, tre voci) è ambiguo e resta fuori. Le righe con opera «Wikizionario» vengono
 -- da etimi_wikizionario.py (le voci italiane: «dal latino avarus», «composto da ago e puntura»; i rimandi «vedi …» con
--- certezza 2), con provenienza wikizionario; vengono dopo i dizionari e prima dell'analisi. Le righe con opera «analisi» vengono da
+-- certezza 2), con provenienza wikizionario; vengono dopo i dizionari e prima dell'analisi. Le righe con opera «Wiktionnaire»
+-- fanno lo stesso per le voci francesi (etimi_wiktionnaire.py), con provenienza wiktionnaire. Le righe con opera «analisi» vengono da
 -- analisi_composti.py (καταδάπτω = κατα- + δάπτω): «Analisi della forma», certezza 2, senza fonte, e solo dove i dizionari
 -- non dicono niente.
 create unlogged table if not exists stg_etimo_dizionario (
@@ -744,21 +783,24 @@ begin
   create index on ed_voluti (esito_id, etimo_id);
   analyze ed_voluti;
   -- solo le voci di Wiktionary e dei dizionari senza altre etimologie; per una voce, una sola voce del dizionario.
-  -- Il confronto dei due Wiktionary (Wikizionario-concorda, -discorda: confronta_wikizionario.py) vale invece per le voci
-  -- con un'etimologia di Wiktionary intatta, mai per quelle che la redazione ha toccato
+  -- Il confronto dei due Wiktionary (Wikizionario-concorda, -discorda, e così per il Wiktionnaire:
+  -- confronta_wikizionario.py) vale invece per le voci con un'etimologia di Wiktionary intatta, mai per quelle che la
+  -- redazione ha toccato
   delete from ed_voluti v using lessema l
    where l.id = v.esito_id
      and (l.provenienza not in ('wiktionary', 'perseus')
-          or case when v.opera in ('Wikizionario-concorda', 'Wikizionario-discorda')
+          or case when v.opera ~ '-(concorda|discorda)$'
                   then not exists (select 1 from ipotesi h where h.esito_id = v.esito_id and h.provenienza = 'wiktionary'
                                      and h.stato_editoriale = 'importato' and h.stato in ('accolta', 'alternativa'))
                        or exists (select 1 from ipotesi h where h.esito_id = v.esito_id
-                                     and (h.stato_editoriale <> 'importato' or h.provenienza not in ('wiktionary', 'wikizionario')))
-                  else exists (select 1 from ipotesi h where h.esito_id = v.esito_id and h.provenienza not in ('perseus', 'wikizionario'))
+                                     and (h.stato_editoriale <> 'importato'
+                                          or h.provenienza not in ('wiktionary', 'wikizionario', 'wiktionnaire')))
+                  else exists (select 1 from ipotesi h where h.esito_id = v.esito_id
+                                  and h.provenienza not in ('perseus', 'wikizionario', 'wiktionnaire'))
              end);
   delete from ed_voluti v using (
       select distinct on (esito_id) esito_id, chiave as prima from ed_voluti
-       order by esito_id, opera = 'analisi', opera like 'Wikizionario%', chiave) m
+       order by esito_id, opera = 'analisi', opera ~ '^(Wikizionario|Wiktionnaire)', chiave) m
    where m.esito_id = v.esito_id and v.chiave <> m.prima;
   -- niente cerchi di due passi: l'etimo non deriva già dall'esito
   delete from ed_voluti v
@@ -769,10 +811,11 @@ begin
         join (select chiave, count(*) as n from ed_voluti group by 1) w using (chiave)
        where w.n < r.n) monchi
    where monchi.chiave = v.chiave;
-  -- dove i due Wiktionary concordano non entra un'ipotesi: l'etimologia di Wiktionary cita anche il Wikizionario (passo 5)
+  -- dove i due Wiktionary concordano non entra un'ipotesi: l'etimologia di Wiktionary cita anche il Wikizionario o il
+  -- Wiktionnaire (passo 5)
   create temp table ed_concordi on commit drop as
-    select esito_id, min(sv) as sv from ed_voluti where opera = 'Wikizionario-concorda' group by esito_id;
-  delete from ed_voluti where opera = 'Wikizionario-concorda';
+    select esito_id, split_part(opera, '-', 1) as sigla, min(sv) as sv from ed_voluti where opera like '%-concorda' group by 1, 2;
+  delete from ed_voluti where opera like '%-concorda';
   create temp table ed_firme on commit drop as
   select chiave, min(esito_id) as esito_id, min(opera) as opera, min(sv) as sv,
          string_agg(etimo_id || ':' || tipo || ':' || ordine || ':' || coalesce(affisso, ''), ',' order by ordine, etimo_id) as firma
@@ -782,16 +825,16 @@ begin
 
   -- 3. le etimologie dei dizionari che non servono più o sono cambiate, se nessuno le ha toccate
   delete from ipotesi h
-   where h.provenienza in ('perseus', 'wikizionario') and h.stato_editoriale = 'importato'
+   where h.provenienza in ('perseus', 'wikizionario', 'wiktionnaire') and h.stato_editoriale = 'importato'
      and not exists (
        select 1 from ed_firme f
         where f.chiave = h.id_esterno and f.esito_id = h.esito_id
           -- un disaccordo con Wiktionary è un'alternativa, il resto è accolto: se cambia, l'ipotesi si rifà
-          and h.stato = (case when f.opera = 'Wikizionario-discorda' then 'alternativa' else 'accolta' end)::stato_ipotesi
+          and h.stato = (case when f.opera like '%-discorda' then 'alternativa' else 'accolta' end)::stato_ipotesi
           and f.firma = (select string_agg(x.etimo_id || ':' || x.tipo || ':' || x.ordine || ':' || coalesce(x.affisso, ''), ','
                                            order by x.ordine, x.etimo_id) from relazione x where x.ipotesi_id = h.id))
      and not exists (select 1 from relazione x where x.ipotesi_id = h.id
-                      and (x.provenienza not in ('perseus', 'wikizionario') or x.stato_editoriale <> 'importato'));
+                      and (x.provenienza not in ('perseus', 'wikizionario', 'wiktionnaire') or x.stato_editoriale <> 'importato'));
   get diagnostics n = row_count;
   r := r || jsonb_build_object('etimologie_tolte', n);
 
@@ -811,13 +854,14 @@ begin
     insert into ipotesi (esito_id, etichetta, stato, confidenza, origine, provenienza, stato_editoriale, id_esterno)
     select f.esito_id,
            case when f.opera = 'LSJ' then 'Liddell–Scott–Jones' when f.opera = 'analisi' then 'Analisi della forma'
-                when f.opera like 'Wikizionario%' then 'Wikizionario' else 'Lewis & Short' end,
-           (case when f.opera = 'Wikizionario-discorda' then 'alternativa' else 'accolta' end)::stato_ipotesi,
-           case when f.opera in ('analisi', 'Wikizionario-vedi', 'Wikizionario-discorda') then 2 else 3 end, 'etimo',
-           case when f.opera like 'Wikizionario%' then 'wikizionario' else 'perseus' end, 'importato', f.chiave
+                when f.opera ~ '^(Wikizionario|Wiktionnaire)' then split_part(f.opera, '-', 1) else 'Lewis & Short' end,
+           (case when f.opera like '%-discorda' then 'alternativa' else 'accolta' end)::stato_ipotesi,
+           case when f.opera = 'analisi' or f.opera ~ '-(vedi|discorda)$' then 2 else 3 end, 'etimo',
+           case when f.opera like 'Wikizionario%' then 'wikizionario' when f.opera like 'Wiktionnaire%' then 'wiktionnaire'
+                else 'perseus' end, 'importato', f.chiave
       from ed_firme f
      where not exists (select 1 from ipotesi h where h.id_esterno = f.chiave)
-       and (f.opera = 'Wikizionario-discorda' or not exists (select 1 from ipotesi h where h.esito_id = f.esito_id and h.stato = 'accolta'))
+       and (f.opera like '%-discorda' or not exists (select 1 from ipotesi h where h.esito_id = f.esito_id and h.stato = 'accolta'))
     on conflict do nothing
     returning id, id_esterno)
   insert into ed_nuove select id, id_esterno from ins;
@@ -825,40 +869,45 @@ begin
   r := r || jsonb_build_object('etimologie_nuove', n);
   insert into relazione (ipotesi_id, esito_id, etimo_id, tipo, ordine, affisso, confidenza, provenienza, stato_editoriale, id_esterno)
   select e.id, v.esito_id, v.etimo_id, v.tipo, v.ordine, v.affisso,
-         case when v.opera in ('analisi', 'Wikizionario-vedi', 'Wikizionario-discorda') then 2 else 3 end,
-         case when v.opera like 'Wikizionario%' then 'wikizionario' else 'perseus' end, 'importato', v.chiave || '#' || v.ordine
+         case when v.opera = 'analisi' or v.opera ~ '-(vedi|discorda)$' then 2 else 3 end,
+         case when v.opera like 'Wikizionario%' then 'wikizionario' when v.opera like 'Wiktionnaire%' then 'wiktionnaire'
+              else 'perseus' end, 'importato', v.chiave || '#' || v.ordine
     from ed_nuove e join ed_voluti v on v.chiave = e.chiave
   on conflict do nothing;
   insert into rimando (opera_id, sv, posizione, ipotesi_id)
   select o.id, f.sv, 'propone', e.id
     from ed_nuove e join ed_firme f on f.chiave = e.chiave
-    join opera o on o.sigla = case when f.opera like 'Wikizionario%' then 'Wikizionario' else f.opera end;
+    join opera o on o.sigla = case when f.opera ~ '^(Wikizionario|Wiktionnaire)' then split_part(f.opera, '-', 1) else f.opera end;
 
-  -- 5. dove i due Wiktionary concordano, l'etimologia accolta di Wiktionary cita anche il Wikizionario. Il rimando porta
-  --    la nota «concorda con Wiktionary», così si toglie se l'accordo cade, e non si toccano quelli della redazione
+  -- 5. dove i due Wiktionary concordano, l'etimologia accolta di Wiktionary cita anche il Wikizionario (o il
+  --    Wiktionnaire). Il rimando porta la nota «concorda con Wiktionary», così si toglie se l'accordo cade, e non si
+  --    toccano quelli della redazione
   create temp table ed_rimandi on commit drop as
-    select h.id as ipotesi_id, c.sv
+    select h.id as ipotesi_id, c.sigla, c.sv
       from ed_concordi c
       join ipotesi h on h.esito_id = c.esito_id and h.stato = 'accolta' and h.provenienza = 'wiktionary'
                     and h.stato_editoriale = 'importato';
   delete from rimando m using opera o
-   where o.id = m.opera_id and o.sigla = 'Wikizionario' and m.nota = 'concorda con Wiktionary'
-     and not exists (select 1 from ed_rimandi e where e.ipotesi_id = m.ipotesi_id and e.sv is not distinct from m.sv);
+   where o.id = m.opera_id and o.sigla in ('Wikizionario', 'Wiktionnaire') and m.nota = 'concorda con Wiktionary'
+     and not exists (select 1 from ed_rimandi e where e.ipotesi_id = m.ipotesi_id and e.sigla = o.sigla
+                                                  and e.sv is not distinct from m.sv);
   insert into rimando (opera_id, sv, posizione, nota, ipotesi_id)
   select o.id, e.sv, 'accoglie', 'concorda con Wiktionary', e.ipotesi_id
-    from ed_rimandi e join opera o on o.sigla = 'Wikizionario'
+    from ed_rimandi e join opera o on o.sigla = e.sigla
    where not exists (select 1 from rimando m where m.ipotesi_id = e.ipotesi_id and m.opera_id = o.id
                                               and m.nota = 'concorda con Wiktionary');
-  r := r || jsonb_build_object('concordanze_wikizionario', (select count(*) from rimando m join opera o on o.id = m.opera_id
-                                                            where o.sigla = 'Wikizionario' and m.nota = 'concorda con Wiktionary'),
-                               'discordanze_wikizionario', (select count(*) from ipotesi h where h.provenienza = 'wikizionario'
-                                                            and h.stato = 'alternativa'));
+  r := r || jsonb_build_object('concordanze', (select jsonb_object_agg(sigla, quante) from (
+           select o.sigla, count(*) as quante from rimando m join opera o on o.id = m.opera_id
+            where m.nota = 'concorda con Wiktionary' group by 1) t),
+                               'discordanze', (select jsonb_object_agg(provenienza, quante) from (
+           select h.provenienza, count(*) as quante from ipotesi h
+            where h.provenienza in ('wikizionario', 'wiktionnaire') and h.stato = 'alternativa' group by 1) t));
   r := r || jsonb_build_object('etimologie_dei_dizionari', (select jsonb_object_agg(lingua, quante) from (
            select l.lingua, count(*) as quante from ipotesi h join lessema l on l.id = h.esito_id
-            where h.provenienza in ('perseus', 'wikizionario') group by 1) t));
+            where h.provenienza in ('perseus', 'wikizionario', 'wiktionnaire') group by 1) t));
   return r;
 end $$;
-comment on function importa_etimi_dizionari() is 'Etimologie del Lewis & Short e dell’LSJ (tag <etym>), del Wikizionario e l’analisi della forma, per le voci che non ne hanno altre; il confronto dei due Wiktionary (rimando dove concordano, alternativa con certezza 2 dove discordano): scritte solo dove cambiano.';
+comment on function importa_etimi_dizionari() is 'Etimologie del Lewis & Short e dell’LSJ (tag <etym>), del Wikizionario, del Wiktionnaire e l’analisi della forma, per le voci che non ne hanno altre; il confronto dei due Wiktionary (rimando dove concordano, alternativa con certezza 2 dove discordano): scritte solo dove cambiano.';
 
 -- ===== Stime della prima attestazione dai dizionari del Perseus (novembre 2026, import/DATAZIONI.md) =====
 -- Per ogni voce del Lewis & Short e dell'LSJ, l'autore datato più antico tra quelli citati (datatore_dizionari.py),
@@ -1054,25 +1103,31 @@ language plpgsql as $$
 declare
   nuove int;
   tolte int;
+  cambiate int;
 begin
   if not exists (select 1 from stg_forma) then
     return jsonb_build_object('saltato', 'tabella di appoggio vuota');
   end if;
   drop table if exists cand_fo;
   create temp table cand_fo on commit drop as
-    select distinct s.lingua, lower(s.forma) as forma, s.lemma
+    select s.lingua, lower(s.forma) as forma, s.lemma, bool_or(coalesce(s.sostituisce, 'f') = 't') as sostituisce
       from stg_forma s
      where s.forma <> '' and s.lemma <> ''
-       and exists (select 1 from lessema l where l.lingua = s.lingua and l.lemma = s.lemma and not l.ricostruito);
+       and exists (select 1 from lessema l where l.lingua = s.lingua and l.lemma = s.lemma and not l.ricostruito)
+     group by 1, 2, 3;
   create index on cand_fo (lingua, forma, lemma);
   analyze cand_fo;
   delete from forma_lemma x
    where x.lingua in (select distinct lingua from stg_forma)
      and not exists (select 1 from cand_fo c where c.lingua = x.lingua and c.forma = x.forma and c.lemma = x.lemma);
   get diagnostics tolte = row_count;
-  insert into forma_lemma (lingua, forma, lemma) select lingua, forma, lemma from cand_fo on conflict do nothing;
+  update forma_lemma x set sostituisce = c.sostituisce
+    from cand_fo c where c.lingua = x.lingua and c.forma = x.forma and c.lemma = x.lemma and x.sostituisce <> c.sostituisce;
+  get diagnostics cambiate = row_count;
+  insert into forma_lemma (lingua, forma, lemma, sostituisce) select lingua, forma, lemma, sostituisce from cand_fo
+    on conflict do nothing;
   get diagnostics nuove = row_count;
-  return jsonb_build_object('nuove', nuove, 'tolte', tolte, 'in_tutto', (select count(*) from forma_lemma));
+  return jsonb_build_object('nuove', nuove, 'tolte', tolte, 'cambiate', cambiate, 'in_tutto', (select count(*) from forma_lemma));
 end $$;
 comment on function importa_forme() is 'Forme flesse frequenti e lemmi (forme_it.tsv), per differenza: servono all''analisi di un testo.';
 

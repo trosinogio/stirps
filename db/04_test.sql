@@ -500,7 +500,19 @@ select pg_temp.verifica(
           and (r->>'riconosciute')::numeric = 4 and r->'sconosciute' = '["zzzq"]'::jsonb
      from (select analizza_testo('it', array['Notti', 'piedi', 'madre', 'zzzq'], array[2, 1, 1, 3], 'it', true) as r) x),
   'le forme vanno al lemma (notti → notte), le maiuscole non contano, e l''origine è la prima lingua fuori dall''italiano');
-delete from forma_lemma where lingua = 'it' and forma in ('notti', 'piedi');
+insert into forma_lemma values ('it', 'madre', 'piede', true);
+select pg_temp.verifica(
+  (select (r->>'lemmi')::int = 1 and r->'origini'->0->'esempi'->0->>'lemma' = 'piede'
+     from (select analizza_testo('it', array['madre'], array[1], 'it', true) as r) x),
+  'una forma che è solo una riduzione (dalla = da + la) conta per i lemmi a cui rimanda, non per la voce omonima');
+insert into lessema (lingua, lemma) values ('it', 'zzomonimo');
+insert into forma_lemma values ('it', 'zzomonimo', 'madre', false);
+select pg_temp.verifica(
+  (select (r->>'lemmi')::int = 1 and r->'origini'->0->'esempi'->0->>'lemma' = 'madre'
+     from (select analizza_testo('it', array['zzomonimo'], array[1], 'it', true) as r) x),
+  'una voce omonima senza etimologia non ruba peso al lemma della forma (ha: avere)');
+delete from lessema where lingua = 'it' and lemma = 'zzomonimo';
+delete from forma_lemma where lingua = 'it' and forma in ('notti', 'piedi', 'madre', 'zzomonimo');
 
 \echo '— indice delle radici per area'
 insert into area_radice (lessema_id, area, provenienza) values (lx('ine-pro/ped'), 'corpo', 'redazione'),
@@ -515,5 +527,11 @@ select pg_temp.verifica(
   and (select jsonb_array_length(r->'radici') >= 2 from (select indice_radici('it', true, 'ine-pro', '') as r) x),
   'l''indice delle radici le divide per area, nell''ordine delle aree; un''area si legge in ordine alfabetico; le radici senza area stanno a parte');
 delete from area_radice where lessema_id in (lx('ine-pro/ped'), lx('ine-pro/meh2ter'), lx('ine-pro/gwem'));
+
+\echo '— la linea del senso'
+select pg_temp.verifica(
+  not legame_di_senso('three', 'tooth') and legame_di_senso('seventh', 'seven') and legame_di_senso('flesh, meat', 'meat')
+  and legame_di_senso('he hates', 'hated') and not legame_di_senso('the', 'the') and not legame_di_senso(null, 'three'),
+  'la linea del senso: tre e dente no; seventh e seven, flesh e meat, hates e hated sì; le parole vuote e le glosse mancanti non contano');
 
 \echo '— collaudo completato'

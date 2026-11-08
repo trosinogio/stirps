@@ -104,6 +104,16 @@ export default async function Radice({ params }: { params: Promise<{ lang: strin
   const nodi = nodiFamiglia(sc);
   const discendenti = nodi.slice(1);
   const nl = new Set(discendenti.map((n) => n.lingua)).size;
+  // le lingue della famiglia, le più presenti per prime: i filtri dello stemma
+  const perLinguaN = new Map<string, [string, string, number]>();
+  for (const n of discendenti) {
+    const v = perLinguaN.get(n.lingua) ?? [n.lingua, n.lingua_nome, 0];
+    v[2]++;
+    perLinguaN.set(n.lingua, v);
+  }
+  const lingueFamiglia = [...perLinguaN.values()].sort((a, b) => b[2] - a[2] || a[1].localeCompare(b[1]));
+  // risalire: la famiglia da cui discende la cima di questa
+  const genitori = nodiUnici(sc.catena.filter((c) => c.profondita === 1));
   const grande = nodi.length > LIMITE_DISEGNO;
   const base = `/${lang}/r/${L.slug}`;
   const schede: [Vista, string, string][] = [['sintesi', t.schede.sintesi, base], ['stemma', t.schede.stemma, `${base}/stemma`],
@@ -120,6 +130,15 @@ export default async function Radice({ params }: { params: Promise<{ lang: strin
         {L.glossa && <p className="glossa-g" lang={L.glossa_lingua && L.glossa_lingua !== lang ? L.glossa_lingua : undefined}>{L.glossa_automatica && <Automatica lang={lang} />}{G(L.glossa, lang)}</p>}
         <Definizione L={L} lang={lang} />
         <Origine sc={sc} lang={lang} />
+        {genitori.length > 0 && (
+          <p className="azioni-voce">
+            {genitori.slice(0, 2).map((g) => (
+              <Link key={g.id} className="btn" href={`/${lang}/r/${g.slug}${vista === 'sintesi' ? '' : '/' + vista}`} prefetch={false}>
+                ↑ {t.strumentiStemma.risali(fmt(g))}
+              </Link>
+            ))}
+          </p>
+        )}
         {discendenti.length > 0 && (
           <div className="statistiche">
             <span className="conti">{t.paroleInLingue(discendenti.length, nl)}</span>
@@ -138,7 +157,7 @@ export default async function Radice({ params }: { params: Promise<{ lang: strin
           : (
             <>
               {grande && <p className="sintesi-nota">{t.stemmaRidotto}</p>}
-              <StemmaAdattivo lang={lang} nodi={grande ? null : nodi} nascosti={nomiNascosti(nodi)}><StemmaVerticale lang={lang} nodi={nodi} livelli={grande ? 2 : undefined} /></StemmaAdattivo>
+              <StemmaAdattivo lang={lang} nodi={grande ? null : nodi} nascosti={nomiNascosti(nodi)} lingue={lingueFamiglia} base={base}><StemmaVerticale lang={lang} nodi={nodi} livelli={grande ? 2 : undefined} /></StemmaAdattivo>
               <Legenda lang={lang} />
             </>
           )}

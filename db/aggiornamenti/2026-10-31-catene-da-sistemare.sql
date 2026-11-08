@@ -92,14 +92,17 @@ on conflict do nothing;
 -- 7 novembre 2026: quarto gruppo, «Wiktionary e Wikizionario discordano» (la regola dei due Wiktionary). Le parole italiane
 -- la cui etimologia di Wiktionary inglese, accolta e intatta, ha accanto un'alternativa del Wikizionario che dà un'altra
 -- origine (import/confronta_wikizionario.py): destinatario dal latino destinatarius o dal francese destinataire.
+-- 9 novembre: lo stesso per le parole francesi e il Wiktionnaire, gruppo «Wiktionary e Wiktionnaire discordano».
 insert into lista_lavoro (lista, posizione, lessema_id, gruppo, suggerimento)
 select 'catene-da-sistemare', coalesce((select max(posizione) from lista_lavoro where lista = 'catene-da-sistemare'), 0)
-         + row_number() over (order by y.rango nulls last, y.lemma), y.id, 'Wiktionary e Wikizionario discordano',
-       'Wiktionary: ' || coalesce(y.wikt, '?') || '; Wikizionario: ' || coalesce(y.wiz, '?')
+         + row_number() over (order by y.lingua desc, y.rango nulls last, y.lemma), y.id,
+       'Wiktionary e ' || y.fonte || ' discordano',
+       'Wiktionary: ' || coalesce(y.wikt, '?') || '; ' || y.fonte || ': ' || coalesce(y.wiz, '?')
          || '. Controllare sulle fonti quale origine accogliere.'
   from (
-    select distinct on (l.id) l.id, l.lemma,
-           (select min(f.rango) from frequenza f where f.lingua = 'it' and f.forma = l.lemma) as rango,
+    select distinct on (l.id) l.id, l.lemma, l.lingua,
+           case w.provenienza when 'wiktionnaire' then 'Wiktionnaire' else 'Wikizionario' end as fonte,
+           (select min(f.rango) from frequenza f where f.lingua = l.lingua and f.forma = l.lemma) as rango,
            (select string_agg(g.nome || ' ' || e.lemma, ' + ' order by x.ordine)
               from relazione x join lessema e on e.id = x.etimo_id join lingua g on g.codice = e.lingua
              where x.ipotesi_id = a.id) as wikt,
@@ -109,9 +112,52 @@ select 'catene-da-sistemare', coalesce((select max(posizione) from lista_lavoro 
       from lessema l
       join ipotesi a on a.esito_id = l.id and a.stato = 'accolta' and a.provenienza = 'wiktionary'
                     and a.stato_editoriale = 'importato'
-      join ipotesi w on w.esito_id = l.id and w.stato = 'alternativa' and w.provenienza = 'wikizionario'
+      join ipotesi w on w.esito_id = l.id and w.stato = 'alternativa' and w.provenienza in ('wikizionario', 'wiktionnaire')
                     and w.stato_editoriale = 'importato'
-     where l.lingua = 'it'
+     where (l.lingua = 'it' and w.provenienza = 'wikizionario') or (l.lingua = 'fr' and w.provenienza = 'wiktionnaire')
      order by l.id, w.id
   ) y
+on conflict do nothing;
+
+-- Le funzioni della linea del senso, qui perché questo file gira prima degli aggiornamenti di novembre; stesso testo di
+-- db/02_logica.sql.
+-- La linea del senso tra una parola e il suo etimo (regola di Giovanni, 8 novembre 2026: «la lezione del tre e del
+-- dente»). Due glosse inglesi hanno un legame di senso evidente se condividono una parola piena, o una contiene l'altra
+-- (seventh e seven), dopo la stessa riduzione grezza delle desinenze di import/controlla_sensi.py. Misura sul pacchetto
+-- dell'8 novembre: 51% degli archi accolti, 0,6% delle coppie a caso. L'assenza di un legame evidente non prova un
+-- errore (*h₂ōwyóm «egg» < *h₂éwis «bird» è giusto): serve a far guardare l'arco, mai a toglierlo.
+create or replace function parole_glossa(p_glossa text) returns text[]
+language sql immutable as $$
+  select coalesce(array_agg(distinct regexp_replace(w, '^(.{3,}?)(ingly|edly|ings|ing|ness|ment|ers|ied|ies|est|ed|er|es|ly|s)$', '\1')), '{}')
+    from regexp_split_to_table(lower(regexp_replace(coalesce(p_glossa, ''), '\([^)]*\)', ' ', 'g')), '[^a-z]+') w
+   where length(w) >= 3 and w <> all ('{a,ablative,about,accusative,act,action,adjective,adverb,all,also,alternative,an,and,another,any,archaic,are,as,at,be,being,belonging,between,by,certain,characteristic,condition,dative,do,does,done,down,e.g,esp,especially,etc,feminine,first,for,form,from,generally,genitive,get,go,got,having,he,her,him,his,i.e,imperative,in,indicative,infinitive,instrumental,into,is,it,its,just,kind,less,like,locative,made,make,manner,masculine,me,more,most,much,my,name,neuter,no,nominative,not,noun,obsolete,of,often,on,oneself,only,or,other,our,out,over,participle,particle,particular,past,people,person,pertaining,place,plural,prefix,present,quality,related,relating,same,second,she,singular,some,somebody,someone,something,sort,specific,state,subjunctive,such,suffix,term,that,the,their,them,these,they,thing,things,third,this,those,through,to,type,under,up,upon,us,use,used,usually,variant,verb,very,via,vocative,was,way,we,were,what,where,which,who,whom,whose,with,within,without,word,you,your}'::text[])
+$$;
+
+create or replace function legame_di_senso(p_glossa_a text, p_glossa_b text) returns boolean
+language sql immutable as $$
+  select exists (select 1 from unnest(parole_glossa(p_glossa_a)) x, unnest(parole_glossa(p_glossa_b)) y
+                  where x = y or (length(x) >= 3 and strpos(y, x) > 0) or (length(y) >= 3 and strpos(x, y) > 0))
+$$;
+comment on function legame_di_senso(text, text) is
+  'Le due glosse condividono una parola piena, o una contiene l’altra: la linea del senso tra una parola e il suo etimo è evidente.';
+
+-- 8 novembre 2026: sesto gruppo, «Senza linea di senso». Gli archi accolti tra due parole ricostruite della stessa lingua
+-- (non radici né affissi) le cui glosse non hanno un legame evidente (legame_di_senso()): lì una lettura sbagliata
+-- (*tréyes «three» < *ǵómbʰos «tooth», da tryzub) si nasconde tra i passaggi di significato veri (*h₂ōwyóm «egg» <
+-- *h₂éwis «bird»). Va tracciato il passaggio di significato, o corretto l'arco.
+insert into lista_lavoro (lista, posizione, lessema_id, gruppo, suggerimento)
+select 'catene-da-sistemare', coalesce((select max(posizione) from lista_lavoro where lista = 'catene-da-sistemare'), 0)
+         + row_number() over (order by y.lingua <> 'ine-pro', y.lingua, y.lemma), y.id, 'Senza linea di senso',
+       '*' || y.lemma || ' «' || left(y.ge, 60) || '» < *' || y.etimo || ' «' || left(y.gt, 60)
+         || '»: tracciare il passaggio di significato, o correggere l''arco.'
+  from (select distinct on (e.id) e.id, e.lingua, e.lemma, e.glossa as ge, t.lemma as etimo, t.glossa as gt
+          from relazione x
+          join ipotesi h on h.id = x.ipotesi_id and h.stato = 'accolta'
+          join lessema e on e.id = x.esito_id
+          join lessema t on t.id = x.etimo_id
+         where e.ricostruito and t.ricostruito and e.lingua = t.lingua
+           and e.lemma !~ '(^-|-$)' and t.lemma !~ '(^-|-$)'
+           and e.glossa is not null and t.glossa is not null and e.glossa_lingua = 'en' and t.glossa_lingua = 'en'
+           and not legame_di_senso(e.glossa, t.glossa)
+         order by e.id, x.ordine) y
 on conflict do nothing;

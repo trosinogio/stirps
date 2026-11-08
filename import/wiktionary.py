@@ -32,11 +32,16 @@ POS = {'verb': 'v.', 'adj': 'agg.', 'adv': 'avv.', 'name': 'np', 'prep': 'prep.'
 PREFISSI_ESPANSIONE = ('Inherited from ', 'Borrowed from ', 'Derived from ', 'Learned borrowing from ',
                        'Unadapted borrowing from ', 'Semi-learned borrowing from ', 'Orthographic borrowing from ',
                        'Calque of ', 'Semantic loan from ', 'Phono-semantic matching of ')
-DUBBIO_FORTE = re.compile(r'\b(uncertain|unknown|obscure|unclear|disputed)\b', re.I)
-DUBBIO = re.compile(r'\b(perhaps|possibly|maybe|conceivably)\b', re.I)
+# «similar to Proto-Semitic *šabʕ-, from which it may be a borrowing» (*septḿ̥): un confronto, non un etimo
+DUBBIO_FORTE = re.compile(r'\b(uncertain|unknown|obscure|unclear|disputed|similar|resembl\w*)\b', re.I)
+DUBBIO = re.compile(r'\b(perhaps|possibly|maybe|conceivably|(?-i:may|might|could))\b', re.I)
 PROBABILE = re.compile(r'\b(probably|likely)\b', re.I)
 INTERROMPE = re.compile(r'\b(or|compare|cf|cognates?|related|see|akin|influenced|contamination|alongside|versus|vs)\b', re.I)
 PROSEGUE = re.compile(r'\b(from|via|through|ultimately)\b', re.I)
+# le altre ipotesi di un'etimologia discussa: «or maybe from French page», «Alternatively from Latin patiēns» (pazzo)
+ALTERNATIVA = re.compile(r'\b(or|alternatively|otherwise|another|others|other\s+(?:scholars|sources|theor\w+|views?|hypothes\w+))\b', re.I)
+DERIVA = re.compile(r'\b(from|borrow\w*|deriv\w*|loan\w*)\b', re.I)
+CONFRONTO = re.compile(r'\b(compare|cf|cognates?|related|akin|see|influenced|contamination|alongside|versus|vs|parallel)\b', re.I)
 # «First element con- derives from cum…»: da qui il testo spiega le parti del composto, non la parola
 ELEMENTI = re.compile(r'\b(elements?|components?|constituents?)\b|\b(first|second|third|latter|former)\s+(part|member|half)\b', re.I)
 
@@ -253,7 +258,10 @@ MAIUSCOLA_DEI_NOMI = {'de', 'gsw', 'lb', 'bar', 'pdc', 'ksh'}
 # segni che scrivono suoni o parole diverse: il norreno háls, il francese dé, il protogermanico berô, ё e й in russo
 SEGNI_DELLA_PAGINA = {'ang': '\u0304\u0306\u0307',             # macron, breve, punto: sæterdæġ → sæterdæg, iċ → ic
                       'enm': '\u0304\u0306',                     # fōtmāl → fotmal
-                      'ru': '\u0301\u0300', 'uk': '\u0301\u0300', 'be': '\u0301\u0300', 'rue': '\u0301\u0300'}   # accento tonico
+                      'ru': '\u0301\u0300', 'uk': '\u0301\u0300', 'be': '\u0301\u0300', 'rue': '\u0301\u0300',   # accento tonico
+                      # protoslavo: gli accenti (acuto, grave, doppio grave, breve rovesciata, circonflesso, tilde) non
+                      # stanno nel titolo, che tiene invece pipa e ogonek: *šȅstь → *šestь, *pę̑tь → *pętь
+                      'sla-pro': '\u0301\u0300\u030f\u0311\u0302\u0303'}
 
 
 def nome_pagina(lingua, termine):
@@ -387,6 +395,8 @@ def lemma_valido(lingua, lemma, ricostruito=False):
         return False                    # «+univ», «+af»: il nome di un modello letto come codice di lingua
     if not (lemma or '').strip('*- '):
         return False                    # un lemma vuoto («itc-pro:» da un termine senza parola) non è una voce
+    if '/' in lemma or lemma.startswith(('Appendix', 'Reconstruction:', 'Unsupported titles')):
+        return False                    # pagine di servizio di Wiktionary (i/languages A to L), sigle (c/o), due parole
     if ricostruito:                                      # le ricostruzioni hanno la loro notazione: *(s)ker-
         return True
     if NON_LEMMA.search(lemma or ''):
@@ -535,6 +545,11 @@ class Importatore:
                                      # il lessico comune, senza nomi propri né locuzioni; le voci raggiunte entrano sempre
         self.esterni = set()         # con l'elenco, anche le voci con l'etimo in un'altra lingua (--esterni en): hound < enm
         self.glosse_precedenti = {}  # chiave → glossa del pacchetto pubblicato (--glosse-precedenti dati/lessemi.tsv.gz)
+        self.comuni = {}             # nella lingua principale, i lemmi senza etimologia che entrano lo stesso (--comuni it=…):
+                                     # quelli del lessico di frequenza, perché l'analisi di un testo li riconosca
+        self.lette = set()           # le voci di cui si è letta la pagina (voce())
+        self.id_proprio = {}         # voce → l'identificativo che la sua pagina si dà ({{etymon|gem-pro|id=three}})
+        self.con_ident = defaultdict(set)   # chiave senza identificativo → le chiavi con (*þrīz → *þrīz@three)
         self.con_etimologia = set()  # lingue di chiusura di cui entrano tutte le voci con un'etimologia, ma non i lemmi
                                      # senza (--con-etimologia en): l'inglese ha centinaia di migliaia di lemmi vuoti
         self.stat = Counter()
@@ -542,15 +557,27 @@ class Importatore:
     # ---- lessemi ----
     def lessema(self, lingua, termine, glossa=None, translit=None, pos=None, omografo=1, ident=None):
         lingua = codice_lingua(lingua)
-        termine = nome_pagina(lingua, senza_modificatori(termine))
+        termine = senza_modificatori(termine)
+        # «xaa:زوق» dentro un {{ety}} di una voce spagnola: il codice è la lingua della parola, non parte del lemma
+        m = re.match(r'^([a-z]{2,3}(?:-[a-z]{2,4})*):(\S.*)$', termine)
+        if m and m.group(1) != lingua:
+            lingua, termine = codice_lingua(m.group(1)), m.group(2)
+        # due grafie in un rimando («minuzza//minuzzare», «lě / *li»): vale la prima
+        termine = re.split(r'\s*//\s*|\s+/\s+', termine)[0]
+        termine = nome_pagina(lingua, termine)
         ric = termine.startswith('*')
         if not ric and lingua in VARIETA_ATTESTATE:
             lingua = VARIETA_ATTESTATE[lingua]
         lemma = termine[1:] if ric else termine
+        # un lemma già in alfabeto latino non ha traslitterazione: quella che arriva è un pezzo di glossa o di codice
+        # («liquid lard(?)» per tucca, «ablative of <i …>manus</i>» per manu) e finirebbe nell'indirizzo della voce
+        if translit and re.fullmatch(r"[\sA-Za-zÀ-ɏḀ-ỿ'’·.\-]+", lemma or ''):
+            translit = None
         if not ric and base_lingua(lingua) == 'grc' and lemma and all(c in CIPRIOTA for c in lemma):
             lingua = 'grc-arp'          # sillabario cipriota: greco arcadocipriota, con il suo indice
         k = chiave(lingua, termine.lstrip('*') if not ric else termine, omografo)
         if ident and ric:
+            self.con_ident[k].add(k + '@' + ident)
             k += '@' + ident            # radici omografe: *(s)ker-@cut e *(s)ker-@turn sono due nodi
         l = self.lessemi.get(k)
         if l is None:
@@ -610,6 +637,10 @@ class Importatore:
             self.lessemi[k0]['sensi'] = v['se']
         if glossa:
             self.lessemi[k0].setdefault('propria', glossa[:200])   # la glossa della sua voce, non di una menzione
+        self.lette.add(k0)
+        for t in v.get('tpl') or []:
+            if t.get('n') == 'etymon' and (t.get('a') or {}).get('id'):
+                self.id_proprio.setdefault(k0, t['a']['id'].strip())
         if k0 in self.ipotesi:          # stessa etimologia, altra parte del discorso
             self.stat['voci_duplicate'] += 1
             return
@@ -631,6 +662,7 @@ class Importatore:
         prec = k0
         catena_attiva = True
         primo = True
+        alternative = []                # le altre ipotesi del testo, un etimo ciascuna, con certezza al massimo 2
         for t in tpl:
             n, a, e = t['n'], t['a'], t.get('e') or ''
             pos_t = testo.find(e, cursore) if e else -1
@@ -668,6 +700,16 @@ class Importatore:
                 conf_voce = 1
                 if n == 'unk':
                     origine = 'ignota'
+                continue
+            if n in CATENA and not primo and ALTERNATIVA.search(connettore) and DERIVA.search(connettore) \
+                    and not CONFRONTO.search(connettore) and '+' not in connettore \
+                    and connettore.count('(') <= connettore.count(')'):
+                kt = self.etimo_alternativo(a, lingua_voce, k0, archi, alternative)
+                if kt:
+                    conf_alt = 1 if DUBBIO_FORTE.search(connettore) else 2
+                    alternative.append({'etimo': kt, 'esito': k0, 'tipo': CATENA[n], 'ordine': 1, 'affisso': None,
+                                        'conf': conf_alt, 'forma': None})
+                catena_attiva = False      # la catena dell'ipotesi principale finisce qui
                 continue
             if not catena_attiva:
                 continue
@@ -776,6 +818,12 @@ class Importatore:
                                       'conf': min(conf, conf_voce), 'forma': mostra})
                     primo, prec = False, kt
                     continue
+                # «три (… ultimately from *tréyes) + зуб (… ultimately from *ǵómbʰos)»: dopo un «+», o dentro una
+                # parentesi aperta, il testo spiega un elemento del composto, non prosegue la catena della parola
+                if '+' in connettore or connettore.count('(') > connettore.count(')'):
+                    self.stat['catene_ferme_al_composto'] += 1
+                    catena_attiva = False
+                    continue
                 if prec is None or INTERROMPE.search(connettore) or not PROSEGUE.search(connettore):
                     self.stat['catene_interrotte'] += 1
                     catena_attiva = False
@@ -801,6 +849,12 @@ class Importatore:
                 self.attestazioni[k0] = d
                 self.stat['date_dalla_prosa'] += 1
         conf = min([x['conf'] for x in archi] + [conf_voce]) if archi else conf_voce
+        for i, x in enumerate(alternative, 1):
+            kh = f'{k0}#wikt-o{i}'
+            self.ipotesi[kh] = {'chiave': kh, 'esito': k0, 'etichetta': f'Wiktionary (altra ipotesi {i})', 'stato': 'alternativa',
+                                'confidenza': min(x['conf'], conf_voce, 2), 'origine': 'etimo', 'nota': None}
+            self.relazioni.append({**x, 'ipotesi': kh, 'chiave': kh + '#0'})
+            self.stat['ipotesi_alternative_dal_testo'] += 1
         if not archi and origine == 'etimo':
             if conf_voce == 1:
                 origine = 'ignota'
@@ -814,6 +868,21 @@ class Importatore:
             x['ipotesi'] = k0 + '#wikt'
             x['chiave'] = f'{k0}#wikt#{i}'
             self.relazioni.append(x)
+
+    def etimo_alternativo(self, a, lingua_voce, k0, archi, alternative):
+        """La voce dell'etimo di un'ipotesi alternativa ({{der|it|la|patiēns}} dopo «Alternatively from»), o None."""
+        lingua, termine = codice_lingua(a.get('2')), (a.get('3') or a.get('4') or '').strip()
+        if not lingua or not termine or termine == '-' or ',' in termine or '/' in termine or re.match(r'^[A-Z][a-z]+:', termine):
+            return None
+        termine = pulisci_parte(termine)[0]
+        if not termine.startswith('*') and (termine.startswith('-') or termine.endswith('-')):
+            return None
+        lingua, termine, omo_t, _ = self.risolvi(lingua, termine, (a.get('4') or a.get('alt') or '').strip() or None)
+        glossa_t = (a.get('5') or a.get('t') or a.get('gloss') or '').strip() or None
+        kt = self.lessema(lingua, termine, glossa=glossa_t, omografo=omo_t, ident=(a.get('id') or '').strip() or None)
+        if kt == k0 or any(x['etimo'] == kt for x in archi + alternative):
+            return None
+        return kt
 
     # ---- chiusura delle catene: le voci delle lingue intermedie ----
     def carica_chiusura(self, lingua, lemmi, forme=None, glosse=None, base=False, varianti=None):
@@ -978,7 +1047,9 @@ class Importatore:
                     else:
                         candidati = [(lingua, pagina)]
                     for lc, termine in candidati:
-                        raggiunta = chiave(lc, termine, omo) in self.lessemi
+                        kb = chiave(lc, termine, omo)
+                        # *oktō citato solo come *oktō@eight: la pagina si legge lo stesso (non per le radici omografe)
+                        raggiunta = kb in self.lessemi or (kb in self.con_ident and not termine.endswith('-'))
                         if raggiunta or (intera and not v.get('rec') and self.ammessa(lingua, v)):
                             fatte.add((lingua, i))
                             self.voce(v, lingua_voce=lc, parola=termine)
@@ -1019,25 +1090,37 @@ class Importatore:
         completa, non solo le sue famiglie. Le forme ricostruite (sesta colonna di glosse.tsv) restano fuori."""
         for lingua in sorted(self.intere):
             percorso = (self.chiusura.get(lingua) or {}).get('file_glosse')
-            if not percorso or not os.path.exists(percorso):
+            if percorso and os.path.exists(percorso):
+                self.lemmi_da_glosse(lingua, percorso)
+
+    def aggiungi_lemmi_comuni(self, lingua, percorso):
+        """Nella lingua principale (--comuni it=frequenze_it.tsv.gz) entrano anche i lemmi senza etimologia del lessico
+        comune: referto non ha un'etimologia su Wiktionary, ma è una parola dell'italiano, e l'analisi di un testo deve
+        riconoscerla. Solo parole del lessico di frequenza, minuscole, di una parola sola."""
+        elenco = self.comuni.get(lingua)
+        if elenco and percorso and os.path.exists(percorso):
+            prima = len(self.lessemi)
+            self.lemmi_da_glosse(lingua, percorso, lambda p: p.lower() in elenco and not p[:1].isupper() and ' ' not in p)
+            self.stat['lemmi comuni senza etimologia'] += len(self.lessemi) - prima
+
+    def lemmi_da_glosse(self, lingua, percorso, ammesso=None):
+        for riga in open(percorso, encoding='utf-8'):
+            c = riga.rstrip('\n').split('\t') + ['', '', '', '', '', '', '', '']
+            parola, etimn, pos, glossa, ricostruita = c[0], c[1], c[2], c[3], c[5]
+            if not parola or ricostruita == '1' or parola.startswith('*') or (ammesso and not ammesso(parola)):
                 continue
-            for riga in open(percorso, encoding='utf-8'):
-                c = riga.rstrip('\n').split('\t') + ['', '', '', '', '', '', '', '']
-                parola, etimn, pos, glossa, ricostruita = c[0], c[1], c[2], c[3], c[5]
-                if not parola or ricostruita == '1' or parola.startswith('*'):
-                    continue
-                omo = int(etimn) if etimn.isdigit() else 1
-                pagina = nome_pagina(lingua, parola)
-                if chiave(lingua, pagina, omo) in self.lessemi:
-                    continue
-                kl = self.lessema(lingua, pagina, glossa=glossa[:200] if glossa else None,
-                                  pos=POS.get(pos) or ('s.' if pos == 'noun' else None), omografo=omo)
-                if glossa:
-                    self.lessemi[kl].setdefault('propria', glossa[:200])
-                if c[6] and not self.lessemi[kl].get('pronuncia'):
-                    self.lessemi[kl]['pronuncia'] = json.loads(c[6])
-                if c[7] and not self.lessemi[kl].get('sensi'):
-                    self.lessemi[kl]['sensi'] = json.loads(c[7])
+            omo = int(etimn) if etimn.isdigit() else 1
+            pagina = nome_pagina(lingua, parola)
+            if chiave(lingua, pagina, omo) in self.lessemi:
+                continue
+            kl = self.lessema(lingua, pagina, glossa=glossa[:200] if glossa else None,
+                              pos=POS.get(pos) or ('s.' if pos == 'noun' else None), omografo=omo)
+            if glossa:
+                self.lessemi[kl].setdefault('propria', glossa[:200])
+            if c[6] and not self.lessemi[kl].get('pronuncia'):
+                self.lessemi[kl]['pronuncia'] = json.loads(c[6])
+            if c[7] and not self.lessemi[kl].get('sensi'):
+                self.lessemi[kl]['sensi'] = json.loads(c[7])
                 self.stat[f'lemmi_interi_{lingua}'] += 1
 
     def collega_participi(self):
@@ -1095,9 +1178,56 @@ class Importatore:
             return 'affisso_come_base'
         return None
 
+    def unisci_identificativi(self):
+        """*þrīz e *þrīz@three sono la stessa parola: la pagina di Wiktionary (con l'etimologia) e i discendenti che la
+        citano con id=three. Una voce con un identificativo si unisce alla voce della sua pagina se la pagina si dà quello
+        stesso identificativo, o se è l'unica variante; le radici omografe (*(s)ker-@cut, @turn) restano distinte."""
+        mappa = {}
+        for base, varianti in self.con_ident.items():
+            if base not in self.lessemi or base not in self.lette or self.lessemi[base]['lemma'].endswith('-'):
+                continue
+            proprio = self.id_proprio.get(base)
+            scelte = [k for k in varianti if k.split('@', 1)[1] == proprio] if proprio else []
+            if not scelte and len(varianti) == 1:
+                scelte = list(varianti)
+            for k in scelte:
+                if k in self.lessemi:
+                    mappa[k] = base
+        if not mappa:
+            return
+        m = lambda k: mappa.get(k, k)
+        for r in self.relazioni:
+            r['etimo'], r['esito'] = m(r['etimo']), m(r['esito'])
+        self.relazioni = [r for r in self.relazioni if r['etimo'] != r['esito']]
+        for k, base in mappa.items():
+            h = self.ipotesi.pop(k, None)
+            if h and base not in self.ipotesi:
+                h['esito'] = base
+                self.ipotesi[base] = h
+            self.lessemi[base]['glosse'].update(self.lessemi[k]['glosse'])
+            for c in ('translit', 'pos'):
+                self.lessemi[base][c] = self.lessemi[base].get(c) or self.lessemi[k].get(c)
+            del self.lessemi[k]
+            if k in self.attestazioni and base not in self.attestazioni:
+                self.attestazioni[base] = self.attestazioni.pop(k)
+        nuovi = defaultdict(Counter)
+        for esito, conta in self.intermedi.items():
+            for (etimo, tipo, conf, forma), n in conta.items():
+                if m(etimo) != m(esito):
+                    nuovi[m(esito)][(m(etimo), tipo, conf, forma)] += n
+        self.intermedi = nuovi
+        self.radici = {(m(a), m(b)) for a, b in self.radici}
+        self.doppioni = {(m(a), m(b)) for a, b in self.doppioni}
+        self.formazioni_ambigue = {m(k) for k in self.formazioni_ambigue}
+        self.stat['identificativi_uniti'] = len(mappa)
+
     def risolvi_intermedi(self):
         for esito, conta in self.intermedi.items():
             if esito in self.ipotesi:     # la voce ha già una sua etimologia
+                continue
+            if esito in self.lette and self.lessemi.get(esito, {}).get('lingua') == 'ine-pro':
+                # *tréyes: la sua pagina non dà un etimo, e una catena di un'altra pagina non gliene dà uno
+                self.stat['intermedi_pie_senza_etimo'] += 1
                 continue
             # gli anelli impossibili non si offrono nemmeno come alternative
             for c in [c for c in conta if self.arco_impossibile(c[0], esito)]:
@@ -1384,7 +1514,14 @@ class Importatore:
         for hs in per_esito.values():
             if any(h['stato'] == 'accolta' for h in hs):
                 continue
-            migliore = max(enumerate(hs), key=lambda x: (x[1]['confidenza'], -x[0]))[1]
+            # a parità di certezza vince l'ipotesi principale del testo, non un'altra ipotesi («or …», «alternatively …»)
+            migliore = max(enumerate(hs), key=lambda x: (x[1]['confidenza'], x[1]['chiave'].endswith('#wikt'), -x[0]))[1]
+            l = self.lessemi.get(migliore['esito']) or {}
+            if l.get('lingua') == 'ine-pro' and migliore['confidenza'] < 3:
+                # *h₁óynos «perhaps built on the pronominal stem *éy»: resta in cima alla sua famiglia, con
+                # l'ipotesi visibile come alternativa
+                self.stat['alternative_pie_non_promosse'] += 1
+                continue
             migliore['stato'] = 'accolta'
             self.stat['alternative_promosse'] += 1
 
@@ -1514,7 +1651,7 @@ if __name__ == '__main__':
     #               [--forme-base it=forme.tsv]
     #               [--intere la,grc] [--con-etimologia en] [--elenco en=../dati/frequenze_en.tsv.gz] [--esterni en]
     #               [--glosse-precedenti ../dati/lessemi.tsv.gz]
-    args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti = [], [], 1, set(), set(), {}, set(), {}
+    args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti, comuni = [], [], 1, set(), set(), {}, set(), {}, {}
     forme_base = None   # --forme-base it=forme.tsv: le forme flesse della lingua di partenza (filtra.py con FORME)
     it_ = iter(sys.argv[1:])
     for x in it_:
@@ -1529,6 +1666,10 @@ if __name__ == '__main__':
             with (gzip.open(percorso_e, 'rt', encoding='utf-8') if percorso_e.endswith('.gz') else open(percorso_e, encoding='utf-8')) as f:
                 # le colonne di dati/frequenze_*.tsv.gz: lingua, forma, rango, conteggio, fonte
                 elenchi[lingua_e] = {r.split('\t')[1].lower() for r in f if r.count('\t') >= 1}
+        elif x == '--comuni':
+            lingua_c, percorso_c = next(it_).split('=', 1)
+            with (gzip.open(percorso_c, 'rt', encoding='utf-8') if percorso_c.endswith('.gz') else open(percorso_c, encoding='utf-8')) as f:
+                comuni[lingua_c] = {r.split('\t')[1].lower() for r in f if r.count('\t') >= 1}
         elif x == '--glosse-precedenti':
             with gzip.open(next(it_), 'rt', encoding='utf-8') as f:
                 for r in f:
@@ -1547,6 +1688,7 @@ if __name__ == '__main__':
     imp.intere = intere
     imp.con_etimologia = con_etimologia
     imp.elenco = elenchi
+    imp.comuni = comuni
     imp.esterni = esterni
     imp.glosse_precedenti = precedenti
     for c in chiusure:
@@ -1569,6 +1711,7 @@ if __name__ == '__main__':
         if p[1]:
             completa_glosse(imp, p[1], lingua)
     imp.nomi_tedeschi()
+    imp.unisci_identificativi()
     imp.risolvi_intermedi()
     imp.precisa_omografe()
     imp.elementi_di_composizione()
@@ -1576,6 +1719,8 @@ if __name__ == '__main__':
     imp.chiudi_su_radici()
     imp.togli_cicli()
     imp.aggiungi_lemmi_interi()
+    if len(args) > 2:
+        imp.aggiungi_lemmi_comuni(LINGUA, args[2])
     imp.togli_archi_impossibili()
     imp.togli_non_validi()
     st = imp.scrivi(args[1])
