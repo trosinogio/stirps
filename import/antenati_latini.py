@@ -16,10 +16,11 @@ primo, e la precisione per soglia di fiducia: si propone solo sopra la soglia ch
 almeno l'85% di esatte. Le proposte vanno alla redazione (lista di lavoro), mai al pubblico: le parole senza etimologia
 sono spesso derivate italiane o forme che il latino non ha, e il campione delle note è più facile.
 
-    python3 antenati_latini.py coppie.tsv latino.tsv [senza.tsv proposte.tsv]
+    python3 antenati_latini.py coppie.tsv latino.tsv italiano.tsv [senza.tsv proposte.tsv]
 
 coppie.tsv: id_it, lemma_it, pos_it, id_la, lemma_la, pos_la, tipo, glossa_it, glossa_la (le relazioni accolte);
-latino.tsv: id, lemma, pos, glossa, provenienza, nome_proprio; senza.tsv: id, lemma, pos, glossa, rango di frequenza.
+latino.tsv: id, lemma, pos, glossa, provenienza, nome_proprio; italiano.tsv: lemma, ha un'etimologia (t/f);
+senza.tsv: id, lemma, pos, glossa, rango di frequenza.
 Il rapporto va sullo standard error.
 """
 import math, random, sys, unicodedata, zlib
@@ -187,6 +188,30 @@ def senso(glossa):
     return {w[:5] for w in t if len(w) >= 3 and w not in PAROLE_VUOTE}
 
 
+# le voci che il modello non prova: forme di altre parole, e derivati italiani la cui base è nel dizionario (rovinato
+# da rovinare, condanna da condannare, divertente da divertire): lì l'analisi più economica è italiana, non latina
+FORME = ('contraction', 'apocop', 'elided', 'elision', 'form of', 'participle', 'plural of', 'letter', 'abbreviation',
+         'initialism', 'clipping', 'misspelling', 'synonym of')
+DERIVATI = (('ato', 'are'), ('ata', 'are'), ('ati', 'are'), ('ate', 'are'), ('ito', 'ire'), ('ita', 'ire'),
+            ('uto', 'ere'), ('uta', 'ere'), ('ente', 'ere'), ('ente', 'ire'), ('ante', 'are'), ('abile', 'are'),
+            ('ibile', 'ere'), ('ibile', 'ire'), ('atile', 'are'), ('amento', 'are'), ('imento', 'ire'),
+            ('azione', 'are'), ('izione', 'ire'), ('atore', 'are'), ('itore', 'ire'), ('atrice', 'are'),
+            ('anza', 'are'), ('enza', 'ere'), ('enza', 'ire'), ('a', 'are'), ('o', 'are'), ('e', 'are'))
+
+
+def esclusa(lemma, glossa, italiani):
+    """Perché una voce italiana non si prova (None se si prova)."""
+    if lemma[:1].isupper(): return 'maiuscola'
+    if not glossa.strip(): return 'senza glossa'
+    g = glossa.lower()
+    if any(f in g for f in FORME): return 'forma di un\'altra parola'
+    l = lemma.lower()
+    for fin, base in DERIVATI:
+        if l.endswith(fin) and len(l) - len(fin) >= 3 and l[:len(l) - len(fin)] + base in italiani:
+            return 'derivato italiano'
+    return None
+
+
 COMPATIBILI = {('s', 'a'), ('a', 's'), ('s', 's'), ('a', 'a'), ('v', 'v')}
 
 
@@ -242,6 +267,7 @@ def prevedi(mod, lex, it_lemma, cl, glossa=''):
 def main():
     coppie_raw = righe(sys.argv[1]); latino = righe(sys.argv[2])
     lex = Lessico(latino)
+    italiani = {r[0].lower() for r in righe(sys.argv[3])}
     forma_di = {v[0]: v[2] for v in lex.voci}
     # una parola italiana con più etimi latini: ognuno è giusto
     per_it = defaultdict(set); info = {}; primo = {}
@@ -256,9 +282,11 @@ def main():
           f'{sum(len(c) for c in mod.finali.values())} finali, {len(mod.op)} operazioni sul tema', file=sys.stderr)
     # prova sul 20% tenuto da parte: esatta se il primo è un etimo accolto, o lo stesso lemma in un'altra voce
     # (lo stesso lemma da Wiktionary e dal Perseus); «variante» se differisce dall'etimo solo nella finale
-    esiti = []; trovati = 0
+    esiti = []; trovati = 0; fuori_prova = Counter()
     for i in sorted(prova):
         lemma, cl, gl = info[i]
+        perche = esclusa(lemma, gl, italiani - {lemma.lower()})
+        if perche: fuori_prova[perche] += 1; continue
         veri = {forma_di.get(x) for x in per_it[i]} - {None}
         if any(lex.voci[k][2] in veri for k in lex.candidati(mod, norm(lemma))): trovati += 1
         p = prevedi(mod, lex, lemma, cl, gl)
@@ -271,8 +299,8 @@ def main():
         esiti.append((fiducia, e, lemma, v[1]))
     n = len(esiti); c = Counter(e[1] for e in esiti)
     print(f'tenute da parte: {n}; l\'etimo vero è tra i candidati in {trovati} ({trovati / n:.1%}); al primo posto '
-          f'{c["esatta"]} ({c["esatta"] / n:.1%}), una variante dell\'etimo {c["variante"]}, senza candidati {c["no"]}',
-          file=sys.stderr)
+          f'{c["esatta"]} ({c["esatta"] / n:.1%}), una variante dell\'etimo {c["variante"]}, senza candidati {c["no"]}; '
+          f'non provate: ' + ', '.join(f'{k} {v}' for k, v in fuori_prova.most_common()), file=sys.stderr)
     con = sorted((e for e in esiti if e[0] is not None), key=lambda e: -e[0])
     soglia = None
     for s in (0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0):
@@ -287,19 +315,22 @@ def main():
     random.Random(1).shuffle(errori)
     print('  errori sopra la soglia: ' + '; '.join(f'{e[2]} → {e[3]}' for e in errori[:20]), file=sys.stderr)
     print(f'soglia scelta: {soglia}', file=sys.stderr)
-    if len(sys.argv) > 4 and soglia is not None:
+    if len(sys.argv) > 5 and soglia is not None:
         mod = Modello([(norm(info[i][0]), norm(primo[i]), info[i][1]) for i in ids])
-        fuori = []
-        for r in righe(sys.argv[3]):
+        fuori = []; scartate = Counter()
+        for r in righe(sys.argv[4]):
+            perche = esclusa(r[1], r[3], italiani - {r[1].lower()})
+            if perche: scartate[perche] += 1; continue
             p = prevedi(mod, lex, r[1], classe(r[2]), r[3])
             if not p: continue
             fiducia = (p[1][0] - p[0][0]) if len(p) > 1 else 5.0
             if fiducia >= soglia:
                 v = lex.voci[p[0][1]]
                 fuori.append(f'{r[0]}\t{r[1]}\t{v[0]}\t{v[1]}\t{fiducia:.2f}\t{r[4]}\n')
-        with open(sys.argv[4], 'w', encoding='utf-8') as f:
+        with open(sys.argv[5], 'w', encoding='utf-8') as f:
             f.writelines(fuori)
-        print(f'proposte per le parole senza etimologia: {len(fuori)}', file=sys.stderr)
+        print(f'proposte per le parole senza etimologia: {len(fuori)}; non provate: '
+              + ', '.join(f'{k} {v}' for k, v in scartate.most_common()), file=sys.stderr)
 
 
 if __name__ == '__main__':
