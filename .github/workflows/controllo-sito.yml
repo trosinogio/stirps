@@ -12,14 +12,8 @@ jobs:
         run: |
           S=https://dizionario-etimologico.vercel.app
           prova() { curl -s -o /tmp/p.html -w "%{http_code} %{size_download}B" "$S$1"; printf ' %s | ' "$1"; grep -o "$2" /tmp/p.html | head -${3:-2} | tr '\n' ' '; echo; }
-          prova /it/w/en/brew-2 'glossa-g[^<]*<[^<]*<[^<]*'
-          prova /it/w/la/tucca '<title>[^<]*'
-          prova /it/w/la/liquid-lard '<title>[^<]*'
-          prova /it/w/ine-pro/treyes 'Discende da\|discende da\|capostipite[^<]*' 3
-          prova /it/r/ine-pro/treyes/stemma 'st-cerca\|Cerca nello stemma' 1
-          prova /it/w/it/tre 'azioni-voce.\{0,300\}' 1
-          prova /it/w/it/pazzo 'patiēns\|patiens' 2
-          prova /it/norme '<title>[^<]*'
-          prova /it/radici 'ine-pro/corpo#elenco' 1
-          prova /it/w/it/telo-2 'glossa-g[^<]*<[^<]*' 1
-          prova /it/analisi '<title>[^<]*'
+          prova /it/w/it/cinque 'glossa-g[^<]*<[^<]*<[^<]*' 1
+          prova /it/w/it/quattro 'glossa-g[^<]*<[^<]*<[^<]*' 1
+          prova /it/w/it/uno 'glossa-g[^<]*<[^<]*<[^<]*' 1
+          prova /it/w/it/nove 'glossa-g[^<]*<[^<]*<[^<]*' 1
+          prova /it/w/it/due 'glossa-g[^<]*<[^<]*<[^<]*' 1
