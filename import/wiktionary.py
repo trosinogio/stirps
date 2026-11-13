@@ -774,6 +774,9 @@ class Importatore:
                 if not lingua or not termine or termine == '-':
                     continue
                 termine = pulisci_parte(termine)[0]
+                if '<' in termine or '>' in termine:
+                    self.stat['termini_con_modificatori_annidati'] += 1
+                    continue
                 if ',' in termine:
                     # sintassi recente: più forme nello stesso template («ἀββα,ἀββᾶς»); vale quella già nota
                     parti = [x.strip() for x in termine.split(',') if x.strip()]
@@ -1163,6 +1166,9 @@ class Importatore:
         parti = [(p, l or lingue_parti.get(i + 1)) for i, (p, l) in enumerate(parti)]
         if n == 'prefix' and parti:
             parti = [(parti[0][0].rstrip('-') + '-', None)] + parti[1:]
+        elif n == 'suffix' and parti and num[0][0] >= 3:
+            # {{suffix|grc||τής}} (κριτής): la base manca, l'argomento che c'è è il suffisso e non una parola
+            parti = parti[:-1] + [('-' + parti[-1][0].lstrip('-'), None)]
         elif n == 'suffix' and len(parti) >= 2:
             parti = parti[:-1] + [('-' + parti[-1][0].lstrip('-'), None)]
         elif n == 'confix' and len(parti) >= 2:
