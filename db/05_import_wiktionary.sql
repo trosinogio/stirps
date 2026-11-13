@@ -392,7 +392,9 @@ begin
     -- parte del discorso non dice quale omografo è quale (brew², «ciglio di un colle», prendeva «fermentazione,
     -- infusione» di brew¹, che è registrato come verbo); vale la traduzione della glossa della voce
     and o.n = 1
-    and ((x.wpos is not null and w.pos = x.wpos)                       -- stessa parte del discorso
+    -- stessa parte del discorso; il Wikizionario scrive i numerali come aggettivi («cinque»: numero naturale che segue
+    -- quattro e precede sei), e senza questo il numerale prendeva da Wikidata «cardinale»
+    and ((x.wpos is not null and (w.pos = x.wpos or (x.wpos = 'num' and w.pos = 'adj')))
          or (x.wpos is null                                            -- voce senza parte del discorso:
              and (select count(distinct w2.pos) from stg_wikizionario w2   -- il Wikizionario deve darne una sola
                    where w2.lingua = x.lingua and w2.parola = x.lemma) = 1))
@@ -552,6 +554,7 @@ begin
       join stg_glossa_wikidata w on w.lemma = l.lemma
      where l.lingua = 'it' and l.stato_editoriale <> 'superato' and coalesce(l.glossa_lingua, '') <> 'it'
        and w.glossa ~ '^[[:lower:]]' and length(w.glossa) >= 6
+       and w.glossa !~* '^(cardinale|ordinale|numerale)$'   -- un'etichetta di categoria non è una glossa (cinque: «cardinale»)
        and not exists (select 1 from glossa g where g.lessema_id = l.id and g.lingua = 'it' and g.accezione_id is null
                         and not (g.provenienza in ('wikidata', 'traduzione-automatica', 'claude') and g.stato_editoriale = 'importato'))
        and (case w.categoria
