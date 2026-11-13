@@ -28,7 +28,9 @@ CATENA = {'inh': 'eredita', 'inh+': 'eredita', 'bor': 'prestito', 'bor+': 'prest
           'lbor': 'prestito_dotto', 'slbor': 'semidotto', 'der': 'generico', 'der+': 'generico', 'uder': 'generico',
           'cal': 'calco', 'calque': 'calco', 'sl': 'calco_semantico', 'psm': 'calco'}
 LOCALI = {'bf': 'retroformazione', 'back-form': 'retroformazione', 'clipping': 'accorciamento', 'ellipsis': 'accorciamento',
-          'named-after': 'deonimico', 'deverbal': 'derivazione'}
+          'named-after': 'deonimico', 'deverbal': 'derivazione',
+          # una voce senza etimologia che è la variante di un'altra (filtra.py, variante_di): ὄνυμα < ὄνομα
+          'variante': 'variante'}
 AFFISSI = {'af', 'affix', 'suffix', 'prefix', 'confix', 'compound', 'blend'}
 POS = {'verb': 'v.', 'adj': 'agg.', 'adv': 'avv.', 'name': 'np', 'prep': 'prep.', 'pron': 'pron.', 'conj': 'cong.',
        'intj': 'inter.', 'num': 'num.', 'det': 'det.', 'phrase': 'loc.', 'suffix': 'suff.', 'prefix': 'pref.'}
@@ -762,6 +764,15 @@ class Importatore:
                 continue
             if n in LOCALI:
                 b, lb = pulisci_parte(a.get('2') or '')
+                if b and primo and n == 'variante':
+                    # la parola di cui è variante, con la sua grafia di pagina (ὄνομᾰ → ὄνομα) e l'omografo giusto
+                    lingua_b, pagina_b, omo_b, _ = self.risolvi(lb or codice_lingua(a.get('1')) or lingua_voce, b, None)
+                    kb = self.lessema(lingua_b, pagina_b, omografo=omo_b)
+                    if kb != k0:
+                        archi.append({'etimo': kb, 'esito': k0, 'tipo': 'variante', 'ordine': 1, 'affisso': None, 'conf': 3, 'forma': None})
+                        self.stat['varianti_legate_al_lemma'] += 1
+                        primo, prec = False, kb
+                    continue
                 if b and primo:
                     kb = self.lessema(lb or codice_lingua(a.get('1')) or lingua_voce, b)
                     archi.append({'etimo': kb, 'esito': k0, 'tipo': LOCALI[n], 'ordine': 1, 'affisso': None, 'conf': 3, 'forma': None})

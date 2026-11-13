@@ -397,6 +397,38 @@ def menzione_come_der(v):
              'e': m.get('expansion', '')}]
 
 
+# Le lingue in cui una variante senza etimologia si lega al suo lemma: quelle che entrano intere (INTERE), dove la
+# voce c'è già. Altrove ogni grafia alternativa diventerebbe una voce nuova «con etimologia» (in inglese decine di migliaia)
+VARIANTI_LEGATE = set(filter(None, os.environ.get('VARIANTI_LEGATE', 'la,grc').split(',')))
+# «Epic form of πρός (prós)», «Lyric, Aeolic, and Laconian form of ὄνομᾰ», «Alternative spelling of X»
+VARIANTE_DI = re.compile(r'^(?:[A-Z][\w-]*,? (?:(?:and|or) )?)+(?:form|spelling|variant) of ([^\s(,;:]+)')
+
+
+def variante_di(v):
+    '''Una voce senza etimologia che è la variante di un'altra parola della sua lingua (ὄνυμα, «Lyric, Aeolic, and
+    Laconian form of ὄνομᾰ»; προτί, «Epic form of πρός»): un passaggio di tipo variante verso quella parola, così la
+    variante e ciò che ne discende stanno nella famiglia della parola. Solo se tutti i sensi rimandano alla stessa
+    parola, con alt_of di Kaikki o con la glossa; non per le forme flesse né per le pagine ricostruite (lì le
+    ricostruzioni alternative hanno la loro strada, VARIANTI).'''
+    sensi = v.get('senses') or []
+    if v.get('lang_code') not in VARIANTI_LEGATE or not sensi or marcata(v) \
+            or (v.get('original_title') or '').startswith('Reconstruction:'):
+        return []
+    bersagli = set()
+    for s in sensi:
+        w = next((a.get('word') for a in s.get('alt_of') or [] if a.get('word')), None)
+        if not w:
+            m = VARIANTE_DI.match((s.get('glosses') or [''])[0])
+            w = m.group(1) if m else None
+        if not w:
+            return []
+        bersagli.add(w.strip())
+    w = bersagli.pop() if len(bersagli) == 1 else ''
+    if not w or w == v.get('word') or not PAROLA_RICOSTRUITA.match(w):
+        return []
+    return [{'n': 'variante', 'a': {'1': v.get('lang_code'), '2': w}, 'e': ''}]
+
+
 def testo_come_der(v):
     """Un'etimologia scritta solo a parole, senza nessun modello: la prima frase, se è semplice. «From Latin dominus»
     (der dal latino), «From domandare» o «Deverbal of domandare» (der dalla stessa lingua), «Past participle of trovare»,
@@ -525,7 +557,7 @@ def forme_per_analisi(v):
 
 
 if __name__ == '__main__':
-    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = non_parole = dal_testo = radici_dalla_ety = 0
+    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = non_parole = dal_testo = radici_dalla_ety = varianti_legate = 0
     esempi_testo = 0
     out = open(sys.argv[1], 'w', encoding='utf-8')
     glosse = open(sys.argv[2], 'w', encoding='utf-8')
@@ -626,6 +658,11 @@ if __name__ == '__main__':
                 print('  dal testo: ' + json.dumps({'parola': v.get('word'), 'testo': (v.get('etymology_text') or '')[:160],
                                                     'modello': tpl[0]}, ensure_ascii=False), file=sys.stderr)
         if not tpl:
+            tpl = variante_di(v)
+            varianti_legate += bool(tpl)
+            if tpl and varianti_legate <= 12:
+                print(f"  variante: {v.get('word')} → {tpl[0]['a']['2']} ({((v.get('senses') or [{}])[0].get('glosses') or [''])[0][:60]})", file=sys.stderr)
+        if not tpl:
             senza += 1
             nomi = sorted({t.get('name') or '' for t in (v.get('etymology_templates') or [])} - {''})
             causa = 'modelli non letti' if nomi else 'solo testo' if (v.get('etymology_text') or '').strip() else 'nessuna etimologia'
@@ -646,7 +683,7 @@ if __name__ == '__main__':
                               'se': dati_scheda(v),
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
-    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}; con una radice dichiarata da {{{{ety}}}} {radici_dalla_ety}), forme flesse {flesse} '
+    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}; con una radice dichiarata da {{{{ety}}}} {radici_dalla_ety}; varianti senza etimologia legate al lemma {varianti_legate}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}, sigle e simboli esclusi {non_parole}', file=sys.stderr)
     if varianti_f:

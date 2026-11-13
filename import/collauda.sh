@@ -72,6 +72,16 @@ assert radici_ety(variante, 'grc') == [('ine-pro', '*dʰeyh₂-', None)], 'la ra
 assert da_ety({'args': {'1': 'grc', '2': ':from<text:from earlier>', '3': 'ζώῐ̈ον<ety:af<ζώς<ety:from<ζωός><-ῐον>>'}}, 'grc')['args']['3'] == 'ζώῐ̈ον', 'parentesi non chiuse nel dump: resta il termine'
 assert da_ety({'args': {'1': 'la', '2': ':af', '3': 'fābula<id:discourse>', '4': '-lus<alt:-la>'}}, 'la')['args'] == {'1': 'la', '2': 'fābula<id:discourse>', '3': '-lus<alt:-la>'}, 'il caso semplice non cambia'
 assert porta_etimo({'name': 'inh', 'args': {'1': 'grc', '2': 'grk-pro', '3': '', '4': '*pʰōnā́'}}), 'una forma ricostruita senza pagina è un etimo'
+# le varianti senza etimologia: ὄνυμα e προτί (96 parole sotto) erano cime, staccate da ὄνομα e da πρός
+from filtra import variante_di
+onyma = {'word': 'ὄνυμα', 'lang_code': 'grc', 'senses': [{'glosses': ['Lyric, Aeolic, and Laconian form of ὄνομᾰ (ónomă)']}]}
+assert variante_di(onyma) == [{'n': 'variante', 'a': {'1': 'grc', '2': 'ὄνομᾰ'}, 'e': ''}], variante_di(onyma)
+assert variante_di({'word': 'προτί', 'lang_code': 'grc', 'senses': [{'glosses': ['Epic form of πρός (prós)']}]})[0]['a']['2'] == 'πρός'
+assert variante_di({'word': 'caussa', 'lang_code': 'la', 'senses': [{'glosses': ['x'], 'alt_of': [{'word': 'causa'}]}]})[0]['a']['2'] == 'causa', 'alt_of di Kaikki'
+assert variante_di({'word': 'color', 'lang_code': 'en', 'senses': [{'glosses': ['x'], 'alt_of': [{'word': 'colour'}]}]}) == [], 'solo nelle lingue che entrano intere'
+assert variante_di({'word': 'x', 'lang_code': 'grc', 'senses': [{'glosses': ['Epic form of πρός']}, {'glosses': ['Doric form of ποτί']}]}) == [], 'due parole diverse: nessuna variante'
+assert variante_di({'word': 'x', 'lang_code': 'grc', 'senses': [{'glosses': ['Epic form of πρός']}, {'glosses': ['a river']}]}) == [], 'un senso proprio: non è solo una variante'
+assert variante_di({'word': 'amamus', 'lang_code': 'la', 'senses': [{'glosses': ['first-person plural of amo'], 'form_of': [{'word': 'amo'}]}]}) == [], 'una forma flessa non è una variante'
 assert not porta_etimo({'name': 'suffix', 'args': {'1': 'grc', '2': '', '3': 'τής'}}), '{{suffix|grc||τής}} non ha una base'
 assert not porta_etimo({'name': 'der', 'args': {'1': 'grc', '2': 'qsb-grc', '3': '-'}}), 'il sostrato senza parola non è un etimo'
 assert porta_etimo({'name': 'suffix', 'args': {'1': 'la', '2': 'audiēns', '3': 'ia'}}) and porta_etimo({'name': 'inh', 'args': {'1': 'it', '2': 'la', '3': 'aquila'}})
