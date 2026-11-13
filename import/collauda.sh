@@ -101,6 +101,26 @@ imp.precisa_omografe()
 etimo = {r['esito']: r['etimo'] for r in imp.relazioni}
 assert etimo[karo] == cut, '*karō punta a *(s)ker- «tagliare»'
 assert etimo[cors] == gen, 'con dichiarazioni discordi l\'arco resta sul nodo generico'
+# la glossa con cui una pagina cita il nodo generico porta a una sola omografa: la regola vale solo se, misurata sugli
+# archi che le dichiarazioni decidono, concorda abbastanza spesso; una glossa che si lega a due omografe non decide
+import wiktionary
+def omografe_per_glossa(soglia):
+    wiktionary.OMOGRAFE_PER_GLOSSA = soglia
+    imp = Importatore()
+    gen, cut, turn = imp.lessema('ine-pro', '*(s)ker-'), imp.lessema('ine-pro', '*(s)ker-', ident='cut'), imp.lessema('ine-pro', '*(s)ker-', ident='turn')
+    imp.lessemi[turn]['glosse']['to turn, bend'] += 1
+    curtus, corona, crux = imp.lessema('la', 'curtus'), imp.lessema('la', 'corona'), imp.lessema('la', 'crux')
+    arco(imp, curtus, gen); arco(imp, corona, gen); arco(imp, crux, gen)
+    imp.glossa_arco = {(curtus, gen): 'to cut off', (corona, gen): 'to bend; to turn', (crux, gen): 'to turn; to cut'}
+    imp.radici = {(curtus, cut)}
+    imp.precisa_omografe()
+    return imp, {r['esito']: r['etimo'] for r in imp.relazioni}, (gen, cut, turn, curtus, corona, crux)
+imp, etimo, (gen, cut, turn, curtus, corona, crux) = omografe_per_glossa((50, 0.9))
+assert etimo[curtus] == cut and etimo[corona] == gen and etimo[crux] == gen, 'una prova sola non basta: la glossa non sposta archi'
+assert (imp.stat['omografe_glossa_concorde'], imp.stat['omografe_glossa_in_attesa'], imp.stat['omografe_glossa_non_decide']) == (1, 1, 1), dict(imp.stat)
+imp, etimo, (gen, cut, turn, curtus, corona, crux) = omografe_per_glossa((1, 0.9))
+assert etimo[corona] == turn and etimo[crux] == gen, 'misurata, la glossa «to bend; to turn» porta a *(s)ker- «girare»; «to turn; to cut» non decide'
+wiktionary.OMOGRAFE_PER_GLOSSA = (50, 0.9)
 # audientia: il ripiego sulla radice dichiarata non sceglie a caso tra due radici
 imp = Importatore()
 aud, audience = imp.lessema('la', 'audientia'), imp.lessema('it', 'audience')

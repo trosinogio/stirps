@@ -66,7 +66,7 @@ def main():
                           if pg and any(legate(pg, parole(x)) for x in glp if parole(x))]
                 esito = 'una sola omografa' if len(legati) == 1 else 'più omografe' if legati else 'nessuna omografa'
                 generici[esito] += g['n']
-                if len(legati) == 1 and len(esempi_generici) < 15:
+                if len(legati) == 1:
                     esempi_generici.append(f"  *{g['lemma']} «{g['glossa'][:50]}» ×{g['n']} → {legati[0]} ({g['citanti'][:70]})")
             continue
         propria = next((g for g in gl if g['propria']), None)
@@ -88,7 +88,7 @@ def main():
           f'nel gruppo di senso della pagina {dentro} ({dentro / max(1, tot):.0%}), fuori {fuori_n} '
           f'({len({f[0] for f in fuori})} radici; {dict(per_lingua.most_common(5))})')
     print(f'nodi generici di radici omografe, citazioni senza identificativo per glossa: {dict(generici)}')
-    for e in esempi_generici:
+    for e in random.Random(13).sample(esempi_generici, min(40, len(esempi_generici))):
         print(e)
     fuori.sort(key=lambda f: (-f[4], f[0]))
     print('citazioni fuori dal gruppo, le più frequenti:')

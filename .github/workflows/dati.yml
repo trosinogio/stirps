@@ -233,6 +233,17 @@ jobs:
           cd import
           python3 controlla_omografe.py /tmp/glosse_radici.tsv /tmp/omografe_fuori.tsv | tee /tmp/omografe.txt
           echo "::notice title=Radici omografe::$(head -2 /tmp/omografe.txt | tr '\n' ' ')"
+          python3 -c "import json; s = json.load(open('dati/it/rapporto_parser.json')); print('::notice title=Omografe per glossa::' + str({k: v for k, v in s.items() if k.startswith('omografe')}))" || true
+
+      - name: Glosse delle radici (artefatto)
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: glosse-radici
+          path: |
+            /tmp/glosse_radici.tsv
+            /tmp/omografe_fuori.tsv
+          retention-days: 14
 
       - name: Stima dell'import
         continue-on-error: true
