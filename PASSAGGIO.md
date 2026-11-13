@@ -12,13 +12,10 @@ Questo file sta solo sul ramo `passaggio` e non va unito a `main`.
     finte, Wiktionnaire, norme sul sito, aree delle radici nell'editor, strumenti dello stemma, file per Zenodo.
     Dopo la #23: database 929 MB su 1.024, 558.507 voci.
   - PR #24: le glosse dei numerali italiani; *cinque* aveva «cardinale» da Wikidata.
-- **Da controllare subito:** la PR #24 è stata unita il 13 novembre (commit `ac5f03c`).
-  1. Il collaudo è riuscito. Leggi l'esito del workflow «Pubblica» su `main` (annotazioni Spazio, Controllo, Deploy,
-     Ramo di riserva):
-     `gh api "repos/trosinogio/stirps/actions/runs?branch=main&per_page=6"`, poi
-     `gh api repos/trosinogio/stirps/check-runs/<id del job>/annotations`.
-  2. Controlla sul sito che `/it/w/it/cinque` mostri «numero naturale che segue quattro e precede sei», e così
-     *quattro*, *uno*, *nove*, *due* (vedi «Sito pubblicato» più sotto).
+- **PR #24 pubblicata e controllata (13 novembre):**
+  - workflow «Pubblica» riuscito: 929 MB, 558.504 voci, ramo di riserva `backup-2026-11-13-1319`;
+  - sul sito *cinque*, *quattro*, *uno*, *nove* e *due* mostrano le definizioni del Wikizionario
+    («numero naturale che segue quattro e precede sei»).
 - I rami di lavoro nuovi partono da `origin/main`.
 
 ## Come lavorare con Giovanni
@@ -97,36 +94,35 @@ Questo file sta solo sul ramo `passaggio` e non va unito a `main`.
 
 ## Cose aperte (in ordine di utilità)
 
-1. **Verifica della pubblicazione della PR #24** (vedi sopra).
-2. **Glosse degli omografi in inglese.**
+1. **Glosse degli omografi in inglese.**
    - *Il problema:* circa 2.500 voci con omografi non prendono più la glossa del Wikizionario, che spesso era quella
      dell'altro omografo. Ora mostrano la glossa inglese, finché OPUS-MT non ne conferma la traduzione.
    - *Idea:* un lotto di traduzione di Claude solo per quelle voci (`import/definisci.py`, workflow Definizioni).
-3. **Radici omografe senza identificativo.**
+2. **Radici omografe senza identificativo.**
    - *I casi:*
      - *tewk-* «gonfiarsi» e *tewk-* «premere» sono un nodo solo, e sotto c'è *tъkati* «pungere»;
      - *tuber*² (un albero) sta sotto *tewh₂-*;
      - *Tityus* ha la glossa del fiume e la radice del gigante.
    - *Idea misurabile:* confrontare la glossa citata nel modello (`t=`) con quella del nodo (`legame_di_senso()`).
-4. **Linea del senso.**
+3. **Linea del senso.**
    - *Il problema:* 1.412 archi stanno nel gruppo «Senza linea di senso».
    - *Idea:* far ipotizzare a Claude il passaggio di significato, segnato ≈, misurando prima su un campione (un'analisi
      automatica si misura prima di usarla).
-5. **Numerali:** *two* e *zwei* si fermano al germanico.
+4. **Numerali:** *two* e *zwei* si fermano al germanico.
    - *Perché:*
      - *twai-* ha il trattino, e per le regole è una radice;
      - l'alto tedesco antico *zwei* non ha etimologia nel dump.
    - *Già provato:* una prova con il riquadro «PIE word» è stata ritirata, perché violava la regola delle radici.
-6. **Parentele dubbie nelle famiglie.**
+5. **Parentele dubbie nelle famiglie.**
    - *Il problema:* un'etimologia con certezza 1, promossa ad accolta, mette la parola nella famiglia (*tucca*,
      *tъkati*).
    - *Da proporre a Giovanni:* tenerle fuori da `mv_famiglia`.
-7. **Per Giovanni:**
+6. **Per Giovanni:**
    - i segreti Zenodo (`ZENODO_SANDBOX_TOKEN`, `ZENODO_TOKEN`);
    - i rami da cancellare: `analisi-forme`, `dati-analisi-forme`, `antenati-latini`, `glosse-numerali`, e alla fine
      `passaggio`;
    - le quattro questioni aperte delle norme: le proposte sono nel Claude Doc «Stirps — Norme redazionali (bozza)».
-8. Il resto è in `CLAUDE.md`, «Prossimi passi».
+7. Il resto è in `CLAUDE.md`, «Prossimi passi».
 
 ## Dove leggere i dettagli
 
