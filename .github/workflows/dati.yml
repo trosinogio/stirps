@@ -42,6 +42,8 @@ jobs:
       GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
       # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
       DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq
+      # i modelli grezzi di alcune parole, per capire perché la loro etimologia non si legge (le cime greche del 13 novembre)
+      DIAGNOSI_PAROLE: φωνή,σῆμα,ζῷον,ὄνυμα,προτί,ζώς,πρός
       # le glosse con cui le pagine citano le radici ricostruite, per il controllo delle radici omografe
       GLOSSE_RADICI: /tmp/glosse_radici.tsv
     steps:
