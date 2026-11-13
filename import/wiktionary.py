@@ -799,6 +799,11 @@ class Importatore:
                 lingua, termine, omo_t, forma_extra = self.risolvi(lingua, termine, mostra)
                 mostra = mostra or forma_extra
                 kt = self.lessema(lingua, termine, glossa=glossa_t, translit=tr, omografo=omo_t, ident=(a.get('id') or '').strip() or None)
+                if glossa_t and termine.startswith('*') and termine.endswith('-'):
+                    # per il controllo delle radici omografe (GLOSSE_RADICI): chi cita la radice, e con quale senso
+                    citanti = self.lessemi[kt].setdefault('citanti', {}).setdefault(glossa_t, [])
+                    if k0 not in citanti and len(citanti) < 5:
+                        citanti.append(k0)
                 tipo = CATENA[n]
                 # der resta indeterminato anche al primo livello: Wiktionary lo usa sia per la stessa parola
                 # per via non precisata sia per le derivazioni («from Latin vertō» per il composto verticollo)
@@ -1205,6 +1210,8 @@ class Importatore:
                 h['esito'] = base
                 self.ipotesi[base] = h
             self.lessemi[base]['glosse'].update(self.lessemi[k]['glosse'])
+            for g, citanti in self.lessemi[k].get('citanti', {}).items():
+                self.lessemi[base].setdefault('citanti', {}).setdefault(g, []).extend(citanti)
             for c in ('translit', 'pos'):
                 self.lessemi[base][c] = self.lessemi[base].get(c) or self.lessemi[k].get(c)
             del self.lessemi[k]
@@ -1561,6 +1568,18 @@ class Importatore:
             if l.get('ident'):
                 l['omografo'] = 2 + sorted(per_radice[(l['lingua'], l['lemma'])]).index(l['ident'])
         self.stat['radici_omografe_distinte'] = sum(len(v) for v in per_radice.values())
+        if os.environ.get('GLOSSE_RADICI'):
+            # le glosse candidate di ogni radice ricostruita, per import/controlla_omografe.py: radice, lingua, lemma,
+            # glossa, quante volte, se è quella della sua pagina, se la radice ha omografe dichiarate, chi la cita
+            with open(os.environ['GLOSSE_RADICI'], 'w', encoding='utf-8') as f:
+                for l in self.lessemi.values():
+                    if not (l['ricostruito'] and l['lemma'].endswith('-')):
+                        continue
+                    generico = not l.get('ident') and (l['lingua'], l['lemma']) in per_radice
+                    for g, n in l['glosse'].most_common() or ([(l['ident'], 0)] if l.get('ident') else []):
+                        f.write('\t'.join(esc(x) for x in (
+                            l['chiave'], l['lingua'], l['lemma'], g, n, 't' if g == l.get('propria') else 'f',
+                            't' if generico else 'f', ' | '.join(l.get('citanti', {}).get(g, [])[:5]))) + '\n')
         for l in self.lessemi.values():
             if l.get('ident') and not l['glosse']:
                 l['glosse'][l['ident']] += 1          # l'identificativo di Wiktionary è un'indicazione di senso: «cut»

@@ -42,6 +42,8 @@ jobs:
       GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
       # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
       DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq
+      # le glosse con cui le pagine citano le radici ricostruite, per il controllo delle radici omografe
+      GLOSSE_RADICI: /tmp/glosse_radici.tsv
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -223,6 +225,14 @@ jobs:
           python3 import/controlla_sensi.py dati/lessemi.tsv.gz dati/ipotesi.tsv.gz dati/relazioni.tsv.gz 2> /tmp/sensi.txt
           cat /tmp/sensi.txt
           echo "::notice title=Linea del senso::$(head -1 /tmp/sensi.txt) $(grep 'stessa lingua' /tmp/sensi.txt)"
+
+      - name: Radici omografe
+        continue-on-error: true
+        run: |
+          # una pagina cita una radice con un senso che non è quello della radice (*tewk- «gonfiarsi» e «premere»)?
+          cd import
+          python3 controlla_omografe.py /tmp/glosse_radici.tsv /tmp/omografe_fuori.tsv | tee /tmp/omografe.txt
+          echo "::notice title=Radici omografe::$(head -2 /tmp/omografe.txt | tr '\n' ' ')"
 
       - name: Stima dell'import
         continue-on-error: true
