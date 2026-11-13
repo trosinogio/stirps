@@ -272,14 +272,18 @@ function StemmaOrizzontale({ lang, nodi, nomi, q, lingua, livelli, onConta }: {
                   const p = d.padre!, xm = disegno.X(d) - 14;
                   const evid = d.n ? cammino.has(d.id) : false;
                   const evidR = d.n ? ricerca.percorso.has(d.id) : false;
-                  return <path key={'a' + d.id} className={`st-arco ${d.n ? classeArco(d.n.tipo) : 'e-gruppo'}${evid ? ' evid' : ''}${evidR ? ' evid-r' : ''}`}
+                  return <path key={'a' + d.id} className={`st-arco ${d.n ? classeArco(d.n.tipo) : 'e-gruppo'}${d.n?.dubbio ? ' dubbio' : ''}${evid ? ' evid' : ''}${evidR ? ' evid-r' : ''}`}
                     d={`M${disegno.X(p) + 4},${disegno.Y(p)}H${xm}V${disegno.Y(d)}H${disegno.X(d) - 4}`} />;
                 })}
+                {/* un legame dubbio (certezza 1) porta un «?» sopra l'ultimo tratto */}
+                {disegno.posati.filter((d) => d.padre && d.n?.dubbio).map((d) => (
+                  <text key={'d' + d.id} className="st-dub" x={disegno.X(d) - 9} y={disegno.Y(d) - 5} textAnchor="middle" aria-hidden="true">?</text>
+                ))}
               </g>
               <g>
                 {disegno.posati.map((d) => d.n ? (
                   <g key={'n' + d.id} className={`st-nodo ${classeRamo(d.n.ramo)}${d.n.ricostruito ? ' ric' : ''}${cammino.has(d.id) ? ' evid' : ''}${ricerca.percorso.has(d.id) ? ' evid-r' : ''}${ricerca.trovati.has(d.id) ? ' trovato' : ''}`}
-                    tabIndex={0} role="link" aria-label={`${fmt(d.n)}, ${d.n.lingua_nome}${d.n.glossa ? ': ' + d.n.glossa : ''}`}
+                    tabIndex={0} role="link" aria-label={`${fmt(d.n)}, ${d.n.lingua_nome}${d.n.glossa ? ': ' + d.n.glossa : ''}${d.n.dubbio ? ' (' + t.legameDubbio + ')' : ''}`}
                     onMouseEnter={() => setSel(d.id)} onMouseLeave={() => setSel(null)}
                     onFocus={() => setSel(d.id)} onBlur={() => setSel(null)}
                     onClick={() => vai(d.n!)}
@@ -330,6 +334,7 @@ function StemmaOrizzontale({ lang, nodi, nomi, q, lingua, livelli, onConta }: {
               {percorso.map((c, i) => (
                 <span key={c.id}>
                   {i > 0 && <span className="gt"> &gt; </span>}
+                  {i > 0 && c.dubbio && <abbr className="dub" title={t.legameDubbio}>?</abbr>}
                   {fmt(c)}
                   {i > 0 && c.tipo_etichetta && <span className="tp"> {c.tipo_etichetta}</span>}
                 </span>

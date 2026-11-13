@@ -1,7 +1,7 @@
 :root{
   color-scheme:light;
   --carta:#F5F6F8; --foglio:#FFFFFF; --ink:#1C2230; --ink-2:#4F5869; --ink-3:#7A8293;
-  --filo:#DCE0E6; --filo-2:#C3C9D3; --lapis:#2742A6; --terra:#E4E7EC;
+  --filo:#DCE0E6; --filo-2:#C3C9D3; --lapis:#2742A6; --terra:#E4E7EC; --dubbio:#8F5600;
   --italica:#A3303A; --ellenica:#2D58AB; --germanica:#22755C; --slava:#873A83; --indoiranica:#946607; --semitica:#7A522B; --proto:#666C7C;
   --serif:var(--font-serif),"Gentium Plus","Noto Serif",Georgia,serif;
   --sans:var(--font-sans),system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
@@ -12,14 +12,14 @@
   :root:not([data-theme="light"]){
     color-scheme:dark;
     --carta:#0F131A; --foglio:#151A23; --ink:#E7E9EE; --ink-2:#AAB2C1; --ink-3:#7F889A;
-    --filo:#252C39; --filo-2:#3A4354; --lapis:#93ABFF; --terra:#1C2330;
+    --filo:#252C39; --filo-2:#3A4354; --lapis:#93ABFF; --terra:#1C2330; --dubbio:#E3B852;
     --italica:#E8838B; --ellenica:#8AA8F0; --germanica:#62C4A1; --slava:#D391CE; --indoiranica:#E3B852; --semitica:#D4A273; --proto:#A3AAB8;
   }
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
   --carta:#0F131A; --foglio:#151A23; --ink:#E7E9EE; --ink-2:#AAB2C1; --ink-3:#7F889A;
-  --filo:#252C39; --filo-2:#3A4354; --lapis:#93ABFF; --terra:#1C2330;
+  --filo:#252C39; --filo-2:#3A4354; --lapis:#93ABFF; --terra:#1C2330; --dubbio:#E3B852;
   --italica:#E8838B; --ellenica:#8AA8F0; --germanica:#62C4A1; --slava:#D391CE; --indoiranica:#E3B852; --semitica:#D4A273; --proto:#A3AAB8;
 }
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -759,3 +759,11 @@ svg.ricerca:not(.selezione) .st-nodo:not(.evid-r){opacity:.4}
 
 /* l'elenco di un'area delle radici: ci si arriva con #elenco */
 #elenco{scroll-margin-top:14px}
+
+/* legami dubbi (certezza 1): un «?» nello stemma, negli elenchi e nella legenda; il tratto del legame cambia colore */
+.dub{display:inline-block;width:16px;height:16px;margin-right:5px;border:1.25px solid currentColor;border-radius:50%;font:700 11px/13.5px var(--sans);text-align:center;text-decoration:none;color:var(--dubbio);vertical-align:2px;cursor:help}
+.legenda .dub,.conti .dub{cursor:default;margin-right:0}
+.statistiche .conti.dubbie{display:inline-flex;align-items:center;gap:7px}
+.st-arco.dubbio{stroke:var(--dubbio)}
+.st-dub{font:700 11px var(--sans);fill:var(--dubbio)}
+.stemma-v li.dubbio::after{border-top-color:var(--dubbio)}

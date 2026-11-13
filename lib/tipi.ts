@@ -16,7 +16,8 @@ export interface Nodo {
   nome_proprio?: boolean;
 }
 export interface NodoCatena extends Nodo { profondita: number; esito: number; tipo: string; tipo_etichetta?: string | null; confidenza_catena: number; attestata?: { anno_da: number; anno_a: number | null; precisione: string } | null; passaggio_data?: { anno_da: number; anno_a: number | null; precisione: string | null } | null }
-export interface NodoDiscendente extends Nodo { profondita: number; etimo: number; tipo: string; tipo_etichetta?: string | null }
+/** confidenza: la certezza del passaggio dall'etimo a questa parola (1 = dubbia), non della catena intera */
+export interface NodoDiscendente extends Nodo { profondita: number; etimo: number; tipo: string; tipo_etichetta?: string | null; confidenza?: number | null }
 export interface Cognato extends Nodo { tipo: 'stretto' | 'per_prestito'; antenato_comune: Nodo; distanza: number }
 export interface Allotropo extends Nodo { antenato_comune: Nodo }
 export interface Connessione extends Nodo { tipo: string; descrizione: string }
@@ -98,6 +99,8 @@ export interface NodoPiatto {
   id: number; slug: string; lemma: string; lingua: string; lingua_sigla: string; lingua_nome: string;
   ramo: string | null; ricostruito: boolean; glossa?: string | null; nome_proprio?: boolean;
   tipo: string | null; tipo_etichetta?: string | null; padre: number | null;
+  /** il passaggio dal padre a questa parola è dubbio (certezza 1): lo stemma lo segna con «?» */
+  dubbio?: boolean;
 }
 
 /** La pronuncia di una voce, da Wiktionary: trascrizioni IPA con la varietà, sillabazione, audio di Wikimedia Commons. */

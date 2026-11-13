@@ -17,10 +17,27 @@ export function nodiFamiglia(sc: Scheda): NodoPiatto[] {
     out.push({
       id: d.id, slug: d.slug, lemma: d.lemma, lingua: d.lingua, lingua_sigla: d.lingua_sigla, lingua_nome: d.lingua_nome,
       ramo: d.ramo, ricostruito: d.ricostruito, glossa: d.glossa ?? null, nome_proprio: d.nome_proprio ?? false,
-      tipo: d.tipo, tipo_etichetta: d.tipo_etichetta ?? null, padre: d.etimo,
+      tipo: d.tipo, tipo_etichetta: d.tipo_etichetta ?? null, padre: d.etimo, dubbio: d.confidenza === 1,
     });
   }
   return out;
+}
+
+/** Le parole che stanno nella famiglia per un legame dubbio: quelle con un passaggio di certezza 1 (traho, forse da
+ *  *dʰregʰ-) e tutti i loro discendenti. */
+export function sottoDubbio(nodi: NodoPiatto[]): Set<number> {
+  const perId = new Map(nodi.map((n) => [n.id, n]));
+  const esito = new Map<number, boolean>();
+  const vale = (n: NodoPiatto): boolean => {
+    const gia = esito.get(n.id);
+    if (gia !== undefined) return gia;
+    esito.set(n.id, false);                       // contro un eventuale ciclo
+    const p = n.padre != null ? perId.get(n.padre) : undefined;
+    const r = !!n.dubbio || (!!p && vale(p));
+    esito.set(n.id, r);
+    return r;
+  };
+  return new Set(nodi.filter(vale).map((n) => n.id));
 }
 
 export function costruisciAlbero(nodi: NodoPiatto[]): { radice: NodoAlbero; tutti: Map<number, NodoAlbero> } {
