@@ -16,6 +16,9 @@ Sono testi automatici: nel dizionario portano il segno ≈ e il nome del modello
     python3 definisci.py estrai PGURL aree lotto.jsonl.gz
         Le radici ricostruite in cima a una famiglia, per l'indice delle radici: Claude assegna a ciascuna un'area di
         significato (AREE), e il risultato va nel registro dati/aree_radici.tsv.gz (l'area al posto della traduzione).
+    python3 definisci.py estrai PGURL omografi lotto.jsonl.gz
+        Le voci con omografi che hanno solo la glossa inglese (il Wikizionario ha una pagina per parola, e la sua glossa
+        andava spesso all'omografo sbagliato): Claude traduce la glossa della voce, senza definizione.
 
 Una voce senza risposta (il modello non conosce la parola con sicurezza) resta nel registro con i campi vuoti, così
 non si paga due volte.
@@ -85,6 +88,29 @@ SCHEMA_AREE = {
         'required': ['n', 'area'], 'additionalProperties': False}}},
     'required': ['voci'], 'additionalProperties': False}
 
+# Le sole glosse (lotto «omografi»): la traduzione della glossa della voce, senza definizione
+SISTEMA_GLOSSE = """Sei un lessicografo italiano. Lavori a Stirps, un dizionario etimologico in rete che per ogni parola mostra la catena degli etimi fino alla radice. Il dizionario è in italiano, ma molte voci hanno solo una glossa inglese, presa da Wiktionary: tu la traduci.
+
+Per ogni voce ricevi un numero tra parentesi quadre, la lingua, il lemma (con l’asterisco se è ricostruito), a volte la traslitterazione e la parte del discorso, e la glossa inglese. Ogni voce ha degli omografi: altre voci scritte allo stesso modo, con un’altra origine e un altro significato (in inglese «bank», la riva, e «bank», l’istituto di credito). Conta solo il significato della glossa che ricevi, non quello più comune della parola.
+
+Per ciascuna voce restituisci «traduzione»: la glossa italiana breve, come in un dizionario bilingue. Uno o più traducenti separati da virgole, i verbi all’infinito, al massimo 80 caratteri; se un traducente non c’è, una definizione di poche parole. Per una parola italiana, un sinonimo o una definizione di poche parole, mai il lemma stesso.
+
+Regole:
+- Traduci il significato della glossa, non le sue parole una per una: di una glossa lunga rendi il nucleo («A large shallow vat; a cistern, tub, or trough, used by brewers…» → «tino, vasca»).
+- Una glossa che rimanda a un’altra parola («alternative form of…», «obsolete spelling of…», «plural of…») si traduce come rimando: «variante di …», «grafia antica di …», «plurale di …», con la parola citata nella sua grafia.
+- Se la glossa non basta a capire il significato e non conosci la parola con sicurezza, lascia la traduzione vuota: una voce vuota è meglio di una voce inventata.
+- Niente etimologia, date, corsivo, grassetto o markdown; niente punto finale.
+- Scrivi in un italiano sobrio e preciso; usa l’apostrofo tipografico (’) e, per citare parole o significati, i caporali (« »). Le parole straniere citate restano nel loro alfabeto.
+- Restituisci un elemento per ogni voce ricevuta, con lo stesso numero."""
+
+SCHEMA_GLOSSE = {
+    'type': 'object',
+    'properties': {'voci': {'type': 'array', 'items': {
+        'type': 'object',
+        'properties': {'n': {'type': 'integer'}, 'traduzione': {'type': 'string'}},
+        'required': ['n', 'traduzione'], 'additionalProperties': False}}},
+    'required': ['voci'], 'additionalProperties': False}
+
 # prezzi per milione di token (ingresso, uscita, lettura della cache), prima dello sconto del 50% della Batch API
 PREZZI = {'claude-opus-5-5': (4, 20, 0.20), 'claude-sonnet-5-5': (2, 10, 0.20), 'claude-haiku-5-5': (0.10, 0.50, 0.01)}
 
@@ -136,8 +162,24 @@ SQL_AREE = SQL_RADICI.replace("json_build_object('tipo', 'radice',", "json_build
     "where " + DECLARATA + " and r.id_esterno", "where r.ricostruito and r.id_esterno")
 
 
+# Le voci importate con omografi (un'altra voce con la stessa lingua e lo stesso lemma) che hanno una glossa inglese e
+# nessuna glossa italiana: lì il Wikizionario non si usa (una pagina per parola), e resta la traduzione della glossa
+SQL_OMOGRAFI = """
+select json_build_object('tipo', 'glossa', """ + VOCE + """)::text
+from lessema r join lingua lg on lg.codice = r.lingua
+where r.provenienza in ('wiktionary', 'perseus') and r.stato_editoriale = 'importato' and r.id_esterno is not null
+  and r.glossa is not null and coalesce(r.glossa_lingua, '') <> 'it'
+  and (select count(*) from lessema o where o.lingua = r.lingua and o.lemma = r.lemma) > 1
+  and not exists (select 1 from glossa g where g.lessema_id = r.id and g.lingua = 'it' and g.accezione_id is null)
+order by r.id_esterno"""
+
+
+# il prompt e lo schema di ogni tipo di voce; gli altri tipi (radice, voce) hanno SISTEMA e SCHEMA
+PER_TIPO = {'area': (SISTEMA_AREE, SCHEMA_AREE), 'glossa': (SISTEMA_GLOSSE, SCHEMA_GLOSSE)}
+
+
 def estrai(pgurl, che, uscita):
-    sql = SQL_RADICI if che == 'radici' else SQL_AREE if che == 'aree' else SQL_CAMPIONE
+    sql = {'radici': SQL_RADICI, 'aree': SQL_AREE, 'omografi': SQL_OMOGRAFI, 'campione': SQL_CAMPIONE}[che]
     out = subprocess.run(['psql', '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1', pgurl], input=sql, capture_output=True,
                          text=True, check=True).stdout
     righe = [r for r in out.splitlines() if r.startswith('{')]
@@ -204,7 +246,7 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
             return
         # a gruppi della stessa lingua e dello stesso tipo
         da_fare.sort(key=lambda v: (v['tipo'], v['lingua'], v['chiave']))
-        k = per_richiesta or {'radice': 8, 'area': 40}.get(da_fare[0]['tipo'], 20)
+        k = per_richiesta or {'radice': 8, 'area': 40, 'glossa': 40}.get(da_fare[0]['tipo'], 20)
         gruppi, cur = [], []
         for v in da_fare:
             if cur and (len(cur) == k or cur[0]['lingua'] != v['lingua'] or cur[0]['tipo'] != v['tipo']):
@@ -213,11 +255,11 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
         gruppi.append(cur)
         richieste = [Request(custom_id=f'g{i:05d}', params=MessageCreateParamsNonStreaming(
             model=modello, max_tokens=32000,
-            system=[{'type': 'text', 'text': SISTEMA_AREE if g[0]['tipo'] == 'area' else SISTEMA,
+            system=[{'type': 'text', 'text': PER_TIPO.get(g[0]['tipo'], (SISTEMA, SCHEMA))[0],
                      'cache_control': {'type': 'ephemeral', 'ttl': '1h'}}],
             messages=[{'role': 'user', 'content': '\n\n'.join(riga(v, n) for n, v in enumerate(g, 1))}],
             output_config={'effort': sforzo, 'format': {'type': 'json_schema',
-                                                        'schema': SCHEMA_AREE if g[0]['tipo'] == 'area' else SCHEMA}}))
+                                                        'schema': PER_TIPO.get(g[0]['tipo'], (SISTEMA, SCHEMA))[1]}}))
             for i, g in enumerate(gruppi)]
         batch_id = client.messages.batches.create(requests=richieste).id
         with open(segno, 'w', encoding='utf-8') as f:
@@ -258,7 +300,9 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
                 esiti['ok' if x['area'] else 'vuote'] += 1
                 nuove[v['chiave']] = (v['originale'], x['area'], '', modello)
                 continue
-            tr, de = pulisci(x['traduzione'])[:150], pulisci(x['definizione'])[:1500]
+            tr, de = pulisci(x['traduzione'])[:150], pulisci(x.get('definizione', ''))[:1500]
+            if v['tipo'] == 'glossa':
+                tr = tr.rstrip('.')                            # una glossa non ha il punto finale
             if v.get('glossa_it'):
                 tr = ''                                        # c'è già una glossa italiana di rango più alto
             if v['lingua'] == 'italiano' and tr.lower() == v['lemma'].lower():
