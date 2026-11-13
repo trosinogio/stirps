@@ -195,6 +195,21 @@ begin
   raise exception using errcode = 'P0098', message = 'annulla';
 exception when sqlstate 'P0098' then null;
 end $$;
+do $$
+declare v_n bigint;
+begin
+  -- un numerale: il Wikizionario lo scrive come aggettivo (e come sostantivo, la cifra)
+  insert into lessema (lingua, lemma, omografo, pos, glossa, glossa_lingua, provenienza, stato_editoriale, id_esterno)
+    values ('it', 'provacinque', 1, 'num.', 'five', 'en', 'wiktionary', 'importato', 'enwikt:it:provacinque') returning id into v_n;
+  insert into stg_wikizionario values ('it', 'provacinque', 'adj', 1, 'numero naturale che segue quattro e precede sei'),
+    ('it', 'provacinque', 'noun', 1, 'cifra 5');
+  perform importa_glosse_wikizionario();
+  perform pg_temp.verifica(
+    (select testo from glossa where lessema_id = v_n and provenienza = 'wikizionario') = 'numero naturale che segue quattro e precede sei',
+    'un numerale prende la glossa dell''aggettivo del Wikizionario (cinque: «numero naturale che segue quattro e precede sei», non «cardinale» di Wikidata)');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
 select pg_temp.verifica(
   (select anno_da = 1590 and precisione = 'esatta' and provenienza = 'wiktionary' from attestazione where lessema_id = lx('it/pizza')),
   'pizza: prima attestazione 1590, secondo Wiktionary');
