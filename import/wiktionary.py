@@ -19,6 +19,9 @@ import gzip, json, re, sys, os, unicodedata
 
 # lingua delle voci da importare (codice Wiktionary): LINGUA=fr python3 wiktionary.py …
 LINGUA = os.environ.get('LINGUA', 'it')
+# radici omografe precisate dalla glossa citata: almeno quante prove, e quale accordo con le dichiarazioni {{root}}
+OMOGRAFE_PER_GLOSSA = (50, 0.9)
+from controlla_sensi import legate, parole
 from collections import Counter, defaultdict
 
 CATENA = {'inh': 'eredita', 'inh+': 'eredita', 'bor': 'prestito', 'bor+': 'prestito', 'ubor': 'prestito', 'obor': 'prestito',
@@ -536,6 +539,7 @@ class Importatore:
         self.relazioni = []          # archi delle voci italiane
         self.intermedi = defaultdict(Counter)   # esito -> Counter((etimo, tipo, conf, forma))
         self.doppioni, self.radici = set(), set()
+        self.glossa_arco = {}                   # (esito, radice citata) -> la glossa con cui la pagina la cita (t=)
         self.formazioni_ambigue = set()   # voci formate con un prefisso o da più basi (Εὔβοια = εὐ- + βοῦς)
         self.chiusura = {}           # lingua -> indici delle voci di chiusura
         self.participi = set()       # (lingua, pagina) dei participi citati come etimi
@@ -799,6 +803,11 @@ class Importatore:
                 lingua, termine, omo_t, forma_extra = self.risolvi(lingua, termine, mostra)
                 mostra = mostra or forma_extra
                 kt = self.lessema(lingua, termine, glossa=glossa_t, translit=tr, omografo=omo_t, ident=(a.get('id') or '').strip() or None)
+                if glossa_t and termine.startswith('*') and termine.endswith('-'):
+                    # per il controllo delle radici omografe (GLOSSE_RADICI): chi cita la radice, e con quale senso
+                    citanti = self.lessemi[kt].setdefault('citanti', {}).setdefault(glossa_t, [])
+                    if k0 not in citanti and len(citanti) < 5:
+                        citanti.append(k0)
                 tipo = CATENA[n]
                 # der resta indeterminato anche al primo livello: Wiktionary lo usa sia per la stessa parola
                 # per via non precisata sia per le derivazioni («from Latin vertō» per il composto verticollo)
@@ -816,6 +825,8 @@ class Importatore:
                     if kt != k0:
                         archi.append({'etimo': kt, 'esito': k0, 'tipo': tipo, 'ordine': 1, 'affisso': None,
                                       'conf': min(conf, conf_voce), 'forma': mostra})
+                        if glossa_t and termine.startswith('*') and termine.endswith('-'):
+                            self.glossa_arco.setdefault((k0, kt), glossa_t)
                     primo, prec = False, kt
                     continue
                 # «три (… ultimately from *tréyes) + зуб (… ultimately from *ǵómbʰos)»: dopo un «+», o dentro una
@@ -842,6 +853,8 @@ class Importatore:
                 if kt != prec:
                     self.intermedi[prec][(kt, tipo, conf, mostra)] += 1
                     self.stat['anelli_intermedi'] += 1
+                    if glossa_t and termine.startswith('*') and termine.endswith('-'):
+                        self.glossa_arco.setdefault((prec, kt), glossa_t)
                 prec = kt
         if k0 not in self.attestazioni:
             d = data_prosa(testo)
@@ -1205,6 +1218,8 @@ class Importatore:
                 h['esito'] = base
                 self.ipotesi[base] = h
             self.lessemi[base]['glosse'].update(self.lessemi[k]['glosse'])
+            for g, citanti in self.lessemi[k].get('citanti', {}).items():
+                self.lessemi[base].setdefault('citanti', {}).setdefault(g, []).extend(citanti)
             for c in ('translit', 'pos'):
                 self.lessemi[base][c] = self.lessemi[base].get(c) or self.lessemi[k].get(c)
             del self.lessemi[k]
@@ -1217,6 +1232,7 @@ class Importatore:
                     nuovi[m(esito)][(m(etimo), tipo, conf, forma)] += n
         self.intermedi = nuovi
         self.radici = {(m(a), m(b)) for a, b in self.radici}
+        self.glossa_arco = {(m(a), m(b)): g for (a, b), g in self.glossa_arco.items()}
         self.doppioni = {(m(a), m(b)) for a, b in self.doppioni}
         self.formazioni_ambigue = {m(k) for k in self.formazioni_ambigue}
         self.stat['identificativi_uniti'] = len(mappa)
@@ -1285,12 +1301,44 @@ class Importatore:
                     break
                 k = r['etimo']
                 visti.add(k)
+        # La glossa con cui la pagina cita il nodo generico (carne: *(s)ker- «to cut off») porta a una sola delle
+        # omografe (*(s)ker-@cut, non @turn)? Una linea di senso con il suo identificativo o con le sue glosse, e con
+        # nessun'altra. Prima di usarla la regola si misura sugli archi che le dichiarazioni {{root}} decidono da sole:
+        # vale solo se concorda con loro almeno nove volte su dieci, su almeno 50 archi (OMOGRAFE_PER_GLOSSA).
+        sensi = {k: [p for p in (parole(x) for x in [self.lessemi[k].get('ident') or ''] + list(self.lessemi[k]['glosse'])) if p]
+                 for ks in varianti.values() for k in ks}
+        per_glossa = {}
+        for r in self.relazioni:
+            if r['etimo'] not in varianti or accolte.get(r['esito']) != r['ipotesi']:
+                continue
+            pg = parole(self.glossa_arco.get((r['esito'], r['etimo'])) or '')
+            if not pg:
+                continue
+            legati = [k for k in sorted(varianti[r['etimo']]) if any(legate(pg, s) for s in sensi[k])]
+            if len(legati) == 1:
+                per_glossa[id(r)] = (r, legati[0])
+            else:
+                self.stat['omografe_glossa_non_decide'] += 1
+        for rid, (r, k) in per_glossa.items():
+            if rid in voti and len(voti[rid]) == 1:
+                self.stat['omografe_glossa_concorde' if next(iter(voti[rid])) == k else 'omografe_glossa_discorde'] += 1
+        prove = self.stat['omografe_glossa_concorde'] + self.stat['omografe_glossa_discorde']
+        vale = prove >= OMOGRAFE_PER_GLOSSA[0] and self.stat['omografe_glossa_concorde'] >= OMOGRAFE_PER_GLOSSA[1] * prove
         for rid, conta in voti.items():
             if len(conta) == 1:
                 archi[rid]['etimo'] = next(iter(conta))
                 self.stat['omografe_precisate'] += 1
             else:
                 self.stat['omografe_ambigue'] += 1
+        for rid, (r, k) in per_glossa.items():
+            if rid in voti and len(voti[rid]) == 1:
+                continue                        # l'ha già decisa la dichiarazione
+            if rid in voti and k not in voti[rid]:
+                self.stat['omografe_glossa_contro_le_dichiarazioni'] += 1
+                continue                        # le parole sotto dichiarano altre omografe: resta com'è
+            self.stat['omografe_glossa_' + ('precisate' if vale else 'in_attesa')] += 1
+            if vale:
+                r['etimo'] = k
 
     def togli_archi_impossibili(self):
         """Ultimo controllo su tutti gli archi (arco_impossibile): quelli che non possono stare escono, e con loro le
@@ -1561,6 +1609,18 @@ class Importatore:
             if l.get('ident'):
                 l['omografo'] = 2 + sorted(per_radice[(l['lingua'], l['lemma'])]).index(l['ident'])
         self.stat['radici_omografe_distinte'] = sum(len(v) for v in per_radice.values())
+        if os.environ.get('GLOSSE_RADICI'):
+            # le glosse candidate di ogni radice ricostruita, per import/controlla_omografe.py: radice, lingua, lemma,
+            # glossa, quante volte, se è quella della sua pagina, se la radice ha omografe dichiarate, chi la cita
+            with open(os.environ['GLOSSE_RADICI'], 'w', encoding='utf-8') as f:
+                for l in self.lessemi.values():
+                    if not (l['ricostruito'] and l['lemma'].endswith('-')):
+                        continue
+                    generico = not l.get('ident') and (l['lingua'], l['lemma']) in per_radice
+                    for g, n in l['glosse'].most_common() or ([(l['ident'], 0)] if l.get('ident') else []):
+                        f.write('\t'.join(esc(x) for x in (
+                            l['chiave'], l['lingua'], l['lemma'], g, n, 't' if g == l.get('propria') else 'f',
+                            't' if generico else 'f', ' | '.join(l.get('citanti', {}).get(g, [])[:5]))) + '\n')
         for l in self.lessemi.values():
             if l.get('ident') and not l['glosse']:
                 l['glosse'][l['ident']] += 1          # l'identificativo di Wiktionary è un'indicazione di senso: «cut»
