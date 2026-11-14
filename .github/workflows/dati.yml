@@ -237,6 +237,26 @@ jobs:
           echo "::notice title=Radici omografe::$(head -2 /tmp/omografe.txt | tr '\n' ' ')"
           python3 -c "import json; s = json.load(open('dati/it/rapporto_parser.json')); print('::notice title=Omografe per glossa::' + str({k: v for k, v in s.items() if k.startswith('omografe')}))" || true
 
+      - name: Discendenti dichiarati
+        continue-on-error: true
+        run: |
+          # l'albero dei discendenti di Wiktionary concorda con le etimologie che abbiamo già? (misura, prima di usarlo)
+          cd import
+          python3 controlla_discendenti.py dati/it/tsv 'dati/*/discendenti.tsv' /tmp/discendenti_archi.tsv | tee /tmp/discendenti.txt
+          echo "::notice title=Discendenti::$(head -2 /tmp/discendenti.txt | tr '\n' ' ')"
+          cat dati/*/discendenti.tsv | gzip -9 > /tmp/discendenti.tsv.gz
+
+      - name: Discendenti (artefatto)
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: discendenti
+          path: |
+            /tmp/discendenti.txt
+            /tmp/discendenti_archi.tsv
+            /tmp/discendenti.tsv.gz
+          retention-days: 14
+
       - name: Glosse delle radici (artefatto)
         continue-on-error: true
         uses: actions/upload-artifact@v4
