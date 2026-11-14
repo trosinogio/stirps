@@ -1,0 +1,85 @@
+# Prova dell'import su un ramo di Neon creato dalla produzione e cancellato alla fine: la fotografia prima, l'import,
+# il confronto dopo, con i cancelli che fermano (scripts/prova-import.sh, import/PROGRAMMA.md). La produzione non si tocca:
+# il ramo è una copia. Parte da sé per le pull request verso main che cambiano i dati o la logica dell'import, con un
+# push su un ramo prova-import-*, oppure a mano dalla scheda Actions.
+# Richiede i segreti NEON_API_KEY e DATABASE_URL_UNPOOLED (quello della produzione: serve solo per riconoscerla e rifiutarla).
+name: Prova dell'import
+on:
+  push:
+    branches: ['prova-import-*']
+  pull_request:
+    branches: [main]
+    paths: ['dati/**', 'db/05_import_wiktionary.sql', 'db/aggiornamenti/**', 'db/prove/**', 'scripts/inizializza-db.mjs', 'scripts/prova-import.sh']
+  workflow_dispatch:
+concurrency:
+  group: prova-import-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+env:
+  PROGETTO_NEON: aged-truth-35630140
+  RAMO_NEON: production
+  NEON_CLI: neon@9.5.0
+jobs:
+  prova:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Dipendenze
+        run: |
+          npm ci --no-audit --no-fund > /dev/null
+          command -v psql > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client > /dev/null; }
+
+      - name: Ramo di prova su Neon
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          if [ -z "$NEON_API_KEY" ]; then echo "::error title=Prova dell'import::manca il segreto NEON_API_KEY"; exit 1; fi
+          nome="prova-import-${GITHUB_RUN_ID}"
+          scade=$(date -u -d '+1 day' +%Y-%m-%dT%H:%M:%SZ)     # se la cancellazione finale non riesce, il ramo scade da sé
+          npx -y "$NEON_CLI" branches create --project-id "$PROGETTO_NEON" --name "$nome" --parent "$RAMO_NEON" \
+            --expires-at "$scade" --no-analytics --output json > /tmp/ramo.json
+          echo "RAMO_PROVA=$nome" >> "$GITHUB_ENV"
+          # la stringa di connessione diretta del ramo: non va mai nel registro
+          url=$(npx -y "$NEON_CLI" connection-string "$nome" --project-id "$PROGETTO_NEON" --no-analytics)
+          echo "::add-mask::$url"
+          echo "URL_PROVA=$url" >> "$GITHUB_ENV"
+          echo "::notice title=Ramo di prova::$nome (copia di $RAMO_NEON, scade tra un giorno)"
+
+      - name: Prova dell'import
+        env:
+          DATABASE_URL_PRODUZIONE: ${{ secrets.DATABASE_URL_UNPOOLED }}
+        run: |
+          export HOST_PRODUZIONE=$(node -e 'console.log(new URL(process.argv[1]).hostname)' "$DATABASE_URL_PRODUZIONE")
+          set +e
+          DATABASE_URL="$URL_PROVA" REGISTRO=/tmp/import.log scripts/prova-import.sh 2>&1 | tee /tmp/prova.txt
+          esito=${PIPESTATUS[0]}
+          set -e
+          {
+            echo "### Prova dell'import ($RAMO_PROVA)"
+            echo '```'
+            sed -n '/^== PRIMA/,$p' /tmp/prova.txt | cut -c1-400
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=Import::$(grep -m1 'import riuscito' /tmp/prova.txt || echo 'import non riuscito'); $(grep -m1 '^\[db\] spazio' /tmp/prova.txt || true)"
+          echo "::notice title=Voci ed etimologie::$(grep -m1 '^voci:' /tmp/prova.txt || true) — $(grep -m1 '^etimologie accolte:' /tmp/prova.txt || true)"
+          echo "::notice title=Glosse e redazione::$(grep -m1 '^glosse italiane:' /tmp/prova.txt || true) — $(grep -m1 '^definizioni:' /tmp/prova.txt || true) — $(grep -m1 '^redazione:' /tmp/prova.txt || true)"
+          grep '^FERMA' /tmp/prova.txt | while IFS= read -r r; do echo "::error title=Cancello::$r"; done
+          [ "$esito" = 0 ] && echo "::notice title=Cancelli::tutti i cancelli passano"
+          exit "$esito"
+
+      - name: Cancella il ramo di prova
+        if: always() && env.RAMO_PROVA != ''
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          for i in 1 2 3; do
+            npx -y "$NEON_CLI" branches delete "$RAMO_PROVA" --project-id "$PROGETTO_NEON" --no-analytics > /dev/null && { echo "ramo $RAMO_PROVA cancellato"; exit 0; }
+            sleep $((i * 10))
+          done
+          echo "::warning title=Ramo di prova::$RAMO_PROVA non cancellato: scade da sé tra un giorno"
