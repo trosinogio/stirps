@@ -52,6 +52,50 @@ assert da_ety({'args': {'1': 'grc', '2': ':af', '3': 'κατά', '4': 'βαίν�
 assert da_ety({'args': {'1': 'la', '2': ':inh', '3': 'itc-pro:<id:x>'}}, 'la') is None, 'un termine vuoto non è un etimo'
 from filtra import porta_etimo
 assert not porta_etimo({'name': 'suffix', 'args': {'1': 'la', '2': '-ia'}}), '{{suffix|la|-ia}} senza base non dà un etimo: vale {{ety}}'
+# la sintassi ad albero di {{ety}}/{{etymon}}: i termini portano la loro etimologia annidata (φωνή, μύω, κριτής, φίλος
+# erano cime senza etimologia: l'etimo diventava «<ety:der<ine-pro:*bʰeh₂->>», e il suffisso -τής una parola)
+from filtra import radici_ety
+fone = {'args': {'1': 'grc', '2': ':inh', '3': 'grk-pro:<alt:*pʰōnā́><ety:der<ine-pro:*bʰeh₂-<id:speak>>>', 'id': 'sound'}}
+assert da_ety(fone, 'grc')['args'] == {'1': 'grc', '2': 'grk-pro', '3': '*pʰōnā́'}, da_ety(fone, 'grc')
+assert radici_ety(fone, 'grc') == [('ine-pro', '*bʰeh₂-', 'speak')], 'la radice dichiarata nell\'albero, con il suo identificativo'
+assert da_ety({'args': {'1': 'grc', '2': ':af', '3': '<alt:κρῐ-><ety:from<κρῑ́νω>>', '4': '-τής'}}, 'grc')['args'] == {'1': 'grc', '2': 'κρῑ́νω', '3': '-τής'}, 'il tema κρῐ- non è una voce: vale κρίνω'
+myo = {'args': {'1': 'grc', '2': ':der', '3': 'ine-pro:<alt:*mewH-ye-><ety:from<*mewH->>'}}
+assert da_ety(myo, 'grc')['args']['3'] == '*mewH-ye-' and radici_ety(myo, 'grc') == [('ine-pro', '*mewH-', None)], 'il tema *mewH-ye- non è una radice'
+filos = {'args': {'1': 'grc', '2': ':inh', '3': 'ine-pro:<alt:*bʰil-o-s><ety:af<*bʰil-><*-os<id:athematic>>>', 'id': 'dear'}}
+assert da_ety(filos, 'grc')['args']['3'] == '*bʰil-o-s' and radici_ety(filos, 'grc') == [('ine-pro', '*bʰil-', None)], 'il suffisso *-os non è una radice'
+assert radici_ety({'args': {'1': 'it', '2': ':influence', '3': 'ine-pro:*bʰer-'}}, 'it') == [], ':influence non dichiara una radice'
+sema = {'args': {'1': 'grc', '2': ':inh<unc:1>', '3': 'grk-pro:<alt:*tsā́mə><ety:inh<ine-pro:<alt:*dʰyéh₂mn̥><ety:af<ine-pro:<alt:*dʰyeh₂-><ety:from<*dʰeyh₂-<pos:root><unc:1>>>><*-mn̥>>>>', '4': ':afeq', '5': '-μα'}}
+assert radici_ety(sema, 'grc') == [], 'un\'etimologia incerta (σῆμα) non dichiara una radice'
+assert da_ety(sema, 'grc')['args'] == {'1': 'grc', '2': 'grk-pro', '3': '*tsā́mə'}, da_ety(sema, 'grc')
+variante = {'args': {'1': 'grc', '2': ':inh', '3': 'ine-pro:<alt:*dʰyéh₂mn̥><ety:af<ine-pro:<alt:*dʰyeh₂-><ety:from<*dʰeyh₂->>><*-mn̥>>'}}
+assert radici_ety(variante, 'grc') == [('ine-pro', '*dʰeyh₂-', None)], 'la radice è la più profonda: *dʰyeh₂- viene da *dʰeyh₂-'
+assert da_ety({'args': {'1': 'grc', '2': ':from<text:from earlier>', '3': 'ζώῐ̈ον<ety:af<ζώς<ety:from<ζωός><-ῐον>>'}}, 'grc')['args']['3'] == 'ζώῐ̈ον', 'parentesi non chiuse nel dump: resta il termine'
+assert da_ety({'args': {'1': 'la', '2': ':af', '3': 'fābula<id:discourse>', '4': '-lus<alt:-la>'}}, 'la')['args'] == {'1': 'la', '2': 'fābula<id:discourse>', '3': '-lus<alt:-la>'}, 'il caso semplice non cambia'
+assert porta_etimo({'name': 'inh', 'args': {'1': 'grc', '2': 'grk-pro', '3': '', '4': '*pʰōnā́'}}), 'una forma ricostruita senza pagina è un etimo'
+# le varianti senza etimologia: ὄνυμα e προτί (96 parole sotto) erano cime, staccate da ὄνομα e da πρός
+from filtra import variante_di
+onyma = {'word': 'ὄνυμα', 'lang_code': 'grc', 'senses': [{'glosses': ['Lyric, Aeolic, and Laconian form of ὄνομᾰ (ónomă)']}]}
+assert variante_di(onyma) == [{'n': 'variante', 'a': {'1': 'grc', '2': 'ὄνομᾰ'}, 'e': ''}], variante_di(onyma)
+assert variante_di({'word': 'προτί', 'lang_code': 'grc', 'senses': [{'glosses': ['Epic form of πρός (prós)']}]})[0]['a']['2'] == 'πρός'
+assert variante_di({'word': 'caussa', 'lang_code': 'la', 'senses': [{'glosses': ['x'], 'alt_of': [{'word': 'causa'}]}]})[0]['a']['2'] == 'causa', 'alt_of di Kaikki'
+assert variante_di({'word': 'color', 'lang_code': 'en', 'senses': [{'glosses': ['x'], 'alt_of': [{'word': 'colour'}]}]}) == [], 'solo nelle lingue che entrano intere'
+assert variante_di({'word': 'x', 'lang_code': 'grc', 'senses': [{'glosses': ['Epic form of πρός']}, {'glosses': ['Doric form of ποτί']}]}) == [], 'due parole diverse: nessuna variante'
+assert variante_di({'word': 'x', 'lang_code': 'grc', 'senses': [{'glosses': ['Epic form of πρός']}, {'glosses': ['a river']}]}) == [], 'un senso proprio: non è solo una variante'
+assert variante_di({'word': 'amamus', 'lang_code': 'la', 'senses': [{'glosses': ['first-person plural of amo'], 'form_of': [{'word': 'amo'}]}]}) == [], 'una forma flessa non è una variante'
+assert not porta_etimo({'name': 'suffix', 'args': {'1': 'grc', '2': '', '3': 'τής'}}), '{{suffix|grc||τής}} non ha una base'
+assert not porta_etimo({'name': 'der', 'args': {'1': 'grc', '2': 'qsb-grc', '3': '-'}}), 'il sostrato senza parola non è un etimo'
+# più forme in <alt:>: la prima; una frase al posto del termine non è un etimo
+from filtra import termine_ety, base_dalla_menzione
+assert termine_ety('itc-ala:<alt:*iowos, *iowez->', 'la')[:2] == ('itc-ala', '*iowos') and termine_ety('ine-pro:<alt:*h₂ér-ti-s ~ *h₂r̥-téy-s>', 'x')[1] == '*h₂ér-ti-s'
+assert da_ety({'args': {'1': 'la', '2': ':from', '3': 'trivius and trivium'}}, 'la') is None, 'una frase non è un etimo'
+# «lie + -ing» scritto {{m|en|lie}} {{suffix|en||ing}}: la base è la menzione che precede
+lying = {'etymology_templates': [{'name': 'm', 'args': {'1': 'en', '2': 'lie', '4': 'to rest'}}, {'name': 'suffix', 'args': {'1': 'en', '2': '', '3': 'ing'}}]}
+assert base_dalla_menzione(lying, 'en')['args'] == {'1': 'en', '2': 'lie', '3': '-ing'}
+prec = {'etymology_templates': [{'name': 'm', 'args': {'1': 'it', '2': 'precoce'}}, {'name': 'm', 'args': {'1': 'it', '2': '-izzare'}}, {'name': 'suf', 'args': {'1': 'it', '2': '', '3': 'ante'}}]}
+assert base_dalla_menzione(prec, 'it')['args']['2'] == 'precoce', 'un affisso menzionato non è la base'
+sed = {'etymology_templates': [{'name': 'der', 'args': {'1': 'en', '2': 'la', '3': '', '4': 'sēduct-'}}, {'name': 'm', 'args': {'1': 'la', '2': 'sēdūcere'}}, {'name': 'suffix', 'args': {'1': 'en', '2': '', '3': 'ive'}}]}
+assert base_dalla_menzione(sed, 'en')['args'] == {'1': 'en', '2': 'la:sēdūcere', '3': '-ive'}
+assert base_dalla_menzione({'etymology_templates': [{'name': 'suffix', 'args': {'1': 'it', '2': '', '3': 'metro'}}]}, 'it') is None, 'senza una menzione il suffisso resta solo'
 assert porta_etimo({'name': 'suffix', 'args': {'1': 'la', '2': 'audiēns', '3': 'ia'}}) and porta_etimo({'name': 'inh', 'args': {'1': 'it', '2': 'la', '3': 'aquila'}})
 from wiktionary import lemma_valido, senza_albero
 # l'albero etimologico appiattito prima del testo di Wiktionary non è testo

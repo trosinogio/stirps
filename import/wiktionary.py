@@ -28,7 +28,9 @@ CATENA = {'inh': 'eredita', 'inh+': 'eredita', 'bor': 'prestito', 'bor+': 'prest
           'lbor': 'prestito_dotto', 'slbor': 'semidotto', 'der': 'generico', 'der+': 'generico', 'uder': 'generico',
           'cal': 'calco', 'calque': 'calco', 'sl': 'calco_semantico', 'psm': 'calco'}
 LOCALI = {'bf': 'retroformazione', 'back-form': 'retroformazione', 'clipping': 'accorciamento', 'ellipsis': 'accorciamento',
-          'named-after': 'deonimico', 'deverbal': 'derivazione'}
+          'named-after': 'deonimico', 'deverbal': 'derivazione',
+          # una voce senza etimologia che è la variante di un'altra (filtra.py, variante_di): ὄνυμα < ὄνομα
+          'variante': 'variante'}
 AFFISSI = {'af', 'affix', 'suffix', 'prefix', 'confix', 'compound', 'blend'}
 POS = {'verb': 'v.', 'adj': 'agg.', 'adv': 'avv.', 'name': 'np', 'prep': 'prep.', 'pron': 'pron.', 'conj': 'cong.',
        'intj': 'inter.', 'num': 'num.', 'det': 'det.', 'phrase': 'loc.', 'suffix': 'suff.', 'prefix': 'pref.'}
@@ -762,6 +764,15 @@ class Importatore:
                 continue
             if n in LOCALI:
                 b, lb = pulisci_parte(a.get('2') or '')
+                if b and primo and n == 'variante':
+                    # la parola di cui è variante, con la sua grafia di pagina (ὄνομᾰ → ὄνομα) e l'omografo giusto
+                    lingua_b, pagina_b, omo_b, _ = self.risolvi(lb or codice_lingua(a.get('1')) or lingua_voce, b, None)
+                    kb = self.lessema(lingua_b, pagina_b, omografo=omo_b)
+                    if kb != k0:
+                        archi.append({'etimo': kb, 'esito': k0, 'tipo': 'variante', 'ordine': 1, 'affisso': None, 'conf': 3, 'forma': None})
+                        self.stat['varianti_legate_al_lemma'] += 1
+                        primo, prec = False, kb
+                    continue
                 if b and primo:
                     kb = self.lessema(lb or codice_lingua(a.get('1')) or lingua_voce, b)
                     archi.append({'etimo': kb, 'esito': k0, 'tipo': LOCALI[n], 'ordine': 1, 'affisso': None, 'conf': 3, 'forma': None})
@@ -770,10 +781,14 @@ class Importatore:
             if n in CATENA:
                 lingua, termine = codice_lingua(a.get('2')), (a.get('3') or '').strip()
                 if not termine:
-                    termine = (a.get('4') or '').strip()     # {{inh|it|la-vul||*terraceus}}: forma senza pagina
+                    # {{inh|it|la-vul||*terraceus}}: forma senza pagina; di più forme («*h₂ér-ti-s ~ *h₂r̥-téy-s») la prima
+                    termine = re.split(r'\s*[~;]\s*|,\s+(?=\*)', (a.get('4') or '').strip(), maxsplit=1)[0].strip()
                 if not lingua or not termine or termine == '-':
                     continue
                 termine = pulisci_parte(termine)[0]
+                if '<' in termine or '>' in termine:
+                    self.stat['termini_con_modificatori_annidati'] += 1
+                    continue
                 if ',' in termine:
                     # sintassi recente: più forme nello stesso template («ἀββα,ἀββᾶς»); vale quella già nota
                     parti = [x.strip() for x in termine.split(',') if x.strip()]
@@ -1163,6 +1178,9 @@ class Importatore:
         parti = [(p, l or lingue_parti.get(i + 1)) for i, (p, l) in enumerate(parti)]
         if n == 'prefix' and parti:
             parti = [(parti[0][0].rstrip('-') + '-', None)] + parti[1:]
+        elif n == 'suffix' and parti and num[0][0] >= 3:
+            # {{suffix|grc||τής}} (κριτής): la base manca, l'argomento che c'è è il suffisso e non una parola
+            parti = parti[:-1] + [('-' + parti[-1][0].lstrip('-'), None)]
         elif n == 'suffix' and len(parti) >= 2:
             parti = parti[:-1] + [('-' + parti[-1][0].lstrip('-'), None)]
         elif n == 'confix' and len(parti) >= 2:
@@ -1483,8 +1501,8 @@ class Importatore:
                 # Εὔβοια dichiara *h₁es- per il prefisso εὐ-, ma la catena sale per βοῦς: la radice non va in cima
                 self.stat['radici_ambigue_non_attaccate'] += 1
                 continue
-            if cima in accolte or any(h['esito'] == cima for h in self.ipotesi.values() if h['stato'] == 'accolta'):
-                continue
+            if cima in accolte:
+                continue                        # «accolte» ha già tutti gli esiti delle ipotesi accolte: niente ripassi
             if forma_ricostruita(self.lessemi[cima]) == 'radice':
                 self.stat['radici_dichiarate_in_conflitto'] += 1   # una radice non discende da un'altra radice
                 continue
@@ -1771,17 +1789,28 @@ if __name__ == '__main__':
         if p[1]:
             completa_glosse(imp, p[1], lingua)
     imp.nomi_tedeschi()
-    imp.unisci_identificativi()
-    imp.risolvi_intermedi()
-    imp.precisa_omografe()
-    imp.elementi_di_composizione()
-    imp.unisci_varianti()
-    imp.chiudi_su_radici()
-    imp.togli_cicli()
-    imp.aggiungi_lemmi_interi()
+    # i passi dopo la lettura, ciascuno con i suoi secondi e il picco di memoria: se un passo scala male (o la
+    # macchina del workflow si ferma), il registro dice quale
+    import resource, time
+
+    def passo(nome, f, *a):
+        t0 = time.time()
+        r = f(*a)
+        print(f'[parser] {nome}: {time.time() - t0:.0f} s, picco {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1048576:.1f} GB, '
+              f'{len(imp.lessemi)} voci, {len(imp.relazioni)} passaggi', file=sys.stderr, flush=True)
+        return r
+    passo('letture', lambda: None)
+    passo('unisci_identificativi', imp.unisci_identificativi)
+    passo('risolvi_intermedi', imp.risolvi_intermedi)
+    passo('precisa_omografe', imp.precisa_omografe)
+    passo('elementi_di_composizione', imp.elementi_di_composizione)
+    passo('unisci_varianti', imp.unisci_varianti)
+    passo('chiudi_su_radici', imp.chiudi_su_radici)
+    passo('togli_cicli', imp.togli_cicli)
+    passo('aggiungi_lemmi_interi', imp.aggiungi_lemmi_interi)
     if len(args) > 2:
-        imp.aggiungi_lemmi_comuni(LINGUA, args[2])
-    imp.togli_archi_impossibili()
-    imp.togli_non_validi()
-    st = imp.scrivi(args[1])
+        passo('aggiungi_lemmi_comuni', imp.aggiungi_lemmi_comuni, LINGUA, args[2])
+    passo('togli_archi_impossibili', imp.togli_archi_impossibili)
+    passo('togli_non_validi', imp.togli_non_validi)
+    st = passo('scrivi', imp.scrivi, args[1])
     print(json.dumps(dict(st), indent=1))
