@@ -16,6 +16,17 @@ Sono testi automatici: nel dizionario portano il segno ≈ e il nome del modello
     python3 definisci.py estrai PGURL aree lotto.jsonl.gz
         Le radici ricostruite in cima a una famiglia, per l'indice delle radici: Claude assegna a ciascuna un'area di
         significato (AREE), e il risultato va nel registro dati/aree_radici.tsv.gz (l'area al posto della traduzione).
+    python3 definisci.py estrai PGURL omografi lotto.jsonl.gz
+        Le voci con omografi che hanno solo la glossa inglese (il Wikizionario ha una pagina per parola, e la sua glossa
+        andava spesso all'omografo sbagliato): Claude traduce la glossa della voce, senza definizione.
+
+    python3 definisci.py blocchi lotto.jsonl.gz cartella [--per-blocco 500]
+    python3 definisci.py raccogli lotto.jsonl.gz cartella MODELLO uscita.tsv.gz [--registro dati/definizioni.tsv.gz]
+        Senza la Batch API: il lotto diviso in blocchi (cartella/blocco_NN.txt, con le istruzioni e le voci numerate),
+        che traducono degli agenti di Claude Code, uno per blocco, scrivendo cartella/esito_NN.tsv (numero, tabulazione,
+        traduzione). «raccogli» controlla ogni esito (una riga per voce, numeri giusti) e scrive l'uscita nel formato
+        del registro; un blocco con difetti ferma tutto, e le voci che il registro ha già non si riscrivono. Vale per
+        i lotti di sole glosse (omografi): il 14 novembre 2026, 14.869 voci in 30 blocchi con Haiku 5.5.
 
 Una voce senza risposta (il modello non conosce la parola con sicurezza) resta nel registro con i campi vuoti, così
 non si paga due volte.
@@ -85,6 +96,29 @@ SCHEMA_AREE = {
         'required': ['n', 'area'], 'additionalProperties': False}}},
     'required': ['voci'], 'additionalProperties': False}
 
+# Le sole glosse (lotto «omografi»): la traduzione della glossa della voce, senza definizione
+SISTEMA_GLOSSE = """Sei un lessicografo italiano. Lavori a Stirps, un dizionario etimologico in rete che per ogni parola mostra la catena degli etimi fino alla radice. Il dizionario è in italiano, ma molte voci hanno solo una glossa inglese, presa da Wiktionary: tu la traduci.
+
+Per ogni voce ricevi un numero tra parentesi quadre, la lingua, il lemma (con l’asterisco se è ricostruito), a volte la traslitterazione e la parte del discorso, e la glossa inglese. Ogni voce ha degli omografi: altre voci scritte allo stesso modo, con un’altra origine e un altro significato (in inglese «bank», la riva, e «bank», l’istituto di credito). Conta solo il significato della glossa che ricevi, non quello più comune della parola.
+
+Per ciascuna voce restituisci «traduzione»: la glossa italiana breve, come in un dizionario bilingue. Uno o più traducenti separati da virgole, i verbi all’infinito, al massimo 80 caratteri; se un traducente non c’è, una definizione di poche parole. Per una parola italiana, un sinonimo o una definizione di poche parole, mai il lemma stesso.
+
+Regole:
+- Traduci il significato della glossa, non le sue parole una per una: di una glossa lunga rendi il nucleo («A large shallow vat; a cistern, tub, or trough, used by brewers…» → «tino, vasca»).
+- Una glossa che rimanda a un’altra parola («alternative form of…», «obsolete spelling of…», «plural of…») si traduce come rimando: «variante di …», «grafia antica di …», «plurale di …», con la parola citata nella sua grafia.
+- Se la glossa non basta a capire il significato e non conosci la parola con sicurezza, lascia la traduzione vuota: una voce vuota è meglio di una voce inventata.
+- Niente etimologia, date, corsivo, grassetto o markdown; niente punto finale.
+- Scrivi in un italiano sobrio e preciso; usa l’apostrofo tipografico (’) e, per citare parole o significati, i caporali (« »). Le parole straniere citate restano nel loro alfabeto.
+- Restituisci un elemento per ogni voce ricevuta, con lo stesso numero."""
+
+SCHEMA_GLOSSE = {
+    'type': 'object',
+    'properties': {'voci': {'type': 'array', 'items': {
+        'type': 'object',
+        'properties': {'n': {'type': 'integer'}, 'traduzione': {'type': 'string'}},
+        'required': ['n', 'traduzione'], 'additionalProperties': False}}},
+    'required': ['voci'], 'additionalProperties': False}
+
 # prezzi per milione di token (ingresso, uscita, lettura della cache), prima dello sconto del 50% della Batch API
 PREZZI = {'claude-opus-5-5': (4, 20, 0.20), 'claude-sonnet-5-5': (2, 10, 0.20), 'claude-haiku-5-5': (0.10, 0.50, 0.01)}
 
@@ -136,8 +170,24 @@ SQL_AREE = SQL_RADICI.replace("json_build_object('tipo', 'radice',", "json_build
     "where " + DECLARATA + " and r.id_esterno", "where r.ricostruito and r.id_esterno")
 
 
+# Le voci importate con omografi (un'altra voce con la stessa lingua e lo stesso lemma) che hanno una glossa inglese e
+# nessuna glossa italiana: lì il Wikizionario non si usa (una pagina per parola), e resta la traduzione della glossa
+SQL_OMOGRAFI = """
+select json_build_object('tipo', 'glossa', """ + VOCE + """)::text
+from lessema r join lingua lg on lg.codice = r.lingua
+where r.provenienza in ('wiktionary', 'perseus') and r.stato_editoriale = 'importato' and r.id_esterno is not null
+  and r.glossa is not null and coalesce(r.glossa_lingua, '') <> 'it'
+  and (select count(*) from lessema o where o.lingua = r.lingua and o.lemma = r.lemma) > 1
+  and not exists (select 1 from glossa g where g.lessema_id = r.id and g.lingua = 'it' and g.accezione_id is null)
+order by r.id_esterno"""
+
+
+# il prompt e lo schema di ogni tipo di voce; gli altri tipi (radice, voce) hanno SISTEMA e SCHEMA
+PER_TIPO = {'area': (SISTEMA_AREE, SCHEMA_AREE), 'glossa': (SISTEMA_GLOSSE, SCHEMA_GLOSSE)}
+
+
 def estrai(pgurl, che, uscita):
-    sql = SQL_RADICI if che == 'radici' else SQL_AREE if che == 'aree' else SQL_CAMPIONE
+    sql = {'radici': SQL_RADICI, 'aree': SQL_AREE, 'omografi': SQL_OMOGRAFI, 'campione': SQL_CAMPIONE}[che]
     out = subprocess.run(['psql', '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1', pgurl], input=sql, capture_output=True,
                          text=True, check=True).stdout
     righe = [r for r in out.splitlines() if r.startswith('{')]
@@ -204,7 +254,7 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
             return
         # a gruppi della stessa lingua e dello stesso tipo
         da_fare.sort(key=lambda v: (v['tipo'], v['lingua'], v['chiave']))
-        k = per_richiesta or {'radice': 8, 'area': 40}.get(da_fare[0]['tipo'], 20)
+        k = per_richiesta or {'radice': 8, 'area': 40, 'glossa': 40}.get(da_fare[0]['tipo'], 20)
         gruppi, cur = [], []
         for v in da_fare:
             if cur and (len(cur) == k or cur[0]['lingua'] != v['lingua'] or cur[0]['tipo'] != v['tipo']):
@@ -213,11 +263,11 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
         gruppi.append(cur)
         richieste = [Request(custom_id=f'g{i:05d}', params=MessageCreateParamsNonStreaming(
             model=modello, max_tokens=32000,
-            system=[{'type': 'text', 'text': SISTEMA_AREE if g[0]['tipo'] == 'area' else SISTEMA,
+            system=[{'type': 'text', 'text': PER_TIPO.get(g[0]['tipo'], (SISTEMA, SCHEMA))[0],
                      'cache_control': {'type': 'ephemeral', 'ttl': '1h'}}],
             messages=[{'role': 'user', 'content': '\n\n'.join(riga(v, n) for n, v in enumerate(g, 1))}],
             output_config={'effort': sforzo, 'format': {'type': 'json_schema',
-                                                        'schema': SCHEMA_AREE if g[0]['tipo'] == 'area' else SCHEMA}}))
+                                                        'schema': PER_TIPO.get(g[0]['tipo'], (SISTEMA, SCHEMA))[1]}}))
             for i, g in enumerate(gruppi)]
         batch_id = client.messages.batches.create(requests=richieste).id
         with open(segno, 'w', encoding='utf-8') as f:
@@ -258,7 +308,9 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
                 esiti['ok' if x['area'] else 'vuote'] += 1
                 nuove[v['chiave']] = (v['originale'], x['area'], '', modello)
                 continue
-            tr, de = pulisci(x['traduzione'])[:150], pulisci(x['definizione'])[:1500]
+            tr, de = pulisci(x['traduzione'])[:150], pulisci(x.get('definizione', ''))[:1500]
+            if v['tipo'] == 'glossa':
+                tr = tr.rstrip('.')                            # una glossa non ha il punto finale
             if v.get('glossa_it'):
                 tr = ''                                        # c'è già una glossa italiana di rango più alto
             if v['lingua'] == 'italiano' and tr.lower() == v['lemma'].lower():
@@ -274,6 +326,67 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
     scrivi({**leggi_tsv(uscita), **nuove}, uscita)
     if os.path.exists(segno):
         os.remove(segno)
+
+
+def blocchi(lotto, cartella, per_blocco=500):
+    """Il lotto in blocchi per gli agenti: le istruzioni e le voci numerate in blocco_NN.txt, le chiavi in blocco_NN.json."""
+    voci = [json.loads(r) for r in gzip.open(lotto, 'rt', encoding='utf-8')]
+    assert all(v['tipo'] == 'glossa' for v in voci), 'i blocchi valgono per i lotti di sole glosse'
+    voci.sort(key=lambda v: (v['lingua'], v['chiave']))
+    os.makedirs(cartella, exist_ok=True)
+    istruzioni = SISTEMA_GLOSSE.replace(
+        'Restituisci un elemento per ogni voce ricevuta, con lo stesso numero.',
+        'Scrivi una riga per ogni voce ricevuta, nell’ordine ricevuto: il numero, un carattere di tabulazione e la traduzione '
+        '(niente dopo la tabulazione se la lasci vuota). Nessuna riga in più, nessuna intestazione.')
+    assert istruzioni != SISTEMA_GLOSSE
+    for b, i in enumerate(range(0, len(voci), per_blocco), 1):
+        gruppo = voci[i:i + per_blocco]
+        with open(os.path.join(cartella, f'blocco_{b:02d}.txt'), 'w', encoding='utf-8') as f:
+            f.write(istruzioni + f'\n\nLe voci sono {len(gruppo)}, numerate da 1 a {len(gruppo)}:\n\n'
+                    + '\n\n'.join(riga(v, n) for n, v in enumerate(gruppo, 1)) + '\n')
+        with open(os.path.join(cartella, f'blocco_{b:02d}.json'), 'w', encoding='utf-8') as f:
+            json.dump([{'chiave': v['chiave'], 'originale': v['originale'], 'lingua': v['lingua'], 'lemma': v['lemma']}
+                       for v in gruppo], f, ensure_ascii=False)
+    print(f'{lotto}: {len(voci)} voci in {b} blocchi da {per_blocco}', file=sys.stderr)
+
+
+def raccogli(cartella, modello, uscita, registro=None):
+    """Gli esiti degli agenti nel formato del registro, dopo il controllo: una riga per voce, numeri da 1 a N."""
+    fatte = leggi_tsv(registro or '')
+    nuove, conti, difetti = {}, {'tradotte': 0, 'vuote': 0, 'già nel registro': 0, 'uguali al lemma': 0}, []
+    for nome in sorted(f for f in os.listdir(cartella) if re.fullmatch(r'blocco_\d+\.json', f)):
+        voci = json.load(open(os.path.join(cartella, nome), encoding='utf-8'))
+        esito = os.path.join(cartella, nome.replace('blocco_', 'esito_').replace('.json', '.tsv'))
+        if not os.path.exists(esito):
+            difetti.append(f'{nome}: manca l\'esito')
+            continue
+        tr = {}
+        for r in open(esito, encoding='utf-8'):
+            m = re.match(r'^(\d+)(?:\t(.*))?$', r.rstrip('\n'))
+            if not m:
+                if r.strip():
+                    difetti.append(f'{nome}: riga non letta «{r.strip()[:40]}»')
+                continue
+            if int(m.group(1)) in tr:
+                difetti.append(f'{nome}: il numero {m.group(1)} c\'è due volte')
+            tr[int(m.group(1))] = (m.group(2) or '').strip()
+        if sorted(tr) != list(range(1, len(voci) + 1)):
+            difetti.append(f'{nome}: {len(tr)} righe per {len(voci)} voci')
+            continue
+        for n, v in enumerate(voci, 1):
+            if v['chiave'] in fatte:
+                conti['già nel registro'] += 1          # una definizione o una traduzione che c'è già non si riscrive
+                continue
+            t = pulisci(tr[n])[:150].rstrip('.')
+            if v['lingua'] == 'italiano' and t.lower() == v['lemma'].lower():
+                t = ''
+                conti['uguali al lemma'] += 1
+            conti['tradotte' if t else 'vuote'] += 1
+            nuove[v['chiave']] = (v['originale'], t, '', modello)
+    if difetti:
+        sys.exit('esiti con difetti, niente scritto:\n  ' + '\n  '.join(difetti))
+    scrivi(nuove, uscita)
+    print(f'{uscita}: {len(nuove)} voci, {conti}', file=sys.stderr)
 
 
 def scrivi_gz(dati, percorso):
@@ -294,6 +407,10 @@ if __name__ == '__main__':
         opz = {k: a[a.index(f'--{k}') + 1] for k in ('sforzo', 'per-richiesta', 'registro') if f'--{k}' in a}
         esegui(a[1], a[2], a[3], sforzo=opz.get('sforzo', 'medium'), per_richiesta=int(opz['per-richiesta']) if 'per-richiesta' in opz else None,
                registro=opz.get('registro'))
+    elif a[0] == 'blocchi':
+        blocchi(a[1], a[2], int(a[a.index('--per-blocco') + 1]) if '--per-blocco' in a else 500)
+    elif a[0] == 'raccogli':
+        raccogli(a[2], a[3], a[4], a[a.index('--registro') + 1] if '--registro' in a else None)
     elif a[0] == 'unisci':
         reg = leggi_tsv(a[1])
         for f in a[2:]:
