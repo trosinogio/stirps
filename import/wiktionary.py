@@ -1500,8 +1500,8 @@ class Importatore:
                 # Εὔβοια dichiara *h₁es- per il prefisso εὐ-, ma la catena sale per βοῦς: la radice non va in cima
                 self.stat['radici_ambigue_non_attaccate'] += 1
                 continue
-            if cima in accolte or any(h['esito'] == cima for h in self.ipotesi.values() if h['stato'] == 'accolta'):
-                continue
+            if cima in accolte:
+                continue                        # «accolte» ha già tutti gli esiti delle ipotesi accolte: niente ripassi
             if forma_ricostruita(self.lessemi[cima]) == 'radice':
                 self.stat['radici_dichiarate_in_conflitto'] += 1   # una radice non discende da un'altra radice
                 continue
@@ -1788,17 +1788,28 @@ if __name__ == '__main__':
         if p[1]:
             completa_glosse(imp, p[1], lingua)
     imp.nomi_tedeschi()
-    imp.unisci_identificativi()
-    imp.risolvi_intermedi()
-    imp.precisa_omografe()
-    imp.elementi_di_composizione()
-    imp.unisci_varianti()
-    imp.chiudi_su_radici()
-    imp.togli_cicli()
-    imp.aggiungi_lemmi_interi()
+    # i passi dopo la lettura, ciascuno con i suoi secondi e il picco di memoria: se un passo scala male (o la
+    # macchina del workflow si ferma), il registro dice quale
+    import resource, time
+
+    def passo(nome, f, *a):
+        t0 = time.time()
+        r = f(*a)
+        print(f'[parser] {nome}: {time.time() - t0:.0f} s, picco {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1048576:.1f} GB, '
+              f'{len(imp.lessemi)} voci, {len(imp.relazioni)} passaggi', file=sys.stderr, flush=True)
+        return r
+    passo('letture', lambda: None)
+    passo('unisci_identificativi', imp.unisci_identificativi)
+    passo('risolvi_intermedi', imp.risolvi_intermedi)
+    passo('precisa_omografe', imp.precisa_omografe)
+    passo('elementi_di_composizione', imp.elementi_di_composizione)
+    passo('unisci_varianti', imp.unisci_varianti)
+    passo('chiudi_su_radici', imp.chiudi_su_radici)
+    passo('togli_cicli', imp.togli_cicli)
+    passo('aggiungi_lemmi_interi', imp.aggiungi_lemmi_interi)
     if len(args) > 2:
-        imp.aggiungi_lemmi_comuni(LINGUA, args[2])
-    imp.togli_archi_impossibili()
-    imp.togli_non_validi()
-    st = imp.scrivi(args[1])
+        passo('aggiungi_lemmi_comuni', imp.aggiungi_lemmi_comuni, LINGUA, args[2])
+    passo('togli_archi_impossibili', imp.togli_archi_impossibili)
+    passo('togli_non_validi', imp.togli_non_validi)
+    st = passo('scrivi', imp.scrivi, args[1])
     print(json.dumps(dict(st), indent=1))
