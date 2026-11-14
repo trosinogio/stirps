@@ -12,8 +12,8 @@ jobs:
         run: |
           S=https://dizionario-etimologico.vercel.app
           prova() { curl -s -o /tmp/p.html -w "%{http_code} %{size_download}B" "$S$1"; printf ' %s | ' "$1"; grep -o "$2" /tmp/p.html | head -${3:-2} | tr '\n' ' '; echo; }
+          prova /it/w/gem-pro/fostra 'ine-pro/peh2-3' 1
+          prova /it/w/grk-pro/kapa 'ine-pro/kap-2' 1
+          prova /it/w/grc/oxus 'ine-pro/h2ek-2' 1
+          prova /it/r/ine-pro/peh2-3 '<title>[^<]*' 1
           prova /it/w/it/cinque 'glossa-g[^<]*<[^<]*<[^<]*' 1
-          prova /it/w/it/quattro 'glossa-g[^<]*<[^<]*<[^<]*' 1
-          prova /it/w/it/uno 'glossa-g[^<]*<[^<]*<[^<]*' 1
-          prova /it/w/it/nove 'glossa-g[^<]*<[^<]*<[^<]*' 1
-          prova /it/w/it/due 'glossa-g[^<]*<[^<]*<[^<]*' 1
