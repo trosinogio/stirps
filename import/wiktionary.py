@@ -781,7 +781,8 @@ class Importatore:
             if n in CATENA:
                 lingua, termine = codice_lingua(a.get('2')), (a.get('3') or '').strip()
                 if not termine:
-                    termine = (a.get('4') or '').strip()     # {{inh|it|la-vul||*terraceus}}: forma senza pagina
+                    # {{inh|it|la-vul||*terraceus}}: forma senza pagina; di più forme («*h₂ér-ti-s ~ *h₂r̥-téy-s») la prima
+                    termine = re.split(r'\s*[~;]\s*|,\s+(?=\*)', (a.get('4') or '').strip(), maxsplit=1)[0].strip()
                 if not lingua or not termine or termine == '-':
                     continue
                 termine = pulisci_parte(termine)[0]

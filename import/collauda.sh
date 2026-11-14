@@ -84,6 +84,18 @@ assert variante_di({'word': 'x', 'lang_code': 'grc', 'senses': [{'glosses': ['Ep
 assert variante_di({'word': 'amamus', 'lang_code': 'la', 'senses': [{'glosses': ['first-person plural of amo'], 'form_of': [{'word': 'amo'}]}]}) == [], 'una forma flessa non è una variante'
 assert not porta_etimo({'name': 'suffix', 'args': {'1': 'grc', '2': '', '3': 'τής'}}), '{{suffix|grc||τής}} non ha una base'
 assert not porta_etimo({'name': 'der', 'args': {'1': 'grc', '2': 'qsb-grc', '3': '-'}}), 'il sostrato senza parola non è un etimo'
+# più forme in <alt:>: la prima; una frase al posto del termine non è un etimo
+from filtra import termine_ety, base_dalla_menzione
+assert termine_ety('itc-ala:<alt:*iowos, *iowez->', 'la')[:2] == ('itc-ala', '*iowos') and termine_ety('ine-pro:<alt:*h₂ér-ti-s ~ *h₂r̥-téy-s>', 'x')[1] == '*h₂ér-ti-s'
+assert da_ety({'args': {'1': 'la', '2': ':from', '3': 'trivius and trivium'}}, 'la') is None, 'una frase non è un etimo'
+# «lie + -ing» scritto {{m|en|lie}} {{suffix|en||ing}}: la base è la menzione che precede
+lying = {'etymology_templates': [{'name': 'm', 'args': {'1': 'en', '2': 'lie', '4': 'to rest'}}, {'name': 'suffix', 'args': {'1': 'en', '2': '', '3': 'ing'}}]}
+assert base_dalla_menzione(lying, 'en')['args'] == {'1': 'en', '2': 'lie', '3': '-ing'}
+prec = {'etymology_templates': [{'name': 'm', 'args': {'1': 'it', '2': 'precoce'}}, {'name': 'm', 'args': {'1': 'it', '2': '-izzare'}}, {'name': 'suf', 'args': {'1': 'it', '2': '', '3': 'ante'}}]}
+assert base_dalla_menzione(prec, 'it')['args']['2'] == 'precoce', 'un affisso menzionato non è la base'
+sed = {'etymology_templates': [{'name': 'der', 'args': {'1': 'en', '2': 'la', '3': '', '4': 'sēduct-'}}, {'name': 'm', 'args': {'1': 'la', '2': 'sēdūcere'}}, {'name': 'suffix', 'args': {'1': 'en', '2': '', '3': 'ive'}}]}
+assert base_dalla_menzione(sed, 'en')['args'] == {'1': 'en', '2': 'la:sēdūcere', '3': '-ive'}
+assert base_dalla_menzione({'etymology_templates': [{'name': 'suffix', 'args': {'1': 'it', '2': '', '3': 'metro'}}]}, 'it') is None, 'senza una menzione il suffisso resta solo'
 assert porta_etimo({'name': 'suffix', 'args': {'1': 'la', '2': 'audiēns', '3': 'ia'}}) and porta_etimo({'name': 'inh', 'args': {'1': 'it', '2': 'la', '3': 'aquila'}})
 from wiktionary import lemma_valido, senza_albero
 # l'albero etimologico appiattito prima del testo di Wiktionary non è testo

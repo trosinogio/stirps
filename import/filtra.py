@@ -113,6 +113,11 @@ def albero_ety(s):
     return chiave, [g for g in gruppi if g.partition(':')[0].strip() not in MOD_CHIAVE]
 
 
+def prima_forma(t):
+    '''La prima di più forme scritte insieme: «*iowos, *iowez-» → «*iowos», «*h₂ér-ti-s ~ *h₂r̥-téy-s» → «*h₂ér-ti-s».'''
+    return re.split(r'\s*[~,;/]\s*|\s+(?:or|and)\s+', (t or '').strip(), maxsplit=1)[0].strip()
+
+
 def termine_ety(x, lingua):
     '''(lingua, termine, modificatori) di un termine di {{ety}}. Se il termine manca vale la forma ricostruita in
     <alt:> (una forma senza pagina: «grk-pro:<alt:*pʰōnā́>») o, per un tema («<alt:κρῐ-><ety:from<κρῑ́νω>>»), la
@@ -121,7 +126,7 @@ def termine_ety(x, lingua):
     m = re.match(r'^([a-z]{2,3}(?:-[a-z]{2,4})*):(.*)$', testo)
     lt, termine = (m.group(1), m.group(2).strip()) if m else (lingua, testo)
     if not termine.strip('*- '):
-        alt = mod.get('alt', '')
+        alt = prima_forma(mod.get('alt', ''))
         if alt.startswith('*') and alt.strip('*- ') and '<' not in alt:
             return lt, alt, {k: v for k, v in mod.items() if k != 'alt'}
         chiave, figli = albero_ety(mod.get('ety', ''))
@@ -209,8 +214,8 @@ def da_ety(t, lingua):
             parti = [preverbo(x, lv) if i < len(parti) - 1 else x for i, x in enumerate(parti)]
             return {'name': nome, 'args': {'1': lv, **{str(i): x for i, x in enumerate(parti, 2)}}, 'expansion': ''}
         lt, termine, mod = termine_ety(termini[0], lv)
-        if not termine.strip('*- ') or '<' in termine or '>' in termine:
-            continue                        # «itc-pro:» senza parola: nessun etimo
+        if not termine.strip('*- ') or '<' in termine or '>' in termine or re.search(r'\s(?:and|or|of|to|the)\s|^(?:and|or|of)\s', termine):
+            continue                        # «itc-pro:» senza parola, o una frase al posto del termine: nessun etimo
         if nome in ('bf', 'clipping', 'ellipsis'):
             return {'name': nome, 'args': {'1': lv, '2': termine if lt == lv else f'{lt}:{termine}'}, 'expansion': ''}
         args = {'1': lv, '2': lt, '3': termine}
@@ -429,6 +434,27 @@ def variante_di(v):
     return [{'n': 'variante', 'a': {'1': v.get('lang_code'), '2': w}, 'e': ''}]
 
 
+def base_dalla_menzione(v, lingua):
+    '''«{{m|en|lie}} {{suffix|en||ing}}» (lying), «From {{m|it|vedova}} (or {{m|it|vedovo}}) {{suf|it||aggio}}»
+    (vedovaggio): il suffisso è scritto senza la base, e la base è la parola menzionata prima. Senza questo il suffisso
+    restava solo (e prima ancora diventava una parola: lying < «ing»). Vale la prima menzione che non è un affisso tra i
+    modelli che precedono il suffisso; se non c'è, niente.'''
+    tpl = v.get('etymology_templates') or []
+    for i, t in enumerate(tpl):
+        a = t.get('args') or {}
+        if ALIAS.get(t.get('name'), t.get('name')) != 'suffix' or scomponi(a.get('2') or '')[0] or not scomponi(a.get('3') or '')[0]:
+            continue
+        for m in tpl[:i]:
+            ma = m.get('args') or {}
+            base = scomponi(ma.get('2') or '')[0]
+            if m.get('name') in MENZIONI and base and not base.startswith('-') and not base.endswith('-') and PAROLA_RICOSTRUITA.match(base):
+                lm = (ma.get('1') or lingua).strip()
+                return {'name': 'af', 'args': {'1': lingua, '2': base if lm == lingua else f'{lm}:{base}',
+                                               '3': '-' + scomponi(a['3'])[0].lstrip('-')}, 'expansion': ''}
+        return None
+    return None
+
+
 def testo_come_der(v):
     """Un'etimologia scritta solo a parole, senza nessun modello: la prima frase, se è semplice. «From Latin dominus»
     (der dal latino), «From domandare» o «Deverbal of domandare» (der dalla stessa lingua), «Past participle of trovare»,
@@ -557,7 +583,7 @@ def forme_per_analisi(v):
 
 
 if __name__ == '__main__':
-    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = non_parole = dal_testo = radici_dalla_ety = varianti_legate = 0
+    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = non_parole = dal_testo = radici_dalla_ety = varianti_legate = basi_dalla_menzione = 0
     esempi_testo = 0
     out = open(sys.argv[1], 'w', encoding='utf-8')
     glosse = open(sys.argv[2], 'w', encoding='utf-8')
@@ -640,6 +666,13 @@ if __name__ == '__main__':
             if conv:
                 classici = [conv] + classici
                 dalla_ety += 1
+            else:
+                conv = base_dalla_menzione(v, LINGUA)
+                if conv:
+                    classici = [conv] + classici
+                    basi_dalla_menzione += 1
+                    if basi_dalla_menzione <= 12:
+                        print(f"  base dalla menzione: {v.get('word')} = {conv['args']['2']} + {conv['args']['3']}", file=sys.stderr)
         if not any(t.get('name') == 'root' for t in classici):
             dichiarate = [r for t in tpl if t.get('name') in ('ety', 'etymon') for r in radici_ety(t, LINGUA)]
             for lr, radice, ident in dict.fromkeys(dichiarate):
@@ -683,7 +716,7 @@ if __name__ == '__main__':
                               'se': dati_scheda(v),
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
-    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}; con una radice dichiarata da {{{{ety}}}} {radici_dalla_ety}; varianti senza etimologia legate al lemma {varianti_legate}), forme flesse {flesse} '
+    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}; con una radice dichiarata da {{{{ety}}}} {radici_dalla_ety}; varianti senza etimologia legate al lemma {varianti_legate}; basi lette dalla menzione prima del suffisso {basi_dalla_menzione}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}, sigle e simboli esclusi {non_parole}', file=sys.stderr)
     if varianti_f:

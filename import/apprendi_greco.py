@@ -136,6 +136,10 @@ def main():
     for c in righe(relazioni_p):
         if len(c) < 6 or c[1] not in accolte or c[2] not in chiavi or chiavi[c[2]][0] != 'grc':
             continue
+        if c[4] == 'variante':
+            # πολίδιον «variante di πολείδιον» non dice come la parola è formata: contata tra le voci «con un'etimologia
+            # ma senza etimo greco» faceva sbagliare la regola dei diminutivi (-ίδιον), che scendeva sotto la soglia
+            continue
         lemma = chiavi[c[2]][1]
         con_etimo.add(lemma)
         if c[3] in chiavi and chiavi[c[3]][0] == 'grc' and c[4] in ('derivazione', 'composizione', 'generico'):
