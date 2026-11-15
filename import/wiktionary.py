@@ -19,13 +19,19 @@ import gzip, json, re, sys, os, unicodedata
 
 # lingua delle voci da importare (codice Wiktionary): LINGUA=fr python3 wiktionary.py …
 LINGUA = os.environ.get('LINGUA', 'it')
+# radici omografe precisate dalla glossa citata: almeno quante prove, e quale accordo con le dichiarazioni {{root}}
+OMOGRAFE_PER_GLOSSA = (50, 0.9)
+from controlla_sensi import legate, parole
+from array import array
 from collections import Counter, defaultdict
 
 CATENA = {'inh': 'eredita', 'inh+': 'eredita', 'bor': 'prestito', 'bor+': 'prestito', 'ubor': 'prestito', 'obor': 'prestito',
           'lbor': 'prestito_dotto', 'slbor': 'semidotto', 'der': 'generico', 'der+': 'generico', 'uder': 'generico',
           'cal': 'calco', 'calque': 'calco', 'sl': 'calco_semantico', 'psm': 'calco'}
 LOCALI = {'bf': 'retroformazione', 'back-form': 'retroformazione', 'clipping': 'accorciamento', 'ellipsis': 'accorciamento',
-          'named-after': 'deonimico', 'deverbal': 'derivazione'}
+          'named-after': 'deonimico', 'deverbal': 'derivazione',
+          # una voce senza etimologia che è la variante di un'altra (filtra.py, variante_di): ὄνυμα < ὄνομα
+          'variante': 'variante'}
 AFFISSI = {'af', 'affix', 'suffix', 'prefix', 'confix', 'compound', 'blend'}
 POS = {'verb': 'v.', 'adj': 'agg.', 'adv': 'avv.', 'name': 'np', 'prep': 'prep.', 'pron': 'pron.', 'conj': 'cong.',
        'intj': 'inter.', 'num': 'num.', 'det': 'det.', 'phrase': 'loc.', 'suffix': 'suff.', 'prefix': 'pref.'}
@@ -528,6 +534,47 @@ def esc(v):
     return str(v).replace('\\', '\\\\').replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
 
 
+# I discendenti dichiarati (collega_discendenti) danno un'etimologia solo se, sulle parole che ne hanno già una, l'albero
+# le mette nella stessa famiglia almeno in tante prove e in questa quota (il 15 novembre 2026: 90% su 108 mila)
+DISCENDENTI_DICHIARATI = (500, 0.85)
+
+
+# «alternative form of X», «Glagolitic spelling of X», «Epic and Ionic form of X»: la glossa di una sola variante
+SOLA_VARIANTE = re.compile(r'^(?:[\w-]+,? (?:(?:and|or) )?)*(?:form|spelling|variant|romanization) of ', re.I)
+
+
+class VociChiusura:
+    """Le voci di una lingua di chiusura, lasciate nel loro file: in memoria restano la pagina, l'omografo, se è una
+    ricostruzione e la posizione della riga, e una voce si legge quando una catena la raggiunge. Tenerle tutte lette
+    (un dizionario per voce, per quaranta lingue) portava il parser a 7 GB, il limite della macchina del workflow."""
+
+    def __init__(self, percorso):
+        self.file = open(percorso, 'rb')
+        self.posizioni = array('Q')
+        self.pagine, self.omografi, self.ricostruite = [], array('I'), bytearray()
+
+    def tutte(self):
+        """Tutte le voci, in ordine, una alla volta (per costruire gli indici): dopo ognuna va chiamato segna()."""
+        self.file.seek(0)
+        pos = 0
+        for riga in self.file:
+            self.posizioni.append(pos)
+            pos += len(riga)
+            yield json.loads(riga)
+
+    def segna(self, pagina, omografo, ricostruita):
+        self.pagine.append(pagina)
+        self.omografi.append(omografo)
+        self.ricostruite.append(1 if ricostruita else 0)
+
+    def leggi(self, i):
+        self.file.seek(self.posizioni[i])
+        return json.loads(self.file.readline())
+
+    def __len__(self):
+        return len(self.pagine)
+
+
 class Importatore:
     def __init__(self):
         self.lessemi = {}            # chiave -> dict
@@ -536,6 +583,7 @@ class Importatore:
         self.relazioni = []          # archi delle voci italiane
         self.intermedi = defaultdict(Counter)   # esito -> Counter((etimo, tipo, conf, forma))
         self.doppioni, self.radici = set(), set()
+        self.glossa_arco = {}                   # (esito, radice citata) -> la glossa con cui la pagina la cita (t=)
         self.formazioni_ambigue = set()   # voci formate con un prefisso o da più basi (Εὔβοια = εὐ- + βοῦς)
         self.chiusura = {}           # lingua -> indici delle voci di chiusura
         self.participi = set()       # (lingua, pagina) dei participi citati come etimi
@@ -548,6 +596,8 @@ class Importatore:
         self.comuni = {}             # nella lingua principale, i lemmi senza etimologia che entrano lo stesso (--comuni it=…):
                                      # quelli del lessico di frequenza, perché l'analisi di un testo li riconosca
         self.lette = set()           # le voci di cui si è letta la pagina (voce())
+        self.seminati = set()        # le voci entrate dall'albero dei discendenti (semina_discendenti())
+        self.chiuse = set()          # (lingua, posizione) delle voci di chiusura già lette (chiudi())
         self.id_proprio = {}         # voce → l'identificativo che la sua pagina si dà ({{etymon|gem-pro|id=three}})
         self.con_ident = defaultdict(set)   # chiave senza identificativo → le chiavi con (*þrīz → *þrīz@three)
         self.con_etimologia = set()  # lingue di chiusura di cui entrano tutte le voci con un'etimologia, ma non i lemmi
@@ -758,6 +808,15 @@ class Importatore:
                 continue
             if n in LOCALI:
                 b, lb = pulisci_parte(a.get('2') or '')
+                if b and primo and n == 'variante':
+                    # la parola di cui è variante, con la sua grafia di pagina (ὄνομᾰ → ὄνομα) e l'omografo giusto
+                    lingua_b, pagina_b, omo_b, _ = self.risolvi(lb or codice_lingua(a.get('1')) or lingua_voce, b, None)
+                    kb = self.lessema(lingua_b, pagina_b, omografo=omo_b)
+                    if kb != k0:
+                        archi.append({'etimo': kb, 'esito': k0, 'tipo': 'variante', 'ordine': 1, 'affisso': None, 'conf': 3, 'forma': None})
+                        self.stat['varianti_legate_al_lemma'] += 1
+                        primo, prec = False, kb
+                    continue
                 if b and primo:
                     kb = self.lessema(lb or codice_lingua(a.get('1')) or lingua_voce, b)
                     archi.append({'etimo': kb, 'esito': k0, 'tipo': LOCALI[n], 'ordine': 1, 'affisso': None, 'conf': 3, 'forma': None})
@@ -766,10 +825,14 @@ class Importatore:
             if n in CATENA:
                 lingua, termine = codice_lingua(a.get('2')), (a.get('3') or '').strip()
                 if not termine:
-                    termine = (a.get('4') or '').strip()     # {{inh|it|la-vul||*terraceus}}: forma senza pagina
+                    # {{inh|it|la-vul||*terraceus}}: forma senza pagina; di più forme («*h₂ér-ti-s ~ *h₂r̥-téy-s») la prima
+                    termine = re.split(r'\s*[~;]\s*|,\s+(?=\*)', (a.get('4') or '').strip(), maxsplit=1)[0].strip()
                 if not lingua or not termine or termine == '-':
                     continue
                 termine = pulisci_parte(termine)[0]
+                if '<' in termine or '>' in termine:
+                    self.stat['termini_con_modificatori_annidati'] += 1
+                    continue
                 if ',' in termine:
                     # sintassi recente: più forme nello stesso template («ἀββα,ἀββᾶς»); vale quella già nota
                     parti = [x.strip() for x in termine.split(',') if x.strip()]
@@ -799,6 +862,11 @@ class Importatore:
                 lingua, termine, omo_t, forma_extra = self.risolvi(lingua, termine, mostra)
                 mostra = mostra or forma_extra
                 kt = self.lessema(lingua, termine, glossa=glossa_t, translit=tr, omografo=omo_t, ident=(a.get('id') or '').strip() or None)
+                if glossa_t and termine.startswith('*') and termine.endswith('-'):
+                    # per il controllo delle radici omografe (GLOSSE_RADICI): chi cita la radice, e con quale senso
+                    citanti = self.lessemi[kt].setdefault('citanti', {}).setdefault(glossa_t, [])
+                    if k0 not in citanti and len(citanti) < 5:
+                        citanti.append(k0)
                 tipo = CATENA[n]
                 # der resta indeterminato anche al primo livello: Wiktionary lo usa sia per la stessa parola
                 # per via non precisata sia per le derivazioni («from Latin vertō» per il composto verticollo)
@@ -816,6 +884,8 @@ class Importatore:
                     if kt != k0:
                         archi.append({'etimo': kt, 'esito': k0, 'tipo': tipo, 'ordine': 1, 'affisso': None,
                                       'conf': min(conf, conf_voce), 'forma': mostra})
+                        if glossa_t and termine.startswith('*') and termine.endswith('-'):
+                            self.glossa_arco.setdefault((k0, kt), glossa_t)
                     primo, prec = False, kt
                     continue
                 # «три (… ultimately from *tréyes) + зуб (… ultimately from *ǵómbʰos)»: dopo un «+», o dentro una
@@ -842,6 +912,8 @@ class Importatore:
                 if kt != prec:
                     self.intermedi[prec][(kt, tipo, conf, mostra)] += 1
                     self.stat['anelli_intermedi'] += 1
+                    if glossa_t and termine.startswith('*') and termine.endswith('-'):
+                        self.glossa_arco.setdefault((prec, kt), glossa_t)
                 prec = kt
         if k0 not in self.attestazioni:
             d = data_prosa(testo)
@@ -889,7 +961,7 @@ class Importatore:
         """Indici di una lingua di chiusura, da caricare prima delle voci principali. Con base=True è la lingua di
         partenza (--forme-base): servono solo i lemmi e le forme, e una forma flessa citata dentro la lingua va al suo
         lemma, conservata come forma citata (quattrocchi < occhio, «occhi»), non resta una voce a sé."""
-        voci = [json.loads(r) for r in open(lemmi, encoding='utf-8')]
+        voci = VociChiusura(lemmi)
         idx = {'voci': voci, 'lemmi': set(), 'omografi': defaultdict(list), 'forme': {}, 'participi': {}, 'flesse': {},
                'file_glosse': glosse, 'omo_radice': {}, 'varianti': []}
         if varianti and os.path.exists(varianti):
@@ -911,11 +983,14 @@ class Importatore:
                     unicodedata.normalize('NFC', x.lower()) for x in c[4].split(',') if x)
                 pos_omografi[pagina].setdefault(omo, set()).add(c[2])
         per_pagina = defaultdict(set)
-        for v in voci:
+        pagine = {}
+        for v in voci.tutte():
             pagina = nome_pagina(lingua, v['w'])
+            pagina = pagine.setdefault(pagina, pagina)      # una sola copia del nome per tutte le voci della pagina
             idx['lemmi'].add(pagina)
             etimn = v.get('en')
             omo = int(etimn) if etimn and str(etimn).isdigit() else 1
+            voci.segna(pagina, omo, v.get('rec'))
             if omo not in per_pagina[pagina]:
                 per_pagina[pagina].add(omo)
                 idx['omografi'][pagina].append((omo, {unicodedata.normalize('NFC', (v.get('c') or '').lower())}))
@@ -1031,18 +1106,18 @@ class Importatore:
         """Importa le etimologie delle voci intermedie già presenti nel dizionario. Nelle lingue intere (--intere)
         il primo passaggio prende anche le voci attestate che nessuna catena raggiunge (lēvir, δαήρ): così le
         famiglie delle radici si completano. Le forme ricostruite entrano solo se una catena le cita."""
-        fatte = set()
+        fatte = self.chiuse                 # le voci già lette, anche tra una chiamata e l'altra
         for passo in range(passi):
             nuove = 0
             for lingua, idx in self.chiusura.items():
                 intera = passo == 0 and (lingua in self.intere or lingua in self.con_etimologia)
-                for i, v in enumerate(idx['voci']):
+                voci = idx['voci']
+                for i in range(len(voci)):
                     if (lingua, i) in fatte:
                         continue
-                    pagina = nome_pagina(lingua, v['w'])
-                    etimn = v.get('en')
-                    omo = int(etimn) if etimn and str(etimn).isdigit() else 1
-                    if v.get('rec'):
+                    pagina, omo, rec = voci.pagine[i], voci.omografi[i], voci.ricostruite[i]
+                    v = None
+                    if rec:
                         candidati = [(c, '*' + pagina) for c in ((lingua + '-vul', lingua) if lingua == 'la' else (lingua,))]
                     else:
                         candidati = [(lingua, pagina)]
@@ -1050,14 +1125,17 @@ class Importatore:
                         kb = chiave(lc, termine, omo)
                         # *oktō citato solo come *oktō@eight: la pagina si legge lo stesso (non per le radici omografe)
                         raggiunta = kb in self.lessemi or (kb in self.con_ident and not termine.endswith('-'))
-                        if raggiunta or (intera and not v.get('rec') and self.ammessa(lingua, v)):
+                        if not raggiunta and not (intera and not rec):
+                            continue
+                        v = v or voci.leggi(i)
+                        if raggiunta or self.ammessa(lingua, v):
                             fatte.add((lingua, i))
                             self.voce(v, lingua_voce=lc, parola=termine)
                             nuove += 1
                             if not raggiunta:
                                 self.stat[f'intere_{lingua}'] += 1
                             break
-            self.stat[f'chiusura_passo_{passo + 1}'] = nuove
+            self.stat[f'chiusura_passo_{passo + 1}'] += nuove
             if not nuove:
                 break
 
@@ -1150,6 +1228,9 @@ class Importatore:
         parti = [(p, l or lingue_parti.get(i + 1)) for i, (p, l) in enumerate(parti)]
         if n == 'prefix' and parti:
             parti = [(parti[0][0].rstrip('-') + '-', None)] + parti[1:]
+        elif n == 'suffix' and parti and num[0][0] >= 3:
+            # {{suffix|grc||τής}} (κριτής): la base manca, l'argomento che c'è è il suffisso e non una parola
+            parti = parti[:-1] + [('-' + parti[-1][0].lstrip('-'), None)]
         elif n == 'suffix' and len(parti) >= 2:
             parti = parti[:-1] + [('-' + parti[-1][0].lstrip('-'), None)]
         elif n == 'confix' and len(parti) >= 2:
@@ -1205,6 +1286,8 @@ class Importatore:
                 h['esito'] = base
                 self.ipotesi[base] = h
             self.lessemi[base]['glosse'].update(self.lessemi[k]['glosse'])
+            for g, citanti in self.lessemi[k].get('citanti', {}).items():
+                self.lessemi[base].setdefault('citanti', {}).setdefault(g, []).extend(citanti)
             for c in ('translit', 'pos'):
                 self.lessemi[base][c] = self.lessemi[base].get(c) or self.lessemi[k].get(c)
             del self.lessemi[k]
@@ -1217,6 +1300,7 @@ class Importatore:
                     nuovi[m(esito)][(m(etimo), tipo, conf, forma)] += n
         self.intermedi = nuovi
         self.radici = {(m(a), m(b)) for a, b in self.radici}
+        self.glossa_arco = {(m(a), m(b)): g for (a, b), g in self.glossa_arco.items()}
         self.doppioni = {(m(a), m(b)) for a, b in self.doppioni}
         self.formazioni_ambigue = {m(k) for k in self.formazioni_ambigue}
         self.stat['identificativi_uniti'] = len(mappa)
@@ -1285,12 +1369,44 @@ class Importatore:
                     break
                 k = r['etimo']
                 visti.add(k)
+        # La glossa con cui la pagina cita il nodo generico (carne: *(s)ker- «to cut off») porta a una sola delle
+        # omografe (*(s)ker-@cut, non @turn)? Una linea di senso con il suo identificativo o con le sue glosse, e con
+        # nessun'altra. Prima di usarla la regola si misura sugli archi che le dichiarazioni {{root}} decidono da sole:
+        # vale solo se concorda con loro almeno nove volte su dieci, su almeno 50 archi (OMOGRAFE_PER_GLOSSA).
+        sensi = {k: [p for p in (parole(x) for x in [self.lessemi[k].get('ident') or ''] + list(self.lessemi[k]['glosse'])) if p]
+                 for ks in varianti.values() for k in ks}
+        per_glossa = {}
+        for r in self.relazioni:
+            if r['etimo'] not in varianti or accolte.get(r['esito']) != r['ipotesi']:
+                continue
+            pg = parole(self.glossa_arco.get((r['esito'], r['etimo'])) or '')
+            if not pg:
+                continue
+            legati = [k for k in sorted(varianti[r['etimo']]) if any(legate(pg, s) for s in sensi[k])]
+            if len(legati) == 1:
+                per_glossa[id(r)] = (r, legati[0])
+            else:
+                self.stat['omografe_glossa_non_decide'] += 1
+        for rid, (r, k) in per_glossa.items():
+            if rid in voti and len(voti[rid]) == 1:
+                self.stat['omografe_glossa_concorde' if next(iter(voti[rid])) == k else 'omografe_glossa_discorde'] += 1
+        prove = self.stat['omografe_glossa_concorde'] + self.stat['omografe_glossa_discorde']
+        vale = prove >= OMOGRAFE_PER_GLOSSA[0] and self.stat['omografe_glossa_concorde'] >= OMOGRAFE_PER_GLOSSA[1] * prove
         for rid, conta in voti.items():
             if len(conta) == 1:
                 archi[rid]['etimo'] = next(iter(conta))
                 self.stat['omografe_precisate'] += 1
             else:
                 self.stat['omografe_ambigue'] += 1
+        for rid, (r, k) in per_glossa.items():
+            if rid in voti and len(voti[rid]) == 1:
+                continue                        # l'ha già decisa la dichiarazione
+            if rid in voti and k not in voti[rid]:
+                self.stat['omografe_glossa_contro_le_dichiarazioni'] += 1
+                continue                        # le parole sotto dichiarano altre omografe: resta com'è
+            self.stat['omografe_glossa_' + ('precisate' if vale else 'in_attesa')] += 1
+            if vale:
+                r['etimo'] = k
 
     def togli_archi_impossibili(self):
         """Ultimo controllo su tutti gli archi (arco_impossibile): quelli che non possono stare escono, e con loro le
@@ -1435,8 +1551,8 @@ class Importatore:
                 # Εὔβοια dichiara *h₁es- per il prefisso εὐ-, ma la catena sale per βοῦς: la radice non va in cima
                 self.stat['radici_ambigue_non_attaccate'] += 1
                 continue
-            if cima in accolte or any(h['esito'] == cima for h in self.ipotesi.values() if h['stato'] == 'accolta'):
-                continue
+            if cima in accolte:
+                continue                        # «accolte» ha già tutti gli esiti delle ipotesi accolte: niente ripassi
             if forma_ricostruita(self.lessemi[cima]) == 'radice':
                 self.stat['radici_dichiarate_in_conflitto'] += 1   # una radice non discende da un'altra radice
                 continue
@@ -1471,6 +1587,182 @@ class Importatore:
             self.relazioni.append({'chiave': kh + '#0', 'ipotesi': kh, 'etimo': radice, 'esito': cima, 'tipo': 'generico',
                                    'ordine': 1, 'affisso': None, 'conf': 2, 'forma': None})
             self.stat['catene_chiuse_su_radice'] += 1
+
+    # ---- i discendenti dichiarati: l'albero, le parole nuove, le etimologie per chi non ne ha ----
+    def archi_discendenti(self, percorsi):
+        """Gli archi dell'albero dei discendenti (filtra.py con DISCENDENTI): genitore e figlio come voci del
+        dizionario (None se la voce non c'è, o se ce n'è più d'una con quella forma), poi lingua, parola e segni del
+        figlio. Un nodo senza parola è il nome di un ramo («Hellenic:»): ciò che gli sta sotto discende dal nodo che gli
+        sta sopra. Un nodo segnato incerto o un calco non porta la discendenza, nemmeno ai nodi sotto di lui. Da una
+        radice con omografe vale solo quella che la pagina dichiara con il suo identificativo, mai il nodo generico."""
+        pagine = Counter()
+        for l in self.lessemi.values():
+            pagine[(l['lingua'], l['lemma'])] += 1
+
+        def voce(lingua, parola, omografo=None):
+            lingua = codice_lingua(lingua)
+            parola = parola.strip()
+            if not lingua or not parola:
+                return None
+            if lingua.endswith('-pro') and not parola.startswith('*'):
+                parola = '*' + parola
+            k = self.chiave_di(lingua, parola)
+            base = k
+            if omografo and omografo > 1:
+                k = f'{k}:{omografo}'
+            if base in self.con_ident:
+                k = base + '@' + self.id_proprio[k] if omografo and k in self.id_proprio else None
+            l = self.lessemi.get(k)
+            if not l or (not omografo and pagine[(l['lingua'], l['lemma'])] > 1):
+                return None
+            return k
+
+        for lingua_pagina, percorso in percorsi:
+            if not os.path.exists(percorso):
+                continue
+            corrente, pila = None, []
+            for riga in open(percorso, encoding='utf-8'):
+                c = riga.rstrip('\n').split('\t')
+                if len(c) < 7:
+                    continue
+                omo = int(c[1].split('.')[0]) if c[1].split('.')[0].isdigit() else 1
+                prof = int(c[3] or 1)
+                if (c[0], c[1]) != corrente:
+                    corrente = (c[0], c[1])
+                    pila = [(0, voce(lingua_pagina, ('*' if c[2] and not c[0].startswith('*') else '') + c[0], omo))]
+                while pila and pila[-1][0] >= prof:
+                    pila.pop()
+                if not pila:
+                    continue
+                genitore = pila[-1][1]
+                segni = set(c[6].split(','))
+                if not c[5].strip():
+                    pila.append((prof, None if segni & {'unc', 'clq'} else genitore))
+                    continue
+                if segni & {'unc', 'clq'}:
+                    pila.append((prof, None))
+                    continue
+                figlio = voce(c[4], c[5])
+                pila.append((prof, figlio))
+                yield genitore, figlio, c[4], c[5], segni
+
+    def sole_varianti(self, lingua):
+        """Le pagine di una lingua di chiusura che sono solo la grafia o la forma alternativa di un'altra parola
+        («alternative form of cwic», «Glagolitic spelling of правъ») e non hanno un'etimologia loro: seminarle farebbe
+        entrare ogni grafia come voce nuova."""
+        idx = self.chiusura[lingua]
+        if 'sole_varianti' not in idx:
+            con_etimologia, varianti = set(idx['voci'].pagine) if hasattr(idx['voci'], 'pagine') else set(), set()
+            if idx.get('file_glosse') and os.path.exists(idx['file_glosse']):
+                for riga in open(idx['file_glosse'], encoding='utf-8'):
+                    c = riga.rstrip('\n').split('\t')
+                    if len(c) > 3 and SOLA_VARIANTE.match(c[3]):
+                        varianti.add(nome_pagina(lingua, c[0]))
+            idx['sole_varianti'] = varianti - con_etimologia
+        return idx['sole_varianti']
+
+    def togli_seminati_orfani(self):
+        """Una parola entrata dall'albero dei discendenti che alla fine non ha né un'etimologia né una parola che ne
+        deriva non collega niente: esce."""
+        legate = {h['esito'] for h in self.ipotesi.values()} | {r['etimo'] for r in self.relazioni}
+        via = {k for k in self.seminati if k in self.lessemi and k not in legate}
+        self.togli(via, 'ipotesi_di_seminati_orfani')
+        self.stat['discendenti_seminati_orfani'] = len(via)
+
+    def semina_discendenti(self, percorsi, lingue):
+        """Le parole che l'albero dichiara e il dizionario non ha entrano, se il loro genitore è una voce di una delle
+        lingue date (i rami antichi: indoeuropeo, protoellenico, greco, protogermanico, protoslavo) e se hanno la loro
+        pagina, come lemma e senza omografi, in una lingua di chiusura: la pagina si legge poi con chiudi(), e vale la
+        sua etimologia; se non ne ha, l'arco lo dà collega_discendenti(). Mai una locuzione, mai una parola
+        indoeuropea (le pagine indoeuropee entrano dalle catene). Rende il numero delle parole entrate."""
+        nuove = 0
+        for genitore, figlio, lingua, parola, segni in list(self.archi_discendenti(percorsi)):
+            if not genitore or figlio or base_lingua(self.lessemi[genitore]['lingua']) not in lingue:
+                continue
+            lingua, parola = codice_lingua(lingua), parola.strip()
+            idx = self.chiusura.get(lingua)
+            if not idx or base_lingua(lingua) == 'ine-pro' or ' ' in parola:
+                continue
+            pagina = nome_pagina(lingua, parola.lstrip('*'))
+            if pagina not in idx['lemmi'] or pagina in idx['omografi']:
+                self.stat['discendenti_senza_pagina_o_omografi'] += 1
+                continue
+            if pagina in self.sole_varianti(lingua):
+                self.stat['discendenti_sole_varianti'] += 1
+                continue
+            ricostruita = parola.startswith('*') or lingua.endswith('-pro')
+            if self.chiave_di(lingua, ('*' if ricostruita else '') + pagina) in self.lessemi:
+                continue                    # c'è già (con omografi o identificativi: l'albero non dice quale)
+            self.seminati.add(self.lessema(lingua, ('*' if ricostruita else '') + pagina))
+            nuove += 1
+            self.stat[f'discendenti_seminati_{lingua}'] += 1
+        self.stat['discendenti_seminati'] += nuove
+        return nuove
+
+    def collega_discendenti(self, percorsi):
+        """Le pagine di Wiktionary elencano i loro discendenti ramo per ramo (filtra.py con DISCENDENTI): ogni nodo
+        dell'albero dice che la parola viene da quella che le sta sopra. Una parola del dizionario senza nessuna
+        etimologia prende quell'arco, con certezza 2 e la sua etichetta. Mai un arco segnato incerto o un calco; mai
+        verso una parola con omografi (l'albero non dice quale); mai una parola indoeuropea (non prende etimi dalle
+        pagine altrui); mai contro la genealogia delle lingue; e se due pagine danno alla parola due genitori che non
+        stanno uno sopra l'altro, nessuno dei due. La regola si misura a ogni giro sulle parole che hanno già la loro
+        etimologia (l'albero le mette nella stessa famiglia?) e vale solo sopra la soglia (DISCENDENTI_DICHIARATI)."""
+        etimi = defaultdict(set)
+        accolte = {h['chiave'] for h in self.ipotesi.values() if h['stato'] == 'accolta'}
+        con_ipotesi = {h['esito'] for h in self.ipotesi.values()}
+        for r in self.relazioni:
+            if r['ipotesi'] in accolte:
+                etimi[r['esito']].add(r['etimo'])
+
+        def antenati(k):
+            visti, giro = set(), {k}
+            for _ in range(12):
+                giro = {e for x in giro for e in etimi.get(x, ())} - visti
+                if not giro:
+                    break
+                visti |= giro
+            return visti
+
+        candidati, concordi, discordi = defaultdict(dict), 0, 0
+        for genitore, figlio, lingua, parola, segni in self.archi_discendenti(percorsi):
+            self.stat['discendenti_archi'] += 1
+            if not genitore or not figlio or genitore == figlio:
+                continue
+            if base_lingua(self.lessemi[figlio]['lingua']) == 'ine-pro' or self.arco_impossibile(genitore, figlio):
+                self.stat['discendenti_esclusi_dalle_regole'] += 1
+                continue
+            if figlio in con_ipotesi:
+                if figlio in etimi:
+                    su = antenati(figlio)
+                    if genitore in su or su & (antenati(genitore) | {genitore}):
+                        concordi += 1
+                    else:
+                        discordi += 1
+                continue
+            tipo = 'prestito' if segni & {'bor', 'lbor', 'slb'} else 'derivazione' if 'der' in segni \
+                or base_lingua(self.lessemi[figlio]['lingua']) == base_lingua(self.lessemi[genitore]['lingua']) \
+                else 'eredita' if discende_da(self.lessemi[figlio]['lingua'], self.lessemi[genitore]['lingua']) else 'generico'
+            candidati[figlio].setdefault(genitore, tipo)
+        self.stat['discendenti_concordi'], self.stat['discendenti_discordi'] = concordi, discordi
+        minimo, soglia = DISCENDENTI_DICHIARATI
+        if concordi + discordi < minimo or concordi < soglia * (concordi + discordi):
+            self.stat['discendenti_regola_non_applicata'] = len(candidati)
+            return
+        for figlio, genitori in candidati.items():
+            # tra più genitori vale il più vicino: quello che non sta sopra un altro (latino, non protoitalico)
+            vicini = [g for g in genitori if not any(g in antenati(x) for x in genitori if x != g)]
+            if len(vicini) != 1 or figlio in antenati(vicini[0]):
+                self.stat['discendenti_con_più_genitori'] += len(vicini) != 1
+                continue
+            genitore = vicini[0]
+            kh = figlio + '#wikt-discendente'
+            self.ipotesi[kh] = {'chiave': kh, 'esito': figlio, 'etichetta': 'Wiktionary (discendente dichiarato)', 'stato': 'accolta',
+                                'confidenza': 2, 'origine': 'etimo', 'nota': None}
+            self.relazioni.append({'chiave': kh + '#0', 'ipotesi': kh, 'etimo': genitore, 'esito': figlio, 'tipo': genitori[genitore],
+                                   'ordine': 1, 'affisso': None, 'conf': 2, 'forma': None})
+            etimi[figlio].add(genitore)
+            self.stat['discendenti_collegati'] += 1
+            self.stat[f"discendenti_collegati_{self.lessemi[figlio]['lingua']}"] += 1
 
     # ---- niente cicli: si toglie l'arco che chiude il ciclo (tipicamente un prestito di ritorno) ----
     def togli_cicli(self):
@@ -1561,6 +1853,18 @@ class Importatore:
             if l.get('ident'):
                 l['omografo'] = 2 + sorted(per_radice[(l['lingua'], l['lemma'])]).index(l['ident'])
         self.stat['radici_omografe_distinte'] = sum(len(v) for v in per_radice.values())
+        if os.environ.get('GLOSSE_RADICI'):
+            # le glosse candidate di ogni radice ricostruita, per import/controlla_omografe.py: radice, lingua, lemma,
+            # glossa, quante volte, se è quella della sua pagina, se la radice ha omografe dichiarate, chi la cita
+            with open(os.environ['GLOSSE_RADICI'], 'w', encoding='utf-8') as f:
+                for l in self.lessemi.values():
+                    if not (l['ricostruito'] and l['lemma'].endswith('-')):
+                        continue
+                    generico = not l.get('ident') and (l['lingua'], l['lemma']) in per_radice
+                    for g, n in l['glosse'].most_common() or ([(l['ident'], 0)] if l.get('ident') else []):
+                        f.write('\t'.join(esc(x) for x in (
+                            l['chiave'], l['lingua'], l['lemma'], g, n, 't' if g == l.get('propria') else 'f',
+                            't' if generico else 'f', ' | '.join(l.get('citanti', {}).get(g, [])[:5]))) + '\n')
         for l in self.lessemi.values():
             if l.get('ident') and not l['glosse']:
                 l['glosse'][l['ident']] += 1          # l'identificativo di Wiktionary è un'indicazione di senso: «cut»
@@ -1649,9 +1953,13 @@ def completa_glosse(imp, percorso, lingua=None):
 if __name__ == '__main__':
     # wiktionary.py lemmi.jsonl uscita/ [glosse.tsv] [--chiudi la=lemmi.jsonl,glosse.tsv,forme.tsv]… [--passi N]
     #               [--forme-base it=forme.tsv]
+    #               [--discendenti la=discendenti.tsv]…
+    #               [--semina-discendenti ine-pro,grk-pro,grc,gem-pro,sla-pro]
     #               [--intere la,grc] [--con-etimologia en] [--elenco en=../dati/frequenze_en.tsv.gz] [--esterni en]
     #               [--glosse-precedenti ../dati/lessemi.tsv.gz]
     args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti, comuni = [], [], 1, set(), set(), {}, set(), {}, {}
+    semina = set()      # --semina-discendenti ine-pro,grc: sotto le voci di queste lingue entrano anche le parole nuove
+    discendenti = []    # --discendenti la=discendenti.tsv: gli alberi dei discendenti dichiarati (filtra.py con DISCENDENTI)
     forme_base = None   # --forme-base it=forme.tsv: le forme flesse della lingua di partenza (filtra.py con FORME)
     it_ = iter(sys.argv[1:])
     for x in it_:
@@ -1678,6 +1986,10 @@ if __name__ == '__main__':
                         precedenti[c[0]] = c[7].replace('\\\\', '\\')
         elif x == '--esterni':
             esterni = {c for c in next(it_).split(',') if c}
+        elif x == '--semina-discendenti':
+            semina = {c for c in next(it_).split(',') if c}
+        elif x == '--discendenti':
+            discendenti.append(tuple(next(it_).split('=', 1)))
         elif x == '--forme-base':
             forme_base = next(it_)
         elif x == '--con-etimologia':
@@ -1704,6 +2016,11 @@ if __name__ == '__main__':
         completa_glosse(imp, args[2])
     imp.collega_participi()
     imp.chiudi(passi)
+    # le parole che gli alberi dei discendenti dichiarano sotto i rami antichi: entrano, e le loro pagine si leggono
+    for _ in range(3 if discendenti and semina else 0):
+        if not imp.semina_discendenti(discendenti, semina):
+            break
+        imp.chiudi(passi)
     imp.collega_participi()
     for c in chiusure:
         lingua, percorsi = c.split('=', 1)
@@ -1711,17 +2028,32 @@ if __name__ == '__main__':
         if p[1]:
             completa_glosse(imp, p[1], lingua)
     imp.nomi_tedeschi()
-    imp.unisci_identificativi()
-    imp.risolvi_intermedi()
-    imp.precisa_omografe()
-    imp.elementi_di_composizione()
-    imp.unisci_varianti()
-    imp.chiudi_su_radici()
-    imp.togli_cicli()
-    imp.aggiungi_lemmi_interi()
+    # i passi dopo la lettura, ciascuno con i suoi secondi e il picco di memoria: se un passo scala male (o la
+    # macchina del workflow si ferma), il registro dice quale
+    import resource, time
+
+    def passo(nome, f, *a):
+        t0 = time.time()
+        r = f(*a)
+        print(f'[parser] {nome}: {time.time() - t0:.0f} s, picco {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1048576:.1f} GB, '
+              f'{len(imp.lessemi)} voci, {len(imp.relazioni)} passaggi', file=sys.stderr, flush=True)
+        return r
+    passo('letture', lambda: None)
+    passo('unisci_identificativi', imp.unisci_identificativi)
+    passo('risolvi_intermedi', imp.risolvi_intermedi)
+    passo('precisa_omografe', imp.precisa_omografe)
+    passo('elementi_di_composizione', imp.elementi_di_composizione)
+    passo('unisci_varianti', imp.unisci_varianti)
+    if discendenti:
+        passo('collega_discendenti', imp.collega_discendenti, discendenti)
+    passo('chiudi_su_radici', imp.chiudi_su_radici)
+    passo('togli_cicli', imp.togli_cicli)
+    # prima dei lemmi interi: un lemma latino o greco seminato e rimasto senza legami rientra come ogni lemma (Dionysia)
+    passo('togli_seminati_orfani', imp.togli_seminati_orfani)
+    passo('aggiungi_lemmi_interi', imp.aggiungi_lemmi_interi)
     if len(args) > 2:
-        imp.aggiungi_lemmi_comuni(LINGUA, args[2])
-    imp.togli_archi_impossibili()
-    imp.togli_non_validi()
-    st = imp.scrivi(args[1])
+        passo('aggiungi_lemmi_comuni', imp.aggiungi_lemmi_comuni, LINGUA, args[2])
+    passo('togli_archi_impossibili', imp.togli_archi_impossibili)
+    passo('togli_non_validi', imp.togli_non_validi)
+    st = passo('scrivi', imp.scrivi, args[1])
     print(json.dumps(dict(st), indent=1))

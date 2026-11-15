@@ -58,12 +58,122 @@ def porta_etimo(t):
     n, a = t.get('name'), t.get('args') or {}
     if n not in CON_ETIMO:
         return False
-    parti = [re.sub(r'<[^<>]*>', '', v).strip() for k, v in sorted(a.items()) if k.isdigit() and int(k) >= 2 and v and v.strip()]
-    if n in ('af', 'affix', 'suffix', 'prefix', 'confix', 'compound', 'blend'):
+    parti = [scomponi(v)[0] for k, v in sorted(a.items()) if k.isdigit() and int(k) >= 2 and v and v.strip()]
+    parti = [p for p in parti if p]
+    if n == 'suffix':
+        # la base è il secondo argomento: {{suffix|grc||τής}} (κριτής) ha solo il suffisso
+        base = scomponi(a.get('2') or '')[0]
+        return bool(base) and not base.startswith('-')
+    if n in ('af', 'affix', 'prefix', 'confix', 'compound', 'blend'):
         return len(parti) >= 2 or any(p and not p.startswith('-') and not p.endswith('-') for p in parti)
     if n in ('bf', 'back-form', 'clipping', 'ellipsis', 'it-deverbal', 'deverbal'):
         return bool(parti)
-    return bool(re.sub(r'<[^<>]*>', '', a.get('3') or '').strip('*- '))
+    # {{inh|grc|grk-pro||*pʰōnā́}}: una forma ricostruita senza pagina sta nel quarto argomento, e il parser la legge
+    return bool(scomponi(a.get('3') or '')[0].strip('*- ')) or scomponi(a.get('4') or '')[0].startswith('*')
+
+
+# I modificatori di una chiave nell'albero di {{ety}} («der<unc><ine-pro:…>»): gli altri gruppi sono termini
+MOD_CHIAVE = {'unc', 'unk', 'text', 'q', 'qq', 'ref', 'conj', 'nocap', 'notext'}
+
+
+def gruppi_angolari(s):
+    '''I gruppi tra parentesi angolari del primo livello di una stringa, anche se ne contengono altri, e il testo
+    fuori: «grk-pro:<alt:*pʰōnā́><ety:der<ine-pro:*bʰeh₂-<id:speak>>>» → ('grk-pro:', ['alt:*pʰōnā́', 'ety:der<…>']).'''
+    fuori, gruppi, prof, inizio = [], [], 0, 0
+    for i, c in enumerate(s or ''):
+        if c == '<':
+            if prof == 0:
+                inizio = i
+            prof += 1
+        elif c == '>' and prof:
+            prof -= 1
+            if prof == 0:
+                gruppi.append(s[inizio + 1:i])
+        elif prof == 0:
+            fuori.append(c)
+    return ''.join(fuori).strip(), gruppi
+
+
+def scomponi(x):
+    '''Un termine con i suoi modificatori: ('grk-pro:', {'alt': '*pʰōnā́', 'ety': 'der<ine-pro:*bʰeh₂-<id:speak>>'}).'''
+    testo, gruppi = gruppi_angolari(x)
+    mod = {}
+    for g in gruppi:
+        k, _, v = g.partition(':')
+        mod.setdefault(k.strip(), v.strip())
+    return testo, mod
+
+
+def albero_ety(s):
+    '''L'etimologia annidata di un termine: «der<ine-pro:*bʰeh₂-<id:speak>>» → ('der', ['ine-pro:*bʰeh₂-<id:speak>']);
+    «af<*bʰil-><*-os<id:athematic>>» → ('af', ['*bʰil-', '*-os<id:athematic>']). I gruppi che sono modificatori della
+    chiave («der<unc>») non sono termini.'''
+    chiave = re.split(r'[<\s]', (s or '').lstrip(':'), maxsplit=1)[0]
+    _, gruppi = gruppi_angolari(s)
+    return chiave, [g for g in gruppi if g.partition(':')[0].strip() not in MOD_CHIAVE]
+
+
+def prima_forma(t):
+    '''La prima di più forme scritte insieme: «*iowos, *iowez-» → «*iowos», «*h₂ér-ti-s ~ *h₂r̥-téy-s» → «*h₂ér-ti-s».'''
+    return re.split(r'\s*[~,;/]\s*|\s+(?:or|and)\s+', (t or '').strip(), maxsplit=1)[0].strip()
+
+
+def termine_ety(x, lingua):
+    '''(lingua, termine, modificatori) di un termine di {{ety}}. Se il termine manca vale la forma ricostruita in
+    <alt:> (una forma senza pagina: «grk-pro:<alt:*pʰōnā́>») o, per un tema («<alt:κρῐ-><ety:from<κρῑ́νω>>»), la
+    parola da cui il tema viene.'''
+    testo, mod = scomponi(x)
+    m = re.match(r'^([a-z]{2,3}(?:-[a-z]{2,4})*):(.*)$', testo)
+    lt, termine = (m.group(1), m.group(2).strip()) if m else (lingua, testo)
+    if not termine.strip('*- '):
+        alt = prima_forma(mod.get('alt', ''))
+        if alt.startswith('*') and alt.strip('*- ') and '<' not in alt:
+            return lt, alt, {k: v for k, v in mod.items() if k != 'alt'}
+        chiave, figli = albero_ety(mod.get('ety', ''))
+        if chiave in ('from', 'der', 'inh') and len(figli) == 1:
+            return termine_ety(figli[0], lt)
+    return lt, termine, mod
+
+
+def radici_ety(t, lingua):
+    '''Le radici ricostruite che un {{ety}}/{{etymon}} dichiara nel suo albero: φωνή < *pʰōnā́ < *bʰeh₂- «parlare»
+    ({{etymon|grc|:inh|grk-pro:<alt:*pʰōnā́><ety:der<ine-pro:*bʰeh₂-<id:speak>>>}}). Valgono come {{root}}: (lingua,
+    radice, identificativo). Conta la radice più profonda di ogni ramo (una variante come *dʰyeh₂- che viene da
+    *dʰeyh₂- non è la radice); un ramo o una radice segnati come incerti (<unc>) non dichiarano niente, e nemmeno
+    :influence, :cog e le chiavi che non danno un etimo.'''
+    trovate = []
+
+    def visita(x, lingua_x, prof=0):
+        """True se sotto questo termine, o in questo termine, c'è una radice dichiarata."""
+        if prof > 12:
+            return False
+        lt, termine, mod = termine_ety(x, lingua_x)
+        sotto = False
+        if mod.get('ety'):
+            chiave, figli = albero_ety(mod['ety'])
+            if chiave in ETY_CHIAVI and '<unc' not in mod['ety'].split('<', 1)[0] + '<' + '<'.join(
+                    g for g in gruppi_angolari(mod['ety'])[1] if g.partition(':')[0].strip() in MOD_CHIAVE):
+                for f in figli:
+                    sotto = visita(f, lt, prof + 1) or sotto
+        ident = mod.get('id') if mod.get('id') and '<' not in mod['id'] else None
+        radice = termine.startswith('*') and termine.endswith('-') and '-' not in termine.strip('*-') \
+            and bool(termine.strip('*-')) and not termine.startswith('*-') and lt.endswith('-pro')
+        if radice and not sotto and 'unc' not in mod and 'unk' not in mod:
+            if (lt, termine, ident) not in trovate:
+                trovate.append((lt, termine, ident))
+            return True
+        return sotto or radice
+
+    a = t.get('args') or {}
+    chiave, incerta = 'from', False
+    for _, x in sorted((int(k), v) for k, v in a.items() if k.isdigit() and int(k) >= 2 and v and v.strip()):
+        x = x.strip()
+        if x.startswith(':'):
+            chiave = re.split(r'[<\s]', x[1:], maxsplit=1)[0]
+            incerta = '<unc' in x or '<unk' in x
+        elif chiave in ETY_CHIAVI and not incerta:
+            visita(x, (a.get('1') or lingua).strip())
+    return trovate
 
 
 def da_ety(t, lingua):
@@ -89,20 +199,28 @@ def da_ety(t, lingua):
         if not nome:
             continue
         if nome in ('af', 'blend'):
-            termini = [preverbo(x, lv) if i < len(termini) - 1 else x for i, x in enumerate(termini)]
-            return {'name': nome, 'args': {'1': lv, **{str(i): x for i, x in enumerate(termini, 2)}}, 'expansion': ''}
-        x = termini[0]
-        mod = dict(re.findall(r'<(\w+):([^<>]*)>', x))
-        termine = re.sub(r'<[^<>]*>', '', x).strip()
-        m = re.match(r'^([a-z]{2,3}(?:-[a-z]{2,4})*):(.*)$', termine)
-        lt, termine = (m.group(1), m.group(2).strip()) if m else (lv, termine)
-        if not termine.strip('*- '):
-            continue                        # «itc-pro:» senza parola: nessun etimo
+            parti = []
+            for x in termini:
+                if scomponi(x)[0].strip('*- ') and not re.search(r'<[^<>]*<', x):
+                    parti.append(x)         # il caso semplice resta com'è: «fābula<id:discourse>»
+                    continue
+                # «<alt:κρῐ-><ety:from<κρῑ́νω>>» (κριτής): il tema non è una voce, vale la parola da cui viene
+                lt, termine, mod = termine_ety(x, lv)
+                if termine.strip('*- ') or termine.startswith('-') or termine.endswith('-'):
+                    parti.append((termine if lt == lv else f'{lt}:{termine}')
+                                 + (f"<id:{mod['id']}>" if mod.get('id') and '<' not in mod['id'] else ''))
+            if not any(scomponi(x)[0].strip('*- ') for x in parti):
+                continue
+            parti = [preverbo(x, lv) if i < len(parti) - 1 else x for i, x in enumerate(parti)]
+            return {'name': nome, 'args': {'1': lv, **{str(i): x for i, x in enumerate(parti, 2)}}, 'expansion': ''}
+        lt, termine, mod = termine_ety(termini[0], lv)
+        if not termine.strip('*- ') or '<' in termine or '>' in termine or re.search(r'\s(?:and|or|of|to|the)\s|^(?:and|or|of)\s', termine):
+            continue                        # «itc-pro:» senza parola, o una frase al posto del termine: nessun etimo
         if nome in ('bf', 'clipping', 'ellipsis'):
             return {'name': nome, 'args': {'1': lv, '2': termine if lt == lv else f'{lt}:{termine}'}, 'expansion': ''}
         args = {'1': lv, '2': lt, '3': termine}
         for k, dove in (('alt', '4'), ('t', 't'), ('id', 'id')):
-            if mod.get(k):
+            if mod.get(k) and '<' not in mod[k]:
                 args[dove] = mod[k]
         return {'name': nome, 'args': args, 'expansion': ''}
     return None
@@ -140,6 +258,46 @@ FORMA = re.compile(r'^(?:\([^)]*\)\s*)*(?:'
 # Le voci che non sono parole: sigle e abbreviazioni (NASA, BBC, SPQR), simboli, caratteri, segni d'interpunzione.
 # Le sigle diventate parole minuscole (laser, radar) restano.
 NON_PAROLE = {'abbrev', 'symbol', 'character', 'punct'}
+
+
+# I discendenti che la pagina dichiara (sezione «Descendants»): l'albero ramo per ramo, dalla radice o dalla parola
+# antica alle lingue di oggi. Kaikki li dà in due forme: una riga per discendente con la profondità e i modelli
+# ({{desc|la|aqua|bor=1}}), oppure nodi annidati con lingua, parola ed etichette.
+MODELLI_DISCENDENTI = {'desc', 'descendant', 'desctree', 'descendants tree'}
+SEGNI_DISCENDENTI = (('bor', 'borrowed'), ('lbor', 'learned'), ('slb', 'semi-learned'), ('der', 'derived'),
+                     ('clq', 'calque'), ('unc', 'uncertain'), ('inh', 'inherited'))
+
+
+def discendenti(v):
+    """(profondità, lingua, parola, segni) per ogni discendente dichiarato; la profondità parte da 1."""
+    def nodi(lista, prof):
+        for d in lista or []:
+            if not isinstance(d, dict):
+                continue
+            if d.get('lang_code') or d.get('word'):
+                et = ' '.join(d.get('tags') or []) + ' ' + ' '.join(d.get('raw_tags') or [])
+                segni = [s for s, parola in SEGNI_DISCENDENTI if parola in et]
+                # un nodo senza parola (solo il nome di una lingua o di un ramo) si scrive lo stesso, vuoto: tiene il
+                # posto nell'albero, altrimenti i suoi figli passerebbero al nodo che lo precede (ποτέ sotto *hwaz)
+                yield prof, d.get('lang_code') or '', d.get('word') or '', segni
+                yield from nodi(d.get('descendants'), prof + 1)
+                continue
+            p = d.get('depth') or prof
+            if not any(t.get('name') in MODELLI_DISCENDENTI for t in d.get('templates') or []):
+                yield p, '', '', []
+            for t in d.get('templates') or []:
+                if t.get('name') not in MODELLI_DISCENDENTI:
+                    continue
+                a = t.get('args') or {}
+                segni = [s for s, _ in SEGNI_DISCENDENTI if a.get(s) and a.get(s) not in ('0', 'no')]
+                i = 2
+                while str(i) in a:
+                    if a[str(i)].strip() not in ('', '-'):
+                        yield p, a.get('1', ''), a[str(i)].strip(), segni
+                    i += 1
+                if i == 2 or all(a[str(j)].strip() in ('', '-') for j in range(2, i)):
+                    yield p, a.get('1', ''), '', segni
+    return nodi(v.get('descendants'), 1)
 
 
 def non_parola(v):
@@ -284,6 +442,59 @@ def menzione_come_der(v):
              'e': m.get('expansion', '')}]
 
 
+# Le lingue in cui una variante senza etimologia si lega al suo lemma: quelle che entrano intere (INTERE), dove la
+# voce c'è già. Altrove ogni grafia alternativa diventerebbe una voce nuova «con etimologia» (in inglese decine di migliaia)
+VARIANTI_LEGATE = set(filter(None, os.environ.get('VARIANTI_LEGATE', 'la,grc').split(',')))
+# «Epic form of πρός (prós)», «Lyric, Aeolic, and Laconian form of ὄνομᾰ», «Alternative spelling of X»
+VARIANTE_DI = re.compile(r'^(?:[A-Z][\w-]*,? (?:(?:and|or) )?)+(?:form|spelling|variant) of ([^\s(,;:]+)')
+
+
+def variante_di(v):
+    '''Una voce senza etimologia che è la variante di un'altra parola della sua lingua (ὄνυμα, «Lyric, Aeolic, and
+    Laconian form of ὄνομᾰ»; προτί, «Epic form of πρός»): un passaggio di tipo variante verso quella parola, così la
+    variante e ciò che ne discende stanno nella famiglia della parola. Solo se tutti i sensi rimandano alla stessa
+    parola, con alt_of di Kaikki o con la glossa; non per le forme flesse né per le pagine ricostruite (lì le
+    ricostruzioni alternative hanno la loro strada, VARIANTI).'''
+    sensi = v.get('senses') or []
+    if v.get('lang_code') not in VARIANTI_LEGATE or not sensi or marcata(v) \
+            or (v.get('original_title') or '').startswith('Reconstruction:'):
+        return []
+    bersagli = set()
+    for s in sensi:
+        w = next((a.get('word') for a in s.get('alt_of') or [] if a.get('word')), None)
+        if not w:
+            m = VARIANTE_DI.match((s.get('glosses') or [''])[0])
+            w = m.group(1) if m else None
+        if not w:
+            return []
+        bersagli.add(w.strip())
+    w = bersagli.pop() if len(bersagli) == 1 else ''
+    if not w or w == v.get('word') or not PAROLA_RICOSTRUITA.match(w):
+        return []
+    return [{'n': 'variante', 'a': {'1': v.get('lang_code'), '2': w}, 'e': ''}]
+
+
+def base_dalla_menzione(v, lingua):
+    '''«{{m|en|lie}} {{suffix|en||ing}}» (lying), «From {{m|it|vedova}} (or {{m|it|vedovo}}) {{suf|it||aggio}}»
+    (vedovaggio): il suffisso è scritto senza la base, e la base è la parola menzionata prima. Senza questo il suffisso
+    restava solo (e prima ancora diventava una parola: lying < «ing»). Vale la prima menzione che non è un affisso tra i
+    modelli che precedono il suffisso; se non c'è, niente.'''
+    tpl = v.get('etymology_templates') or []
+    for i, t in enumerate(tpl):
+        a = t.get('args') or {}
+        if ALIAS.get(t.get('name'), t.get('name')) != 'suffix' or scomponi(a.get('2') or '')[0] or not scomponi(a.get('3') or '')[0]:
+            continue
+        for m in tpl[:i]:
+            ma = m.get('args') or {}
+            base = scomponi(ma.get('2') or '')[0]
+            if m.get('name') in MENZIONI and base and not base.startswith('-') and not base.endswith('-') and PAROLA_RICOSTRUITA.match(base):
+                lm = (ma.get('1') or lingua).strip()
+                return {'name': 'af', 'args': {'1': lingua, '2': base if lm == lingua else f'{lm}:{base}',
+                                               '3': '-' + scomponi(a['3'])[0].lstrip('-')}, 'expansion': ''}
+        return None
+    return None
+
+
 def testo_come_der(v):
     """Un'etimologia scritta solo a parole, senza nessun modello: la prima frase, se è semplice. «From Latin dominus»
     (der dal latino), «From domandare» o «Deverbal of domandare» (der dalla stessa lingua), «Past participle of trovare»,
@@ -412,7 +623,7 @@ def forme_per_analisi(v):
 
 
 if __name__ == '__main__':
-    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = non_parole = dal_testo = 0
+    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = non_parole = dal_testo = radici_dalla_ety = varianti_legate = basi_dalla_menzione = 0
     esempi_testo = 0
     out = open(sys.argv[1], 'w', encoding='utf-8')
     glosse = open(sys.argv[2], 'w', encoding='utf-8')
@@ -425,6 +636,10 @@ if __name__ == '__main__':
     # SENZA: per ogni lemma senza etimologia utile, la causa (diagnosi: perché zoo non ha una catena)
     senza_f = open(os.environ['SENZA'], 'w', encoding='utf-8') if os.environ.get('SENZA') else None
     cause, modelli_ignoti = Counter(), Counter()
+    # DISCENDENTI: l'albero dei discendenti dichiarati da ogni pagina, una riga per nodo: parola, numero
+    # dell'etimologia, se è ricostruita, profondità, lingua e parola del discendente, segni (bor, der, unc…)
+    discendenti_f = open(os.environ['DISCENDENTI'], 'w', encoding='utf-8') if os.environ.get('DISCENDENTI') else None
+    righe_discendenti = pagine_discendenti = 0
     # DIAGNOSI_MODELLI=ety,etymon: alcuni esempi grezzi di quei modelli nel registro, per imparare a leggerli
     diagnosi = set(filter(None, os.environ.get('DIAGNOSI_MODELLI', '').split(',')))
     esempi_diagnosi = Counter()
@@ -450,6 +665,18 @@ if __name__ == '__main__':
         if non_parola(v):
             non_parole += 1
             continue
+        if discendenti_f and v.get('descendants'):
+            ric = '1' if (v.get('original_title') or '').startswith('Reconstruction:') else ''
+            scritte = 0
+            for prof, ld, pd, segni in discendenti(v):
+                pd = pd.replace('\t', ' ').replace('\n', ' ')
+                discendenti_f.write(f"{v['word']}\t{v.get('etymology_number') or 1}\t{ric}\t{prof}\t{ld}\t{pd}\t{','.join(segni)}\n")
+                scritte += 1
+            righe_discendenti += scritte
+            pagine_discendenti += 1
+            if pagine_discendenti <= 2:
+                print('  discendenti, esempio grezzo: ' + json.dumps({'parola': v.get('word'), 'd': v['descendants'][:4]},
+                                                                      ensure_ascii=False)[:1200] + f' → {scritte} righe', file=sys.stderr)
         if varianti_f and (v.get('original_title') or '').startswith('Reconstruction:'):
             for variante, principale, fonte in ricostruzioni_alternative(v):
                 varianti_f.write(f'{variante}\t{principale}\n')
@@ -495,6 +722,19 @@ if __name__ == '__main__':
             if conv:
                 classici = [conv] + classici
                 dalla_ety += 1
+            else:
+                conv = base_dalla_menzione(v, LINGUA)
+                if conv:
+                    classici = [conv] + classici
+                    basi_dalla_menzione += 1
+                    if basi_dalla_menzione <= 12:
+                        print(f"  base dalla menzione: {v.get('word')} = {conv['args']['2']} + {conv['args']['3']}", file=sys.stderr)
+        if not any(t.get('name') == 'root' for t in classici):
+            dichiarate = [r for t in tpl if t.get('name') in ('ety', 'etymon') for r in radici_ety(t, LINGUA)]
+            for lr, radice, ident in dict.fromkeys(dichiarate):
+                classici.append({'name': 'root', 'args': {'1': LINGUA, '2': lr, '3': radice, **({'id': ident} if ident else {})},
+                                 'expansion': ''})
+            radici_dalla_ety += bool(dichiarate)
         tpl = [{'n': t['name'], 'a': t.get('args', {}), 'e': t.get('expansion', '')} for t in classici]
         if not tpl:
             tpl = menzione_come_der(v)
@@ -506,6 +746,11 @@ if __name__ == '__main__':
                 esempi_testo += 1
                 print('  dal testo: ' + json.dumps({'parola': v.get('word'), 'testo': (v.get('etymology_text') or '')[:160],
                                                     'modello': tpl[0]}, ensure_ascii=False), file=sys.stderr)
+        if not tpl:
+            tpl = variante_di(v)
+            varianti_legate += bool(tpl)
+            if tpl and varianti_legate <= 12:
+                print(f"  variante: {v.get('word')} → {tpl[0]['a']['2']} ({((v.get('senses') or [{}])[0].get('glosses') or [''])[0][:60]})", file=sys.stderr)
         if not tpl:
             senza += 1
             nomi = sorted({t.get('name') or '' for t in (v.get('etymology_templates') or [])} - {''})
@@ -527,9 +772,11 @@ if __name__ == '__main__':
                               'se': dati_scheda(v),
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
-    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}), forme flesse {flesse} '
+    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}; con una radice dichiarata da {{{{ety}}}} {radici_dalla_ety}; varianti senza etimologia legate al lemma {varianti_legate}; basi lette dalla menzione prima del suffisso {basi_dalla_menzione}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}, sigle e simboli esclusi {non_parole}', file=sys.stderr)
+    if discendenti_f:
+        print(f'  discendenti dichiarati: {pagine_discendenti} pagine, {righe_discendenti} righe', file=sys.stderr)
     if varianti_f:
         print(f'  ricostruzioni alternative: {dict(varianti)}', file=sys.stderr)
     if analisi_f:

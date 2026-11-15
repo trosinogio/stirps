@@ -52,6 +52,50 @@ assert da_ety({'args': {'1': 'grc', '2': ':af', '3': 'κατά', '4': 'βαίν�
 assert da_ety({'args': {'1': 'la', '2': ':inh', '3': 'itc-pro:<id:x>'}}, 'la') is None, 'un termine vuoto non è un etimo'
 from filtra import porta_etimo
 assert not porta_etimo({'name': 'suffix', 'args': {'1': 'la', '2': '-ia'}}), '{{suffix|la|-ia}} senza base non dà un etimo: vale {{ety}}'
+# la sintassi ad albero di {{ety}}/{{etymon}}: i termini portano la loro etimologia annidata (φωνή, μύω, κριτής, φίλος
+# erano cime senza etimologia: l'etimo diventava «<ety:der<ine-pro:*bʰeh₂->>», e il suffisso -τής una parola)
+from filtra import radici_ety
+fone = {'args': {'1': 'grc', '2': ':inh', '3': 'grk-pro:<alt:*pʰōnā́><ety:der<ine-pro:*bʰeh₂-<id:speak>>>', 'id': 'sound'}}
+assert da_ety(fone, 'grc')['args'] == {'1': 'grc', '2': 'grk-pro', '3': '*pʰōnā́'}, da_ety(fone, 'grc')
+assert radici_ety(fone, 'grc') == [('ine-pro', '*bʰeh₂-', 'speak')], 'la radice dichiarata nell\'albero, con il suo identificativo'
+assert da_ety({'args': {'1': 'grc', '2': ':af', '3': '<alt:κρῐ-><ety:from<κρῑ́νω>>', '4': '-τής'}}, 'grc')['args'] == {'1': 'grc', '2': 'κρῑ́νω', '3': '-τής'}, 'il tema κρῐ- non è una voce: vale κρίνω'
+myo = {'args': {'1': 'grc', '2': ':der', '3': 'ine-pro:<alt:*mewH-ye-><ety:from<*mewH->>'}}
+assert da_ety(myo, 'grc')['args']['3'] == '*mewH-ye-' and radici_ety(myo, 'grc') == [('ine-pro', '*mewH-', None)], 'il tema *mewH-ye- non è una radice'
+filos = {'args': {'1': 'grc', '2': ':inh', '3': 'ine-pro:<alt:*bʰil-o-s><ety:af<*bʰil-><*-os<id:athematic>>>', 'id': 'dear'}}
+assert da_ety(filos, 'grc')['args']['3'] == '*bʰil-o-s' and radici_ety(filos, 'grc') == [('ine-pro', '*bʰil-', None)], 'il suffisso *-os non è una radice'
+assert radici_ety({'args': {'1': 'it', '2': ':influence', '3': 'ine-pro:*bʰer-'}}, 'it') == [], ':influence non dichiara una radice'
+sema = {'args': {'1': 'grc', '2': ':inh<unc:1>', '3': 'grk-pro:<alt:*tsā́mə><ety:inh<ine-pro:<alt:*dʰyéh₂mn̥><ety:af<ine-pro:<alt:*dʰyeh₂-><ety:from<*dʰeyh₂-<pos:root><unc:1>>>><*-mn̥>>>>', '4': ':afeq', '5': '-μα'}}
+assert radici_ety(sema, 'grc') == [], 'un\'etimologia incerta (σῆμα) non dichiara una radice'
+assert da_ety(sema, 'grc')['args'] == {'1': 'grc', '2': 'grk-pro', '3': '*tsā́mə'}, da_ety(sema, 'grc')
+variante = {'args': {'1': 'grc', '2': ':inh', '3': 'ine-pro:<alt:*dʰyéh₂mn̥><ety:af<ine-pro:<alt:*dʰyeh₂-><ety:from<*dʰeyh₂->>><*-mn̥>>'}}
+assert radici_ety(variante, 'grc') == [('ine-pro', '*dʰeyh₂-', None)], 'la radice è la più profonda: *dʰyeh₂- viene da *dʰeyh₂-'
+assert da_ety({'args': {'1': 'grc', '2': ':from<text:from earlier>', '3': 'ζώῐ̈ον<ety:af<ζώς<ety:from<ζωός><-ῐον>>'}}, 'grc')['args']['3'] == 'ζώῐ̈ον', 'parentesi non chiuse nel dump: resta il termine'
+assert da_ety({'args': {'1': 'la', '2': ':af', '3': 'fābula<id:discourse>', '4': '-lus<alt:-la>'}}, 'la')['args'] == {'1': 'la', '2': 'fābula<id:discourse>', '3': '-lus<alt:-la>'}, 'il caso semplice non cambia'
+assert porta_etimo({'name': 'inh', 'args': {'1': 'grc', '2': 'grk-pro', '3': '', '4': '*pʰōnā́'}}), 'una forma ricostruita senza pagina è un etimo'
+# le varianti senza etimologia: ὄνυμα e προτί (96 parole sotto) erano cime, staccate da ὄνομα e da πρός
+from filtra import variante_di
+onyma = {'word': 'ὄνυμα', 'lang_code': 'grc', 'senses': [{'glosses': ['Lyric, Aeolic, and Laconian form of ὄνομᾰ (ónomă)']}]}
+assert variante_di(onyma) == [{'n': 'variante', 'a': {'1': 'grc', '2': 'ὄνομᾰ'}, 'e': ''}], variante_di(onyma)
+assert variante_di({'word': 'προτί', 'lang_code': 'grc', 'senses': [{'glosses': ['Epic form of πρός (prós)']}]})[0]['a']['2'] == 'πρός'
+assert variante_di({'word': 'caussa', 'lang_code': 'la', 'senses': [{'glosses': ['x'], 'alt_of': [{'word': 'causa'}]}]})[0]['a']['2'] == 'causa', 'alt_of di Kaikki'
+assert variante_di({'word': 'color', 'lang_code': 'en', 'senses': [{'glosses': ['x'], 'alt_of': [{'word': 'colour'}]}]}) == [], 'solo nelle lingue che entrano intere'
+assert variante_di({'word': 'x', 'lang_code': 'grc', 'senses': [{'glosses': ['Epic form of πρός']}, {'glosses': ['Doric form of ποτί']}]}) == [], 'due parole diverse: nessuna variante'
+assert variante_di({'word': 'x', 'lang_code': 'grc', 'senses': [{'glosses': ['Epic form of πρός']}, {'glosses': ['a river']}]}) == [], 'un senso proprio: non è solo una variante'
+assert variante_di({'word': 'amamus', 'lang_code': 'la', 'senses': [{'glosses': ['first-person plural of amo'], 'form_of': [{'word': 'amo'}]}]}) == [], 'una forma flessa non è una variante'
+assert not porta_etimo({'name': 'suffix', 'args': {'1': 'grc', '2': '', '3': 'τής'}}), '{{suffix|grc||τής}} non ha una base'
+assert not porta_etimo({'name': 'der', 'args': {'1': 'grc', '2': 'qsb-grc', '3': '-'}}), 'il sostrato senza parola non è un etimo'
+# più forme in <alt:>: la prima; una frase al posto del termine non è un etimo
+from filtra import termine_ety, base_dalla_menzione
+assert termine_ety('itc-ala:<alt:*iowos, *iowez->', 'la')[:2] == ('itc-ala', '*iowos') and termine_ety('ine-pro:<alt:*h₂ér-ti-s ~ *h₂r̥-téy-s>', 'x')[1] == '*h₂ér-ti-s'
+assert da_ety({'args': {'1': 'la', '2': ':from', '3': 'trivius and trivium'}}, 'la') is None, 'una frase non è un etimo'
+# «lie + -ing» scritto {{m|en|lie}} {{suffix|en||ing}}: la base è la menzione che precede
+lying = {'etymology_templates': [{'name': 'm', 'args': {'1': 'en', '2': 'lie', '4': 'to rest'}}, {'name': 'suffix', 'args': {'1': 'en', '2': '', '3': 'ing'}}]}
+assert base_dalla_menzione(lying, 'en')['args'] == {'1': 'en', '2': 'lie', '3': '-ing'}
+prec = {'etymology_templates': [{'name': 'm', 'args': {'1': 'it', '2': 'precoce'}}, {'name': 'm', 'args': {'1': 'it', '2': '-izzare'}}, {'name': 'suf', 'args': {'1': 'it', '2': '', '3': 'ante'}}]}
+assert base_dalla_menzione(prec, 'it')['args']['2'] == 'precoce', 'un affisso menzionato non è la base'
+sed = {'etymology_templates': [{'name': 'der', 'args': {'1': 'en', '2': 'la', '3': '', '4': 'sēduct-'}}, {'name': 'm', 'args': {'1': 'la', '2': 'sēdūcere'}}, {'name': 'suffix', 'args': {'1': 'en', '2': '', '3': 'ive'}}]}
+assert base_dalla_menzione(sed, 'en')['args'] == {'1': 'en', '2': 'la:sēdūcere', '3': '-ive'}
+assert base_dalla_menzione({'etymology_templates': [{'name': 'suffix', 'args': {'1': 'it', '2': '', '3': 'metro'}}]}, 'it') is None, 'senza una menzione il suffisso resta solo'
 assert porta_etimo({'name': 'suffix', 'args': {'1': 'la', '2': 'audiēns', '3': 'ia'}}) and porta_etimo({'name': 'inh', 'args': {'1': 'it', '2': 'la', '3': 'aquila'}})
 from wiktionary import lemma_valido, senza_albero
 # l'albero etimologico appiattito prima del testo di Wiktionary non è testo
@@ -101,6 +145,26 @@ imp.precisa_omografe()
 etimo = {r['esito']: r['etimo'] for r in imp.relazioni}
 assert etimo[karo] == cut, '*karō punta a *(s)ker- «tagliare»'
 assert etimo[cors] == gen, 'con dichiarazioni discordi l\'arco resta sul nodo generico'
+# la glossa con cui una pagina cita il nodo generico porta a una sola omografa: la regola vale solo se, misurata sugli
+# archi che le dichiarazioni decidono, concorda abbastanza spesso; una glossa che si lega a due omografe non decide
+import wiktionary
+def omografe_per_glossa(soglia):
+    wiktionary.OMOGRAFE_PER_GLOSSA = soglia
+    imp = Importatore()
+    gen, cut, turn = imp.lessema('ine-pro', '*(s)ker-'), imp.lessema('ine-pro', '*(s)ker-', ident='cut'), imp.lessema('ine-pro', '*(s)ker-', ident='turn')
+    imp.lessemi[turn]['glosse']['to turn, bend'] += 1
+    curtus, corona, crux = imp.lessema('la', 'curtus'), imp.lessema('la', 'corona'), imp.lessema('la', 'crux')
+    arco(imp, curtus, gen); arco(imp, corona, gen); arco(imp, crux, gen)
+    imp.glossa_arco = {(curtus, gen): 'to cut off', (corona, gen): 'to bend; to turn', (crux, gen): 'to turn; to cut'}
+    imp.radici = {(curtus, cut)}
+    imp.precisa_omografe()
+    return imp, {r['esito']: r['etimo'] for r in imp.relazioni}, (gen, cut, turn, curtus, corona, crux)
+imp, etimo, (gen, cut, turn, curtus, corona, crux) = omografe_per_glossa((50, 0.9))
+assert etimo[curtus] == cut and etimo[corona] == gen and etimo[crux] == gen, 'una prova sola non basta: la glossa non sposta archi'
+assert (imp.stat['omografe_glossa_concorde'], imp.stat['omografe_glossa_in_attesa'], imp.stat['omografe_glossa_non_decide']) == (1, 1, 1), dict(imp.stat)
+imp, etimo, (gen, cut, turn, curtus, corona, crux) = omografe_per_glossa((1, 0.9))
+assert etimo[corona] == turn and etimo[crux] == gen, 'misurata, la glossa «to bend; to turn» porta a *(s)ker- «girare»; «to turn; to cut» non decide'
+wiktionary.OMOGRAFE_PER_GLOSSA = (50, 0.9)
 # audientia: il ripiego sulla radice dichiarata non sceglie a caso tra due radici
 imp = Importatore()
 aud, audience = imp.lessema('la', 'audientia'), imp.lessema('it', 'audience')
@@ -413,6 +477,63 @@ arco(imp, forty, four)
 imp.relazioni.append({**imp.relazioni[-1], 'chiave': forty + '#wikt#1', 'etimo': y, 'ordine': 2})
 imp.togli_archi_impossibili()
 assert [r['etimo'] for r in imp.relazioni if r['esito'] == forty] == [four], imp.relazioni
+# i discendenti dichiarati: una parola senza etimologia prende l'arco dell'albero (agua < aqua), non un nodo incerto né
+# ciò che gli sta sotto, non una parola con omografi, non una parola indoeuropea; e solo se la misura regge
+import wiktionary
+imp = Importatore()
+aqua, acqua, agua, eau, ewe = (imp.lessema('la', 'aqua'), imp.lessema('it', 'acqua'), imp.lessema('es', 'agua'),
+                               imp.lessema('fr', 'eau'), imp.lessema('fro', 'ewe'))
+agua_pt = imp.lessema('pt', 'água')
+aquarium, canna, canna2, wod = (imp.lessema('en', 'aquarium'), imp.lessema('it', 'canna'), imp.lessema('it', 'canna', omografo=2),
+                                imp.lessema('ine-pro', '*wódr̥'))
+arco(imp, acqua, aqua)
+with open(f'{d}/discendenti.tsv', 'w') as f:
+    f.write('aqua\t1\t\t1\tit\tacqua\t\n' 'aqua\t1\t\t1\tes\tagua\t\n' 'aqua\t1\t\t1\tfro\tewe\tunc\n'
+            'aqua\t1\t\t2\tfr\teau\t\n' 'aqua\t1\t\t1\ten\taquarium\tbor\n' 'aqua\t1\t\t1\tit\tcanna\t\n'
+            'aqua\t1\t\t1\tine-pro\t*wódr̥\t\n'
+            # il nome di un ramo senza parola tiene il posto: ciò che gli sta sotto discende da aqua, non dal nodo prima
+            'aqua\t1\t\t1\tit\tacqua\t\n' 'aqua\t1\t\t1\troa-ibe\t\t\n' 'aqua\t1\t\t2\tpt\tágua\t\n')
+# una radice con omografe: l'arco va alla radice che la pagina dichiara con il suo identificativo, o a nessuna
+vestire, pascolare = imp.lessema('ine-pro', '*wes-', ident='dress'), imp.lessema('ine-pro', '*wes-', ident='graze')
+generica, veste, bosko = imp.lessema('ine-pro', '*wes-'), imp.lessema('grc', 'ἐσθής'), imp.lessema('grc', 'βόσκω')
+imp.id_proprio[generica] = 'dress'
+with open(f'{d}/discendenti_pie.tsv', 'w') as f:
+    f.write('wes-\t1\t1\t1\tgrc\tἐσθής\t\n' 'wes-\t2\t1\t1\tgrc\tβόσκω\t\n')
+wiktionary.DISCENDENTI_DICHIARATI = (5, 0.85)
+imp.collega_discendenti([('la', f'{d}/discendenti.tsv')])
+assert imp.stat['discendenti_regola_non_applicata'] == 3 and not imp.stat['discendenti_collegati'], imp.stat
+wiktionary.DISCENDENTI_DICHIARATI = (1, 0.85)
+imp.collega_discendenti([('la', f'{d}/discendenti.tsv'), ('ine-pro', f'{d}/discendenti_pie.tsv')])
+nuovi = {(r['esito'], r['etimo'], r['tipo'], r['conf']) for r in imp.relazioni if r['ipotesi'].endswith('#wikt-discendente')}
+assert nuovi == {(agua, aqua, 'eredita', 2), (aquarium, aqua, 'prestito', 2), (agua_pt, aqua, 'eredita', 2), (veste, vestire, 'eredita', 2)}, nuovi
+assert imp.ipotesi[agua + '#wikt-discendente']['etichetta'] == 'Wiktionary (discendente dichiarato)'
+wiktionary.DISCENDENTI_DICHIARATI = (500, 0.85)
+# le parole nuove dei rami antichi: entra il discendente che ha la sua pagina in una lingua di chiusura (gotico watō),
+# non quello senza pagina, non una locuzione, non una pagina con omografi, non sotto una lingua fuori dall'elenco
+imp = Importatore()
+vuoto = {'voci': [], 'omografi': {}, 'forme': {}, 'participi': {}, 'flesse': {}, 'file_glosse': None}
+imp.chiusura['got'] = {**vuoto, 'lemmi': {'𐍅𐌰𐍄𐍉', '𐌰𐌷𐍈𐌰'}, 'omografi': {'𐌰𐌷𐍈𐌰': [(1, set()), (2, set())]}}
+imp.chiusura['es'] = {**vuoto, 'lemmi': {'agua'}}
+# una pagina che è solo la grafia alternativa di un'altra parola non entra; e una parola entrata che resta senza
+# etimologia e senza derivati esce
+with open(f'{d}/got_glosse.tsv', 'w') as f:
+    f.write('𐍅𐌰𐍄𐍉\t1\tnoun\twater\n' '𐍅𐌰𐍄𐍉𐌽\t1\tnoun\talternative form of 𐍅𐌰𐍄𐍉\n')
+imp.chiusura['got']['lemmi'].add('𐍅𐌰𐍄𐍉𐌽')
+imp.chiusura['got']['file_glosse'] = f'{d}/got_glosse.tsv'
+acqua_pie, aqua = imp.lessema('ine-pro', '*wódr̥'), imp.lessema('la', 'aqua')
+with open(f'{d}/discendenti_semina.tsv', 'w') as f:
+    f.write('wódr̥\t1\t1\t1\tgot\t𐍅𐌰𐍄𐍉\t\n' 'wódr̥\t1\t1\t1\tgot\t𐍅𐌰𐍄𐌰\t\n' 'wódr̥\t1\t1\t1\tgot\t𐌰𐌷𐍈𐌰\t\n'
+            'wódr̥\t1\t1\t1\tgot\t𐍅𐌰𐍄𐍉 𐍅𐌰𐍄𐍉\t\n' 'wódr̥\t1\t1\t1\txx\tboh\t\n' 'wódr̥\t1\t1\t1\tgot\t𐍅𐌰𐍄𐍉𐌽\t\n')
+with open(f'{d}/discendenti_semina_la.tsv', 'w') as f:
+    f.write('aqua\t1\t\t1\tes\tagua\t\n')
+percorsi = [('ine-pro', f'{d}/discendenti_semina.tsv'), ('la', f'{d}/discendenti_semina_la.tsv')]
+assert imp.semina_discendenti(percorsi, {'ine-pro', 'grc'}) == 1, imp.stat
+assert {l['lemma'] for l in imp.lessemi.values() if l['lingua'] == 'got'} == {'𐍅𐌰𐍄𐍉'}, imp.lessemi.keys()
+assert not any(l['lingua'] == 'es' for l in imp.lessemi.values()), 'il latino non è tra i rami da cui si semina'
+assert imp.semina_discendenti(percorsi, {'ine-pro', 'grc'}) == 0, 'la seconda volta non c\'è più niente da seminare'
+assert imp.stat['discendenti_sole_varianti'] == 2, imp.stat
+imp.togli_seminati_orfani()
+assert not any(l['lingua'] == 'got' for l in imp.lessemi.values()) and imp.stat['discendenti_seminati_orfani'] == 1
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \
