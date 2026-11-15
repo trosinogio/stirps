@@ -592,6 +592,7 @@ class Importatore:
         self.comuni = {}             # nella lingua principale, i lemmi senza etimologia che entrano lo stesso (--comuni it=…):
                                      # quelli del lessico di frequenza, perché l'analisi di un testo li riconosca
         self.lette = set()           # le voci di cui si è letta la pagina (voce())
+        self.chiuse = set()          # (lingua, posizione) delle voci di chiusura già lette (chiudi())
         self.id_proprio = {}         # voce → l'identificativo che la sua pagina si dà ({{etymon|gem-pro|id=three}})
         self.con_ident = defaultdict(set)   # chiave senza identificativo → le chiavi con (*þrīz → *þrīz@three)
         self.con_etimologia = set()  # lingue di chiusura di cui entrano tutte le voci con un'etimologia, ma non i lemmi
@@ -1100,7 +1101,7 @@ class Importatore:
         """Importa le etimologie delle voci intermedie già presenti nel dizionario. Nelle lingue intere (--intere)
         il primo passaggio prende anche le voci attestate che nessuna catena raggiunge (lēvir, δαήρ): così le
         famiglie delle radici si completano. Le forme ricostruite entrano solo se una catena le cita."""
-        fatte = set()
+        fatte = self.chiuse                 # le voci già lette, anche tra una chiamata e l'altra
         for passo in range(passi):
             nuove = 0
             for lingua, idx in self.chiusura.items():
@@ -1129,7 +1130,7 @@ class Importatore:
                             if not raggiunta:
                                 self.stat[f'intere_{lingua}'] += 1
                             break
-            self.stat[f'chiusura_passo_{passo + 1}'] = nuove
+            self.stat[f'chiusura_passo_{passo + 1}'] += nuove
             if not nuove:
                 break
 
@@ -1582,36 +1583,18 @@ class Importatore:
                                    'ordine': 1, 'affisso': None, 'conf': 2, 'forma': None})
             self.stat['catene_chiuse_su_radice'] += 1
 
-    # ---- i discendenti dichiarati: un'etimologia per le parole che non ne hanno ----
-    def collega_discendenti(self, percorsi):
-        """Le pagine di Wiktionary elencano i loro discendenti ramo per ramo (filtra.py con DISCENDENTI): ogni nodo
-        dell'albero dice che la parola viene da quella che le sta sopra. Una parola del dizionario senza nessuna
-        etimologia prende quell'arco, con certezza 2 e la sua etichetta. Mai un arco segnato incerto o un calco; mai
-        verso una parola con omografi (l'albero non dice quale); mai una parola indoeuropea (non prende etimi dalle
-        pagine altrui); mai contro la genealogia delle lingue; e se due pagine danno alla parola due genitori che non
-        stanno uno sopra l'altro, nessuno dei due. La regola si misura a ogni giro sulle parole che hanno già la loro
-        etimologia (l'albero le mette nella stessa famiglia?) e vale solo sopra la soglia (DISCENDENTI_DICHIARATI)."""
-        etimi = defaultdict(set)
-        accolte = {h['chiave'] for h in self.ipotesi.values() if h['stato'] == 'accolta'}
-        con_ipotesi = {h['esito'] for h in self.ipotesi.values()}
-        for r in self.relazioni:
-            if r['ipotesi'] in accolte:
-                etimi[r['esito']].add(r['etimo'])
+    # ---- i discendenti dichiarati: l'albero, le parole nuove, le etimologie per chi non ne ha ----
+    def archi_discendenti(self, percorsi):
+        """Gli archi dell'albero dei discendenti (filtra.py con DISCENDENTI): genitore e figlio come voci del
+        dizionario (None se la voce non c'è, o se ce n'è più d'una con quella forma), poi lingua, parola e segni del
+        figlio. Un nodo senza parola è il nome di un ramo («Hellenic:»): ciò che gli sta sotto discende dal nodo che gli
+        sta sopra. Un nodo segnato incerto o un calco non porta la discendenza, nemmeno ai nodi sotto di lui. Da una
+        radice con omografe vale solo quella che la pagina dichiara con il suo identificativo, mai il nodo generico."""
         pagine = Counter()
         for l in self.lessemi.values():
             pagine[(l['lingua'], l['lemma'])] += 1
 
-        def antenati(k):
-            visti, giro = set(), {k}
-            for _ in range(12):
-                giro = {e for x in giro for e in etimi.get(x, ())} - visti
-                if not giro:
-                    break
-                visti |= giro
-            return visti
-
         def voce(lingua, parola, omografo=None):
-            """La chiave della voce, se c'è ed è una sola con quella forma (o quella dell'omografo della pagina)."""
             lingua = codice_lingua(lingua)
             parola = parola.strip()
             if not lingua or not parola:
@@ -1623,15 +1606,12 @@ class Importatore:
             if omografo and omografo > 1:
                 k = f'{k}:{omografo}'
             if base in self.con_ident:
-                # una radice con omografe (*wes- «vestire», «pascolare»…): vale solo quella che la pagina dichiara con
-                # il suo identificativo, mai il nodo generico, che mescolerebbe le famiglie
                 k = base + '@' + self.id_proprio[k] if omografo and k in self.id_proprio else None
             l = self.lessemi.get(k)
             if not l or (not omografo and pagine[(l['lingua'], l['lemma'])] > 1):
                 return None
             return k
 
-        candidati, concordi, discordi = defaultdict(dict), 0, 0
         for lingua_pagina, percorso in percorsi:
             if not os.path.exists(percorso):
                 continue
@@ -1651,32 +1631,87 @@ class Importatore:
                     continue
                 genitore = pila[-1][1]
                 segni = set(c[6].split(','))
-                # un nodo incerto o un calco non porta la discendenza nemmeno ai nodi sotto di lui
                 if not c[5].strip():
-                    # un nodo senza parola è il nome di un ramo («Hellenic:»): ciò che gli sta sotto discende dal
-                    # nodo che gli sta sopra
                     pila.append((prof, None if segni & {'unc', 'clq'} else genitore))
                     continue
-                figlio = None if segni & {'unc', 'clq'} else voce(c[4], c[5])
+                if segni & {'unc', 'clq'}:
+                    pila.append((prof, None))
+                    continue
+                figlio = voce(c[4], c[5])
                 pila.append((prof, figlio))
-                self.stat['discendenti_archi'] += 1
-                if not genitore or not figlio or genitore == figlio:
-                    continue
-                if base_lingua(self.lessemi[figlio]['lingua']) == 'ine-pro' or self.arco_impossibile(genitore, figlio):
-                    self.stat['discendenti_esclusi_dalle_regole'] += 1
-                    continue
-                if figlio in con_ipotesi:
-                    if figlio in etimi:
-                        su = antenati(figlio)
-                        if genitore in su or su & (antenati(genitore) | {genitore}):
-                            concordi += 1
-                        else:
-                            discordi += 1
-                    continue
-                tipo = 'prestito' if segni & {'bor', 'lbor', 'slb'} else 'derivazione' if 'der' in segni \
-                    or base_lingua(self.lessemi[figlio]['lingua']) == base_lingua(self.lessemi[genitore]['lingua']) \
-                    else 'eredita' if discende_da(self.lessemi[figlio]['lingua'], self.lessemi[genitore]['lingua']) else 'generico'
-                candidati[figlio].setdefault(genitore, tipo)
+                yield genitore, figlio, c[4], c[5], segni
+
+    def semina_discendenti(self, percorsi, lingue):
+        """Le parole che l'albero dichiara e il dizionario non ha entrano, se il loro genitore è una voce di una delle
+        lingue date (i rami antichi: indoeuropeo, protoellenico, greco, protogermanico, protoslavo) e se hanno la loro
+        pagina, come lemma e senza omografi, in una lingua di chiusura: la pagina si legge poi con chiudi(), e vale la
+        sua etimologia; se non ne ha, l'arco lo dà collega_discendenti(). Mai una locuzione, mai una parola
+        indoeuropea (le pagine indoeuropee entrano dalle catene). Rende il numero delle parole entrate."""
+        nuove = 0
+        for genitore, figlio, lingua, parola, segni in list(self.archi_discendenti(percorsi)):
+            if not genitore or figlio or base_lingua(self.lessemi[genitore]['lingua']) not in lingue:
+                continue
+            lingua, parola = codice_lingua(lingua), parola.strip()
+            idx = self.chiusura.get(lingua)
+            if not idx or base_lingua(lingua) == 'ine-pro' or ' ' in parola:
+                continue
+            pagina = nome_pagina(lingua, parola.lstrip('*'))
+            if pagina not in idx['lemmi'] or pagina in idx['omografi']:
+                self.stat['discendenti_senza_pagina_o_omografi'] += 1
+                continue
+            ricostruita = parola.startswith('*') or lingua.endswith('-pro')
+            if self.chiave_di(lingua, ('*' if ricostruita else '') + pagina) in self.lessemi:
+                continue                    # c'è già (con omografi o identificativi: l'albero non dice quale)
+            self.lessema(lingua, ('*' if ricostruita else '') + pagina)
+            nuove += 1
+            self.stat[f'discendenti_seminati_{lingua}'] += 1
+        self.stat['discendenti_seminati'] += nuove
+        return nuove
+
+    def collega_discendenti(self, percorsi):
+        """Le pagine di Wiktionary elencano i loro discendenti ramo per ramo (filtra.py con DISCENDENTI): ogni nodo
+        dell'albero dice che la parola viene da quella che le sta sopra. Una parola del dizionario senza nessuna
+        etimologia prende quell'arco, con certezza 2 e la sua etichetta. Mai un arco segnato incerto o un calco; mai
+        verso una parola con omografi (l'albero non dice quale); mai una parola indoeuropea (non prende etimi dalle
+        pagine altrui); mai contro la genealogia delle lingue; e se due pagine danno alla parola due genitori che non
+        stanno uno sopra l'altro, nessuno dei due. La regola si misura a ogni giro sulle parole che hanno già la loro
+        etimologia (l'albero le mette nella stessa famiglia?) e vale solo sopra la soglia (DISCENDENTI_DICHIARATI)."""
+        etimi = defaultdict(set)
+        accolte = {h['chiave'] for h in self.ipotesi.values() if h['stato'] == 'accolta'}
+        con_ipotesi = {h['esito'] for h in self.ipotesi.values()}
+        for r in self.relazioni:
+            if r['ipotesi'] in accolte:
+                etimi[r['esito']].add(r['etimo'])
+
+        def antenati(k):
+            visti, giro = set(), {k}
+            for _ in range(12):
+                giro = {e for x in giro for e in etimi.get(x, ())} - visti
+                if not giro:
+                    break
+                visti |= giro
+            return visti
+
+        candidati, concordi, discordi = defaultdict(dict), 0, 0
+        for genitore, figlio, lingua, parola, segni in self.archi_discendenti(percorsi):
+            self.stat['discendenti_archi'] += 1
+            if not genitore or not figlio or genitore == figlio:
+                continue
+            if base_lingua(self.lessemi[figlio]['lingua']) == 'ine-pro' or self.arco_impossibile(genitore, figlio):
+                self.stat['discendenti_esclusi_dalle_regole'] += 1
+                continue
+            if figlio in con_ipotesi:
+                if figlio in etimi:
+                    su = antenati(figlio)
+                    if genitore in su or su & (antenati(genitore) | {genitore}):
+                        concordi += 1
+                    else:
+                        discordi += 1
+                continue
+            tipo = 'prestito' if segni & {'bor', 'lbor', 'slb'} else 'derivazione' if 'der' in segni \
+                or base_lingua(self.lessemi[figlio]['lingua']) == base_lingua(self.lessemi[genitore]['lingua']) \
+                else 'eredita' if discende_da(self.lessemi[figlio]['lingua'], self.lessemi[genitore]['lingua']) else 'generico'
+            candidati[figlio].setdefault(genitore, tipo)
         self.stat['discendenti_concordi'], self.stat['discendenti_discordi'] = concordi, discordi
         minimo, soglia = DISCENDENTI_DICHIARATI
         if concordi + discordi < minimo or concordi < soglia * (concordi + discordi):
@@ -1888,9 +1923,11 @@ if __name__ == '__main__':
     # wiktionary.py lemmi.jsonl uscita/ [glosse.tsv] [--chiudi la=lemmi.jsonl,glosse.tsv,forme.tsv]… [--passi N]
     #               [--forme-base it=forme.tsv]
     #               [--discendenti la=discendenti.tsv]…
+    #               [--semina-discendenti ine-pro,grk-pro,grc,gem-pro,sla-pro]
     #               [--intere la,grc] [--con-etimologia en] [--elenco en=../dati/frequenze_en.tsv.gz] [--esterni en]
     #               [--glosse-precedenti ../dati/lessemi.tsv.gz]
     args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti, comuni = [], [], 1, set(), set(), {}, set(), {}, {}
+    semina = set()      # --semina-discendenti ine-pro,grc: sotto le voci di queste lingue entrano anche le parole nuove
     discendenti = []    # --discendenti la=discendenti.tsv: gli alberi dei discendenti dichiarati (filtra.py con DISCENDENTI)
     forme_base = None   # --forme-base it=forme.tsv: le forme flesse della lingua di partenza (filtra.py con FORME)
     it_ = iter(sys.argv[1:])
@@ -1918,6 +1955,8 @@ if __name__ == '__main__':
                         precedenti[c[0]] = c[7].replace('\\\\', '\\')
         elif x == '--esterni':
             esterni = {c for c in next(it_).split(',') if c}
+        elif x == '--semina-discendenti':
+            semina = {c for c in next(it_).split(',') if c}
         elif x == '--discendenti':
             discendenti.append(tuple(next(it_).split('=', 1)))
         elif x == '--forme-base':
@@ -1946,6 +1985,11 @@ if __name__ == '__main__':
         completa_glosse(imp, args[2])
     imp.collega_participi()
     imp.chiudi(passi)
+    # le parole che gli alberi dei discendenti dichiarano sotto i rami antichi: entrano, e le loro pagine si leggono
+    for _ in range(3 if discendenti and semina else 0):
+        if not imp.semina_discendenti(discendenti, semina):
+            break
+        imp.chiudi(passi)
     imp.collega_participi()
     for c in chiusure:
         lingua, percorsi = c.split('=', 1)

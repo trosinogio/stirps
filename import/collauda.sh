@@ -508,6 +508,23 @@ nuovi = {(r['esito'], r['etimo'], r['tipo'], r['conf']) for r in imp.relazioni i
 assert nuovi == {(agua, aqua, 'eredita', 2), (aquarium, aqua, 'prestito', 2), (agua_pt, aqua, 'eredita', 2), (veste, vestire, 'eredita', 2)}, nuovi
 assert imp.ipotesi[agua + '#wikt-discendente']['etichetta'] == 'Wiktionary (discendente dichiarato)'
 wiktionary.DISCENDENTI_DICHIARATI = (500, 0.85)
+# le parole nuove dei rami antichi: entra il discendente che ha la sua pagina in una lingua di chiusura (gotico watō),
+# non quello senza pagina, non una locuzione, non una pagina con omografi, non sotto una lingua fuori dall'elenco
+imp = Importatore()
+vuoto = {'voci': [], 'omografi': {}, 'forme': {}, 'participi': {}, 'flesse': {}, 'file_glosse': None}
+imp.chiusura['got'] = {**vuoto, 'lemmi': {'𐍅𐌰𐍄𐍉', '𐌰𐌷𐍈𐌰'}, 'omografi': {'𐌰𐌷𐍈𐌰': [(1, set()), (2, set())]}}
+imp.chiusura['es'] = {**vuoto, 'lemmi': {'agua'}}
+acqua_pie, aqua = imp.lessema('ine-pro', '*wódr̥'), imp.lessema('la', 'aqua')
+with open(f'{d}/discendenti_semina.tsv', 'w') as f:
+    f.write('wódr̥\t1\t1\t1\tgot\t𐍅𐌰𐍄𐍉\t\n' 'wódr̥\t1\t1\t1\tgot\t𐍅𐌰𐍄𐌰\t\n' 'wódr̥\t1\t1\t1\tgot\t𐌰𐌷𐍈𐌰\t\n'
+            'wódr̥\t1\t1\t1\tgot\t𐍅𐌰𐍄𐍉 𐍅𐌰𐍄𐍉\t\n' 'wódr̥\t1\t1\t1\txx\tboh\t\n')
+with open(f'{d}/discendenti_semina_la.tsv', 'w') as f:
+    f.write('aqua\t1\t\t1\tes\tagua\t\n')
+percorsi = [('ine-pro', f'{d}/discendenti_semina.tsv'), ('la', f'{d}/discendenti_semina_la.tsv')]
+assert imp.semina_discendenti(percorsi, {'ine-pro', 'grc'}) == 1, imp.stat
+assert {l['lemma'] for l in imp.lessemi.values() if l['lingua'] == 'got'} == {'𐍅𐌰𐍄𐍉'}, imp.lessemi.keys()
+assert not any(l['lingua'] == 'es' for l in imp.lessemi.values()), 'il latino non è tra i rami da cui si semina'
+assert imp.semina_discendenti(percorsi, {'ine-pro', 'grc'}) == 0, 'la seconda volta non c\'è più niente da seminare'
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \

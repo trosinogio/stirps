@@ -31,6 +31,8 @@ jobs:
         nl:Dutch dum:Middle Dutch gml:Middle Low German osx:Old Saxon frk:Frankish got:Gothic yi:Yiddish pl:Polish ga:Irish
         ar:Arabic he:Hebrew sa:Sanskrit hi:Hindi fa:Persian tr:Turkish ota:Ottoman Turkish ja:Japanese'
       INTERE: la,grc
+      # sotto le voci dei rami antichi entrano anche i discendenti dichiarati che il dizionario non ha (import/wiktionary.py)
+      SEMINA_DISCENDENTI: ine-pro,grk-pro,grc,gem-pro,sla-pro
       CON_ETIMOLOGIA: en,fr,de,ru
       # dell'inglese, il lessico comune (i lemmi tra le 50 mila forme più frequenti) e le parole con l'etimo fuori
       # dall'inglese (ESTERNI), senza nomi propri né locuzioni
