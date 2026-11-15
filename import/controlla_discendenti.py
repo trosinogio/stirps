@@ -78,7 +78,9 @@ def main():
             if len(c) < 7:
                 continue
             righe += 1
-            parola, omo, ric, prof, lf, pf, segni = c[0], int(c[1] or 1), c[2], int(c[3] or 1), c[4], c[5], c[6]
+            # il numero dell'etimologia può avere una sottovoce («1.1»): vale la parte intera
+            parola, ric, prof, lf, pf, segni = c[0], c[2], int(c[3] or 1), c[4], c[5], c[6]
+            omo = int(c[1].split('.')[0]) if c[1].split('.')[0].isdigit() else 1
             if (parola, omo) != corrente:
                 corrente, pagine = (parola, omo), pagine + 1
                 pila = [(0, lingua_pagina, ('*' if ric and not parola.startswith('*') else '') + parola, omo)]
