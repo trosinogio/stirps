@@ -42,7 +42,8 @@ def main():
     tsv = sys.argv[1]
     per_pagina = defaultdict(list)          # (lingua, pagina) → chiavi (una per omografo)
     for c in leggi(os.path.join(tsv, 'lessemi.tsv')):
-        per_pagina[(c[1], c[2])].append(c[0])
+        # il lemma di una forma ricostruita sta senza asterisco: qui lo riprende, come nelle citazioni
+        per_pagina[(c[1], ('*' if c[4] == 't' and not c[2].startswith('*') else '') + c[2])].append(c[0])
     accolte = {c[0] for c in leggi(os.path.join(tsv, 'ipotesi.tsv')) if c[3] == 'accolta'}
     etimi = defaultdict(set)
     for c in leggi(os.path.join(tsv, 'relazioni.tsv')):
@@ -61,6 +62,8 @@ def main():
     def chiavi(lingua, parola, omografo=None):
         lingua = codice_lingua(lingua)
         parola = parola.strip()
+        if lingua.endswith('-pro') and not parola.startswith('*'):
+            parola = '*' + parola
         ks = per_pagina.get((lingua, nome_pagina(lingua, parola)), [])
         if omografo and len(ks) > 1:
             precisa = [k for k in ks if k.endswith(f':{omografo}')] if omografo > 1 else [k for k in ks if k.count(':') == 2]
