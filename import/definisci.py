@@ -20,6 +20,10 @@ Sono testi automatici: nel dizionario portano il segno ≈ e il nome del modello
         Le voci con omografi che hanno solo la glossa inglese (il Wikizionario ha una pagina per parola, e la sua glossa
         andava spesso all'omografo sbagliato): Claude traduce la glossa della voce, senza definizione.
 
+    python3 definisci.py estrai PGURL elenco=chiavi.txt lotto.jsonl.gz
+        Le voci di un elenco di chiavi (una per riga) con la sola glossa inglese o con una traduzione di OPUS-MT: le voci
+        nuove di un import (il 15 novembre 2026, le 9 mila parole entrate dagli alberi dei discendenti).
+
     python3 definisci.py blocchi lotto.jsonl.gz cartella [--per-blocco 500]
     python3 definisci.py raccogli lotto.jsonl.gz cartella MODELLO uscita.tsv.gz [--registro dati/definizioni.tsv.gz]
         Senza la Batch API: il lotto diviso in blocchi (cartella/blocco_NN.txt, con le istruzioni e le voci numerate),
@@ -186,8 +190,25 @@ order by r.id_esterno"""
 PER_TIPO = {'area': (SISTEMA_AREE, SCHEMA_AREE), 'glossa': (SISTEMA_GLOSSE, SCHEMA_GLOSSE)}
 
 
+# Le voci di un elenco di chiavi (un file, una chiave per riga) che hanno una glossa inglese: le voci nuove di un import,
+# perché la traduzione di Claude viene prima di quella automatica di OPUS-MT. Le voci già nel registro non si rifanno.
+SQL_ELENCO = """
+create temp table elenco_chiavi (chiave text primary key);
+\\copy elenco_chiavi from '{file}'
+select json_build_object('tipo', 'glossa', """ + VOCE + """)::text
+from lessema r join lingua lg on lg.codice = r.lingua join elenco_chiavi k on k.chiave = r.id_esterno
+where r.provenienza in ('wiktionary', 'perseus') and r.stato_editoriale = 'importato'
+  and r.glossa is not null and coalesce(r.glossa_lingua, '') <> 'it'
+  and not exists (select 1 from glossa g where g.lessema_id = r.id and g.lingua = 'it' and g.accezione_id is null
+                    and g.provenienza <> 'traduzione-automatica')
+order by r.id_esterno"""
+
+
 def estrai(pgurl, che, uscita):
-    sql = {'radici': SQL_RADICI, 'aree': SQL_AREE, 'omografi': SQL_OMOGRAFI, 'campione': SQL_CAMPIONE}[che]
+    if che.startswith('elenco='):
+        sql = SQL_ELENCO.replace('{file}', os.path.abspath(che.split('=', 1)[1]))
+    else:
+        sql = {'radici': SQL_RADICI, 'aree': SQL_AREE, 'omografi': SQL_OMOGRAFI, 'campione': SQL_CAMPIONE}[che]
     out = subprocess.run(['psql', '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1', pgurl], input=sql, capture_output=True,
                          text=True, check=True).stdout
     righe = [r for r in out.splitlines() if r.startswith('{')]
