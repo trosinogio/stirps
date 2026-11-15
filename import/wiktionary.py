@@ -22,6 +22,7 @@ LINGUA = os.environ.get('LINGUA', 'it')
 # radici omografe precisate dalla glossa citata: almeno quante prove, e quale accordo con le dichiarazioni {{root}}
 OMOGRAFE_PER_GLOSSA = (50, 0.9)
 from controlla_sensi import legate, parole
+from array import array
 from collections import Counter, defaultdict
 
 CATENA = {'inh': 'eredita', 'inh+': 'eredita', 'bor': 'prestito', 'bor+': 'prestito', 'ubor': 'prestito', 'obor': 'prestito',
@@ -533,6 +534,38 @@ def esc(v):
     return str(v).replace('\\', '\\\\').replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
 
 
+class VociChiusura:
+    """Le voci di una lingua di chiusura, lasciate nel loro file: in memoria restano la pagina, l'omografo, se è una
+    ricostruzione e la posizione della riga, e una voce si legge quando una catena la raggiunge. Tenerle tutte lette
+    (un dizionario per voce, per quaranta lingue) portava il parser a 7 GB, il limite della macchina del workflow."""
+
+    def __init__(self, percorso):
+        self.file = open(percorso, 'rb')
+        self.posizioni = array('Q')
+        self.pagine, self.omografi, self.ricostruite = [], array('I'), bytearray()
+
+    def tutte(self):
+        """Tutte le voci, in ordine, una alla volta (per costruire gli indici): dopo ognuna va chiamato segna()."""
+        self.file.seek(0)
+        pos = 0
+        for riga in self.file:
+            self.posizioni.append(pos)
+            pos += len(riga)
+            yield json.loads(riga)
+
+    def segna(self, pagina, omografo, ricostruita):
+        self.pagine.append(pagina)
+        self.omografi.append(omografo)
+        self.ricostruite.append(1 if ricostruita else 0)
+
+    def leggi(self, i):
+        self.file.seek(self.posizioni[i])
+        return json.loads(self.file.readline())
+
+    def __len__(self):
+        return len(self.pagine)
+
+
 class Importatore:
     def __init__(self):
         self.lessemi = {}            # chiave -> dict
@@ -917,7 +950,7 @@ class Importatore:
         """Indici di una lingua di chiusura, da caricare prima delle voci principali. Con base=True è la lingua di
         partenza (--forme-base): servono solo i lemmi e le forme, e una forma flessa citata dentro la lingua va al suo
         lemma, conservata come forma citata (quattrocchi < occhio, «occhi»), non resta una voce a sé."""
-        voci = [json.loads(r) for r in open(lemmi, encoding='utf-8')]
+        voci = VociChiusura(lemmi)
         idx = {'voci': voci, 'lemmi': set(), 'omografi': defaultdict(list), 'forme': {}, 'participi': {}, 'flesse': {},
                'file_glosse': glosse, 'omo_radice': {}, 'varianti': []}
         if varianti and os.path.exists(varianti):
@@ -939,11 +972,14 @@ class Importatore:
                     unicodedata.normalize('NFC', x.lower()) for x in c[4].split(',') if x)
                 pos_omografi[pagina].setdefault(omo, set()).add(c[2])
         per_pagina = defaultdict(set)
-        for v in voci:
+        pagine = {}
+        for v in voci.tutte():
             pagina = nome_pagina(lingua, v['w'])
+            pagina = pagine.setdefault(pagina, pagina)      # una sola copia del nome per tutte le voci della pagina
             idx['lemmi'].add(pagina)
             etimn = v.get('en')
             omo = int(etimn) if etimn and str(etimn).isdigit() else 1
+            voci.segna(pagina, omo, v.get('rec'))
             if omo not in per_pagina[pagina]:
                 per_pagina[pagina].add(omo)
                 idx['omografi'][pagina].append((omo, {unicodedata.normalize('NFC', (v.get('c') or '').lower())}))
@@ -1064,13 +1100,13 @@ class Importatore:
             nuove = 0
             for lingua, idx in self.chiusura.items():
                 intera = passo == 0 and (lingua in self.intere or lingua in self.con_etimologia)
-                for i, v in enumerate(idx['voci']):
+                voci = idx['voci']
+                for i in range(len(voci)):
                     if (lingua, i) in fatte:
                         continue
-                    pagina = nome_pagina(lingua, v['w'])
-                    etimn = v.get('en')
-                    omo = int(etimn) if etimn and str(etimn).isdigit() else 1
-                    if v.get('rec'):
+                    pagina, omo, rec = voci.pagine[i], voci.omografi[i], voci.ricostruite[i]
+                    v = None
+                    if rec:
                         candidati = [(c, '*' + pagina) for c in ((lingua + '-vul', lingua) if lingua == 'la' else (lingua,))]
                     else:
                         candidati = [(lingua, pagina)]
@@ -1078,7 +1114,10 @@ class Importatore:
                         kb = chiave(lc, termine, omo)
                         # *oktō citato solo come *oktō@eight: la pagina si legge lo stesso (non per le radici omografe)
                         raggiunta = kb in self.lessemi or (kb in self.con_ident and not termine.endswith('-'))
-                        if raggiunta or (intera and not v.get('rec') and self.ammessa(lingua, v)):
+                        if not raggiunta and not (intera and not rec):
+                            continue
+                        v = v or voci.leggi(i)
+                        if raggiunta or self.ammessa(lingua, v):
                             fatte.add((lingua, i))
                             self.voce(v, lingua_voce=lc, parola=termine)
                             nuove += 1
