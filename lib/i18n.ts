@@ -56,7 +56,10 @@ export interface Testi {
   radiceFormale: string;
   capoProvvisorio: string;
   origini: Record<string, string>;
-  legenda: { eredita: string; prestito: string; dotto: string; formazione: string; indeterminata: string; ricostruita: string };
+  legenda: { eredita: string; prestito: string; dotto: string; formazione: string; indeterminata: string; ricostruita: string; dubbio: string };
+  legameDubbio: string;
+  perLegameDubbio: string;
+  paroleDubbie: (n: number) => string;
   stemmaSuggerimento: string;
   stemmaDi: (lemma: string) => string;
   nomiPropriMostra: (n: number) => string;
@@ -330,7 +333,10 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     radiceFormale: 'Radice.',
     capoProvvisorio: 'Capostipite provvisorio: l’etimologia non è ancora stata risalita.',
     origini: { ignota: 'Origine ignota', sostrato: 'Voce di sostrato', onomatopea: 'Onomatopea', espressiva: 'Formazione espressiva' },
-    legenda: { eredita: 'eredità', prestito: 'prestito', dotto: 'prestito dotto', formazione: 'derivazione o composizione', indeterminata: 'legame indeterminato', ricostruita: 'forma ricostruita' },
+    legenda: { eredita: 'eredità', prestito: 'prestito', dotto: 'prestito dotto', formazione: 'derivazione o composizione', indeterminata: 'legame indeterminato', ricostruita: 'forma ricostruita', dubbio: 'legame dubbio' },
+    legameDubbio: 'legame dubbio: l’etimologia è incerta',
+    perLegameDubbio: 'sta in questa famiglia per un’etimologia dubbia',
+    paroleDubbie: (n) => `Di queste, ${n.toLocaleString('it-IT')} ${n === 1 ? 'vi sta' : 'vi stanno'} per un’etimologia dubbia.`,
     stemmaSuggerimento: 'Passa sopra una parola per seguirne il percorso dalla radice. Fai clic per aprire la voce.',
     stemmaDi: (l) => `Stemma della famiglia di ${l}`,
     nomiPropriMostra: (n) => `Mostra i nomi propri (${n.toLocaleString('it-IT')})`,
@@ -590,7 +596,10 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     radiceFormale: 'Root.',
     capoProvvisorio: 'Provisional ancestor: its etymology has not yet been traced.',
     origini: { ignota: 'Unknown origin', sostrato: 'Substrate word', onomatopea: 'Onomatopoeia', espressiva: 'Expressive formation' },
-    legenda: { eredita: 'inheritance', prestito: 'borrowing', dotto: 'learned borrowing', formazione: 'derivation or compound', indeterminata: 'indeterminate link', ricostruita: 'reconstructed form' },
+    legenda: { eredita: 'inheritance', prestito: 'borrowing', dotto: 'learned borrowing', formazione: 'derivation or compound', indeterminata: 'indeterminate link', ricostruita: 'reconstructed form', dubbio: 'doubtful link' },
+    legameDubbio: 'doubtful link: the etymology is uncertain',
+    perLegameDubbio: 'belongs to this family through a doubtful etymology',
+    paroleDubbie: (n) => `Of these, ${n.toLocaleString('en-GB')} ${n === 1 ? 'is' : 'are'} here through a doubtful etymology.`,
     stemmaSuggerimento: 'Hover over a word to follow its path from the root. Click to open the entry.',
     stemmaDi: (l) => `Stemma of the family of ${l}`,
     nomiPropriMostra: (n) => `Show proper names (${n.toLocaleString('en-GB')})`,

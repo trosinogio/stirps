@@ -35,7 +35,7 @@ export function Fiducia({ n }: { n: number }) {
   );
 }
 
-export function Legenda({ lang }: { lang: Lang }) {
+export function Legenda({ lang, dubbi = false }: { lang: Lang; dubbi?: boolean }) {
   const t = TESTI[lang].legenda;
   const tratti: [string, string][] = [['e-eredita', t.eredita], ['e-prestito', t.prestito], ['e-dotto', t.dotto], ['e-formazione', t.formazione], ['e-indeterminata', t.indeterminata]];
   return (
@@ -50,6 +50,7 @@ export function Legenda({ lang }: { lang: Lang }) {
         <svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4" className="leg-ric" /></svg>
         {t.ricostruita}
       </span>
+      {dubbi && <span><span className="dub" aria-hidden="true">?</span>{t.dubbio}</span>}
     </p>
   );
 }

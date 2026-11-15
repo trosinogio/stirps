@@ -758,9 +758,14 @@ select jsonb_build_object(
                             and x.esito_id = c.percorso[c.profondita] and x.tipo = c.tipi[c.profondita]
                             and x.anno_da is not null))
       order by c.profondita, c.lessema_id) from cat c), '[]'::jsonb),
+  -- «confidenza» è quella del passaggio dall'etimo a questa parola (non della catena intera): lo stemma e la pagina
+  -- della famiglia segnano i legami dubbi (certezza 1) e contano le parole che stanno nella famiglia solo per quelli
   'discendenti', coalesce((select jsonb_agg(nodo_json(d.lessema_id, p_lingua, p_anteprima) || jsonb_build_object(
       'profondita', d.profondita, 'etimo', d.percorso[d.profondita], 'tipo', d.tipi[d.profondita],
-      'tipo_etichetta', etichetta_in('tipo_relazione', d.tipi[d.profondita], p_lingua, 'breve'))
+      'tipo_etichetta', etichetta_in('tipo_relazione', d.tipi[d.profondita], p_lingua, 'breve'),
+      'confidenza', (select max(a.confidenza) from arco a
+                      where a.etimo_id = d.percorso[d.profondita] and a.esito_id = d.lessema_id
+                        and a.stato_ipotesi = 'accolta' and a.categoria <> 'influsso' and (p_anteprima or a.pubblico)))
       order by d.profondita, d.lessema_id) from dis d), '[]'::jsonb),
   'cognati', coalesce((select jsonb_agg(nodo_json(g.lessema_id, p_lingua, p_anteprima) || jsonb_build_object(
       'tipo', g.tipo, 'antenato_comune', nodo_json(g.antenato_comune, p_lingua, p_anteprima), 'distanza', g.distanza)

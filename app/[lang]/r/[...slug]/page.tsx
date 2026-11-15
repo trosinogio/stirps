@@ -6,7 +6,7 @@ import Automatica from '@/components/Automatica';
 import Definizione from '@/components/Definizione';
 import { lingueGeo, ranghi, scheda } from '@/lib/dati';
 import { classeRamo, contaRami, fmt, G, nodiUnici, ORDINE_LINGUE, ORDINE_RAMI, ramoDi } from '@/lib/forme';
-import { contaNascosti, costruisciAlbero, dimensioni, LIMITE_DISEGNO, nodiFamiglia, nomiNascondibili } from '@/lib/albero';
+import { contaNascosti, costruisciAlbero, dimensioni, LIMITE_DISEGNO, nodiFamiglia, nomiNascondibili, sottoDubbio } from '@/lib/albero';
 import { BarraRami, intercala, Legenda, VoceLink } from '@/components/comuni';
 import StemmaAdattivo from '@/components/StemmaAdattivo';
 import StemmaVerticale from '@/components/StemmaVerticale';
@@ -56,7 +56,7 @@ function nomiNascosti(nodi: NodoPiatto[]) {
   return contaNascosti(nomiNascondibili(radice), dimensioni(radice));
 }
 
-function PannelloLingue({ nodi, lang }: { nodi: NodoPiatto[]; lang: Lang }) {
+function PannelloLingue({ nodi, lang, dubbie }: { nodi: NodoPiatto[]; lang: Lang; dubbie: Set<number> }) {
   const per = new Map<string, Map<string, NodoPiatto[]>>();
   for (const n of nodi) {
     const r = ramoDi(n.ramo);
@@ -76,6 +76,7 @@ function PannelloLingue({ nodi, lang }: { nodi: NodoPiatto[]; lang: Lang }) {
               <div className="parole">
                 {ns.sort((a, b) => a.lemma.localeCompare(b.lemma)).map((n) => (
                   <span key={n.id} className="parola-l">
+                    {dubbie.has(n.id) && <abbr className="dub" title={TESTI[lang].perLegameDubbio}>?</abbr>}
                     <VoceLink n={n} lang={lang} sigla={false} />
                     {n.glossa && <span className="gl"> {G(n.glossa, lang)}</span>}
                   </span>
@@ -104,6 +105,8 @@ export default async function Radice({ params }: { params: Promise<{ lang: strin
   const nodi = nodiFamiglia(sc);
   const discendenti = nodi.slice(1);
   const nl = new Set(discendenti.map((n) => n.lingua)).size;
+  // le parole che stanno nella famiglia per un legame dubbio (certezza 1), con i loro discendenti
+  const dubbie = sottoDubbio(nodi);
   // le lingue della famiglia, le più presenti per prime: i filtri dello stemma
   const perLinguaN = new Map<string, [string, string, number]>();
   for (const n of discendenti) {
@@ -142,6 +145,7 @@ export default async function Radice({ params }: { params: Promise<{ lang: strin
         {discendenti.length > 0 && (
           <div className="statistiche">
             <span className="conti">{t.paroleInLingue(discendenti.length, nl)}</span>
+            {dubbie.size > 0 && <span className="conti dubbie"><span className="dub" aria-hidden="true">?</span>{t.paroleDubbie(dubbie.size)}</span>}
             <BarraRami rami={contaRami(discendenti)} />
           </div>
         )}
@@ -151,14 +155,14 @@ export default async function Radice({ params }: { params: Promise<{ lang: strin
       </nav>
       <div className="pannello">
         {!discendenti.length ? <p className="vuoto">{t.nessunDiscendente}</p>
-          : vista === 'lingue' ? <PannelloLingue nodi={nodi} lang={lang} />
+          : vista === 'lingue' ? <PannelloLingue nodi={nodi} lang={lang} dubbie={dubbie} />
           : vista === 'sintesi' ? <SintesiFamiglia lang={lang} nodi={nodi} ranghi={usi} base={base} />
           : vista === 'mappa' ? <Mappa lang={lang} nodi={nodi} archi={discendenti.map((n) => ({ da: n.padre!, a: n.id, tipo: n.tipo! }))} lingue={geo} />
           : (
             <>
               {grande && <p className="sintesi-nota">{t.stemmaRidotto}</p>}
               <StemmaAdattivo lang={lang} nodi={grande ? null : nodi} nascosti={nomiNascosti(nodi)} lingue={lingueFamiglia} base={base}><StemmaVerticale lang={lang} nodi={nodi} livelli={grande ? 2 : undefined} /></StemmaAdattivo>
-              <Legenda lang={lang} />
+              <Legenda lang={lang} dubbi={dubbie.size > 0} />
             </>
           )}
       </div>

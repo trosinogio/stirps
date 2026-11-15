@@ -534,4 +534,13 @@ select pg_temp.verifica(
   and legame_di_senso('he hates', 'hated') and not legame_di_senso('the', 'the') and not legame_di_senso(null, 'three'),
   'la linea del senso: tre e dente no; seventh e seven, flesh e meat, hates e hated sì; le parole vuote e le glosse mancanti non contano');
 
+-- la certezza del passaggio nei discendenti: stella < *h₂stḗr-leh₂ è «possibile» (2), stella > it. stella «probabile» (3);
+-- la catena intera varrebbe 2 per tutte e due
+select pg_temp.verifica(
+  (select (d ->> 'confidenza')::int from jsonb_array_elements(scheda('ine-pro/h2sterleh2', true) -> 'discendenti') d
+    where d ->> 'slug' = 'la/stella') = 2
+  and (select (d ->> 'confidenza')::int from jsonb_array_elements(scheda('ine-pro/h2sterleh2', true) -> 'discendenti') d
+        where d ->> 'slug' = 'it/stella') = 3,
+  'scheda: ogni discendente porta la certezza del suo passaggio, non quella della catena (stella 2, it. stella 3)');
+
 \echo '— collaudo completato'

@@ -34,7 +34,7 @@ Per i dettagli: `README.md` (app, database, redazione, storie, glosse, indirizzi
 
 - `npm run dev`: sviluppo (con un `DATABASE_URL` locale).
 - `npx tsc --noEmit`: controllo dei tipi.
-- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, i 101 del seme (`db/04_test.sql`) e i 111 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
+- `PGURL=postgres://utente:password@localhost:5432 scripts/collauda.sh`: tutti i test su un Postgres vuoto, i 102 del seme (`db/04_test.sql`) e i 112 dell’import (`db/06_test_import.sql`). Devono passare prima di ogni push; la stessa cosa la fa `.github/workflows/collaudo.yml`.
 - `DATABASE_URL=postgres://utente:password@localhost:5432/copia scripts/prova-import.sh`: la prova dell’import su una copia del database, con il confronto prima e dopo e i cancelli che fermano (voci, etimologie e indirizzi persi, definizioni cadute, lavoro della redazione toccato). È obbligatoria prima di pubblicare dati, `db/05` o un aggiornamento datato: le tappe sono in `import/PROGRAMMA.md`. La stessa prova gira su un ramo di Neon, creato dalla produzione e cancellato alla fine, con il workflow «Prova dell’import» (pull request che toccano `dati/` o `db/`, o un push su un ramo `prova-import-*`).
 - `node scripts/applica-sql.mjs file.sql`: applica un file SQL in una transazione.
 - `node scripts/esporta-redazione.mjs cartella`: copia del lavoro della redazione in JSON; ogni notte la fa `.github/workflows/copia-redazione.yml` nel ramo `copia-redazione`.
@@ -84,6 +84,7 @@ Come cambia il database:
 - **Colori:** variabili CSS in `app/globals.css`. La classe `r-<ramo>` imposta `--pig`, il colore del ramo linguistico.
 - **Pagine dinamiche:** `storie` e `redazione` sono `force-dynamic`; le voci usano ISR (`revalidate`).
 - **Stemma:** i nomi propri da cui non derivano parole comuni restano nascosti finché il lettore non li chiede (`nomiNascondibili()` in `lib/albero.ts`); oltre 12 figli se ne disegnano 6, quelli con i rami più grandi, e gli altri vanno in una lista a tendina con il filtro (`dividiFigli()`), un `<details>` nello stemma verticale.
+- **Legami dubbi** (decisione di Giovanni, 13 novembre 2026: «segna il dubbio»): una parola con un’etimologia accolta di certezza 1 resta nella famiglia, ma il legame porta un «?» e cambia colore (stemma, elenco per lingue, legenda), e la pagina della famiglia conta le parole che vi stanno per un’etimologia dubbia (`sottoDubbio()` in `lib/albero.ts`; `scheda()` dà a ogni discendente la certezza del suo passaggio, non della catena). Erano 3.439 parole, 35 mila con i discendenti (*traho* sotto \*dʰregʰ-, 494), quasi tutte l’ipotesi principale di Wiktionary dichiarata incerta.
 - **Prefetch:** i link negli elenchi (`VoceLink`, iniziali, pagine) hanno `prefetch={false}`. Con il valore predefinito ogni link visibile fa calcolare al server una pagina intera, e su 540 mila voci quasi nessuna è in cache.
 - **Pagine pesanti:** prima di pubblicare un elenco, misura il peso dell’HTML e il tempo della prima visita (`next build` e `next start` in locale, con `NEON_AUTH_COOKIE_SECRET` di prova).
 
@@ -118,6 +119,17 @@ Come cambia il database:
 - **Le liste di lavoro:** `prime-100` (cento voci scelte per provenienza, da `db/aggiornamenti/2026-10-31-prime-100.sql`); `catene-da-sistemare` (ricalcolata a ogni deploy), con i gruppi «Solo la radice dichiarata», «Passaggio sospetto» (un legame indeterminato tra parole della stessa lingua senza un trigramma in comune: *torre*, τύρρις < φιλία), «Radice diversa da quella dichiarata» (la catena arriva a un’altra radice da quella di Wiktionary: *otre*, *fusse*), «Wiktionary e Wikizionario discordano» e «Wiktionary e Wiktionnaire discordano»; `senza-etimologia` (le parole comuni, prime 30.000 per frequenza, senza nessuna etimologia: *referto*); `aree-da-rivedere` (un campione fisso di cinque radici per area: la redazione conferma o corregge l’area nell’editor, `imposta_area_radice()`, e il cruscotto conta quante aree di Claude restano).
 
 ## Prossimi passi
+
+Priorità di Giovanni (13 novembre 2026): **le etimologie greche e più connessioni possibili tra le lingue indoeuropee importate**. Misure sulla copia della produzione di quel giorno: 126.097 voci greche (25.806 di Wiktionary, 100.275 dell’LSJ), 24.664 con un’etimologia accolta (Wiktionary 15.855, LSJ 4.968, analisi della forma 3.462), 101.433 senza niente; delle 23.865 in una famiglia, 15.111 arrivano a una radice indoeuropea, 836 si fermano al protoellenico, 6.982 a una parola greca attestata; 1.468 famiglie indoeuropee su 3.776 hanno una parola greca (con il latino 1.040, l’inglese 1.096, l’italiano 942, il tedesco 809, il russo 728), e 820 hanno il latino senza il greco. Ogni passo si misura prima e dopo con questi numeri.
+
+1. **Le cime greche.** Fatto il 14 novembre 2026 (pull request 27): le etimologie ad albero di `{{ety}}` e le varianti legate al lemma; restano ζῷον e ἀργός.
+2. **I discendenti dichiarati da Wiktionary.** Fatto il 15 novembre 2026 (pull request 29 e 30): vedi «I discendenti dichiarati» qui sopra. Restano le 8.188 voci nuove con la sola glossa inglese e le lingue romanze dal latino, da decidere.
+3. **Il Wiktionnaire per il greco antico** (e, se Kaikki lo offre, il Wikizionario greco): il dump francese è già scaricato, `etimi_wiktionnaire.py` legge solo le voci francesi. Regola dei due Wiktionary: confronto, citazione doppia, disaccordi in lista di lavoro.
+4. **Le voci dell’LSJ senza etimologia** (l’80% del greco): 23.044 hanno la forma di un preverbio davanti a un lemma che c’è. Capire perché l’analisi della forma le lascia fuori (la soglia dell’85%, ἀν- privativo o ἀνα-), regola per regola, con la misura di `apprendi_greco.py`.
+5. **Il protoellenico:** 836 parole si fermano a una forma protoellenica; controllare che le pagine protoelleniche di Wiktionary siano lette fino alla radice.
+6. **Le radici omografe** (\*tewk- «gonfiarsi» e «premere»): `import/controlla_omografe.py` misura nel workflow Dati le citazioni con un senso diverso da quello della radice; poi decidere se precisare gli archi o mandarli in lista di lavoro.
+7. **I numerali** *two* e *zwei*, fermi al germanico.
+8. **Con il credito dell’API** (esaurito il 13 novembre): le glosse italiane delle 14.869 voci con omografi (pronte sul ramo `definizioni-omografi`: lotto «omografi», prima un campione di 50) e le ipotesi di passaggio di senso per i 1.422 archi «Senza linea di senso».
 
 - Le quattro questioni aperte delle norme: le proposte di Claude sono nel Doc (8 novembre 2026), e la pagina Norme del sito (`NORME` in `lib/contenuti.ts`) le mostra «in discussione». Quando Giovanni decide, si aggiornano il Doc e la pagina.
 - Ritocchi all’editor che emergeranno dalle prime 100: all’8 novembre lo storico della redazione è vuoto, e non ne è emerso nessuno.

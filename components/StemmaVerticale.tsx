@@ -17,9 +17,10 @@ export default function StemmaVerticale({ lang, nodi, livelli }: { lang: Lang; n
   const { radice } = costruisciAlbero(nodi);
   const nascosti = nomiNascondibili(radice);
   const dim = dimensioni(radice);
-  const classi = (n: NodoAlbero, np: boolean) => [n.tipo ? classeArco(n.tipo) : '', np ? 'np' : ''].filter(Boolean).join(' ') || undefined;
+  const classi = (n: NodoAlbero, np: boolean) => [n.tipo ? classeArco(n.tipo) : '', np ? 'np' : '', n.dubbio ? 'dubbio' : ''].filter(Boolean).join(' ') || undefined;
   const riga = (n: NodoAlbero) => (
     <Link className={`riga ${classeRamo(n.ramo)}`} href={`/${lang}/w/${n.slug}`} prefetch={false}>
+      {n.dubbio && <abbr className="dub" title={t.legameDubbio}>?</abbr>}
       <span className="lemma">{fmt(n)}</span>
       <span className="sigla">{n.lingua_sigla}</span>
       {n.tipo_etichetta && <span className="tp">{n.tipo_etichetta}</span>}
