@@ -244,6 +244,7 @@ jobs:
           cd import
           python3 controlla_discendenti.py dati/it/tsv 'dati/*/discendenti.tsv' /tmp/discendenti_archi.tsv | tee /tmp/discendenti.txt
           echo "::notice title=Discendenti::$(head -2 /tmp/discendenti.txt | tr '\n' ' ')"
+          python3 -c "import json; s = json.load(open('dati/it/rapporto_parser.json')); print('::notice title=Discendenti collegati::' + str({k: v for k, v in s.items() if k.startswith('discendenti')}))" || true
           for f in dati/*/discendenti.tsv; do l=$(basename $(dirname $f)); sed "s/^/$l\t/" $f; done | gzip -9 > /tmp/discendenti.tsv.gz
           # la sandbox di Claude non scarica gli artefatti: l'albero va anche su un ramo di servizio senza storia
           rm -rf /tmp/misure && mkdir /tmp/misure && cd /tmp/misure && git init -q && cp /tmp/discendenti.tsv.gz /tmp/discendenti.txt /tmp/discendenti_archi.tsv . 2>/dev/null

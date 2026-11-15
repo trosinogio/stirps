@@ -50,6 +50,7 @@ for voce in $(printf '%s' "$CHIUSURA" | sed 's/ \([a-z][a-z-]*:\)/\n\1/g' | tr '
     continue
   fi
   ARGOMENTI+=(--chiudi "$codice=dati/$codice/lemmi.jsonl,dati/$codice/glosse.tsv,dati/$codice/forme.tsv,dati/$codice/varianti.tsv")
+  ARGOMENTI+=(--discendenti "$codice=dati/$codice/discendenti.tsv")
 done
 if [ ${#MANCANTI[@]} -gt 0 ]; then
   # il dump grezzo di Wiktionary inglese ha tutte le lingue: si scarica una volta, per tutte quelle che mancano, e se ne
@@ -64,6 +65,8 @@ if [ ${#MANCANTI[@]} -gt 0 ]; then
       if [ -s "dati/$codice/lemmi.jsonl" ]; then
         echo "     $codice: $(wc -l < "dati/$codice/lemmi.jsonl") voci dal dump grezzo"
         ARGOMENTI+=(--chiudi "$codice=dati/$codice/lemmi.jsonl,dati/$codice/glosse.tsv,dati/$codice/forme.tsv,dati/$codice/varianti.tsv")
+        ARGOMENTI+=(--discendenti "$codice=dati/$codice/discendenti.tsv")
+  ARGOMENTI+=(--discendenti "$codice=dati/$codice/discendenti.tsv")
       else
         echo "::warning title=Chiusura::nessuna voce per $codice, nemmeno nel dump grezzo: la lingua resta fuori"
       fi
@@ -81,7 +84,7 @@ fi
 
 echo "2/4  leggo le etimologie"
 python3 wiktionary.py "$DATI/lemmi.jsonl" "$DATI/tsv" "$DATI/glosse.tsv" ${ARGOMENTI[@]+"${ARGOMENTI[@]}"} --passi "$PASSI" \
-  --forme-base "$LINGUA=$DATI/forme.tsv" \
+  --forme-base "$LINGUA=$DATI/forme.tsv" --discendenti "$LINGUA=$DATI/discendenti.tsv" \
   ${INTERE:+--intere "$INTERE"} ${CON_ETIMOLOGIA:+--con-etimologia "$CON_ETIMOLOGIA"} ${COMUNI:+--comuni "$COMUNI"} \
   $(for e in $ELENCHI; do printf -- "--elenco %s " "$e"; done) ${ESTERNI:+--esterni "$ESTERNI"} \
   ${PRECEDENTI:+--glosse-precedenti "$PRECEDENTI"} > "$DATI/rapporto_parser.json"

@@ -12,6 +12,8 @@ volte l'albero dei discendenti dice la stessa cosa?
 Per ogni arco dell'albero (genitore → figlio), l'esito:
 - «concorde, diretto»: il genitore è l'etimo della parola nella catena accolta;
 - «concorde, più su»: il genitore è un antenato nella catena (l'albero salta un passaggio, o la catena ne ha uno in più);
+- «concorde, stessa famiglia»: la catena accolta non passa dal genitore, ma i due hanno un antenato in comune (l'albero
+  cita un'altra grafia o un altro passaggio della stessa parola: enm rolle < fro role, e noi fro rolle);
 - «rovesciato»: nella nostra catena è il genitore a discendere dal figlio;
 - «diverso»: la parola ha un'etimologia accolta che non passa dal genitore;
 - «nuovo»: la parola c'è e non ha etimologia: l'arco che i discendenti potrebbero dare;
@@ -114,6 +116,8 @@ def main():
                     esito = 'concorde, più su'
                 elif set(kf) & {a for k in kg for a in antenati(k)}:
                     esito = 'rovesciato'
+                elif {a for k in kf for a in antenati(k)} & {a for k in kg for a in antenati(k)}:
+                    esito = 'concorde, stessa famiglia'
                 else:
                     esito = 'diverso'
             esiti[esito] += 1
@@ -125,13 +129,13 @@ def main():
                 esempi[esito].append((lg, pg, lf, pf, segno, ora))
 
     def misura(c):
-        si = c['concorde, diretto'] + c['concorde, più su']
+        si = c['concorde, diretto'] + c['concorde, più su'] + c['concorde, stessa famiglia']
         no = c['rovesciato'] + c['diverso']
         return f"{si / max(1, si + no):.0%} su {si + no}"
 
     print(f'discendenti dichiarati: {pagine} pagine, {righe} righe, {sum(esiti.values())} archi distinti; '
           f'dove la parola ha già un\'etimologia l\'albero concorda nel {misura(esiti)} (diretto {esiti["concorde, diretto"]}, '
-          f'più su {esiti["concorde, più su"]}, diverso {esiti["diverso"]}, rovesciato {esiti["rovesciato"]}); '
+          f'più su {esiti["concorde, più su"]}, nella stessa famiglia per altra via {esiti["concorde, stessa famiglia"]}, diverso {esiti["diverso"]}, rovesciato {esiti["rovesciato"]}); '
           f'archi nuovi possibili {esiti["nuovo"]}; figlio assente {esiti["figlio assente"]}, genitore assente {esiti["genitore assente"]}')
     print('per segno dell\'arco: ' + '; '.join(f'{s} {misura(c)}, nuovi {c["nuovo"]}' for s, c in sorted(per_segno.items())))
     for titolo, tab in (('per lingua del figlio', per_lingua), ('per lingua del genitore', per_lingua_gen)):
