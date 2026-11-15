@@ -12,11 +12,9 @@ jobs:
         run: |
           S=https://dizionario-etimologico.vercel.app
           prova() { curl -s -o /tmp/p.html -w "%{http_code} %{size_download}B" "$S$1"; printf ' %s | ' "$1"; grep -o "$2" /tmp/p.html | head -${3:-2} | tr '\n' ' '; echo; }
-          prova /it/w/grc/phone 'href="/it/w/[a-z-]*/[^"]*"' 12
-          prova /it/w/grc/krites 'href="/it/w/[a-z-]*/[^"]*"' 12
-          prova /it/w/grc/onuma 'href="/it/w/[a-z-]*/[^"]*"' 12
-          prova /it/w/grc/proti 'href="/it/w/[a-z-]*/[^"]*"' 12
-          prova /it/w/grc/philos 'href="/it/w/[a-z-]*/[^"]*"' 12
-          prova /it/w/en/lying 'href="/it/w/[a-z-]*/[^"]*"' 12
-          prova /it/r/ine-pro/bheh2-2 'phone' 1
-          prova /it 'voci[^<]*' 2
+          prova /it/w/grc/pote 'href="/it/w/[a-z-]*/[^"]*"' 8
+          prova /it/w/grc/dokeo 'href="/it/w/[a-z-]*/[^"]*"' 8
+          prova /it/w/it/esteta 'href="/it/w/[a-z-]*/[^"]*"' 8
+          prova /it/w/fro/corir 'href="/it/w/[a-z-]*/[^"]*"' 8
+          prova /it/w/la/crystallus 'href="/it/w/[a-z-]*/[^"]*"' 8
+          prova /it/w/grc/pote 'discendente dichiarato' 1
