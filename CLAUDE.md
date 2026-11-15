@@ -137,5 +137,5 @@ Priorità di Giovanni (13 novembre 2026): **le etimologie greche e più connessi
 - Il lettore del Wiktionnaire: restano da leggere i composti di più di due elementi (`import/LEGGIMI.md`).
 - La linea del senso per il latino, con LatinISE (fattibile: `import/LEGGIMI.md`, «La linea del senso»); per l’italiano manca un corpus storico aperto.
 - Un nuovo filtro del dump italiano che conservi i modelli di menzione (`m`, `l`), per le etimologie scritte solo nel testo («From the verb segare»).
-- Licenza, «Chi siamo», dominio, mappa del sito, «come citare questa voce».
+- La licenza dei testi della redazione (il codice è AGPL-3.0-or-later dal 15 novembre 2026, scelta affidata da Giovanni a Claude; i dati sono CC BY-SA 4.0 per obbligo delle fonti: `LICENZE.md`), dominio, mappa del sito, «come citare questa voce».
 - La traduzione automatica delle note per il sito inglese, segnata ≈ come le glosse: le note si scrivono solo in italiano, e oggi il sito inglese le mostra con «(in Italian)».
