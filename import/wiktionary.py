@@ -2048,11 +2048,12 @@ if __name__ == '__main__':
         passo('collega_discendenti', imp.collega_discendenti, discendenti)
     passo('chiudi_su_radici', imp.chiudi_su_radici)
     passo('togli_cicli', imp.togli_cicli)
+    # prima dei lemmi interi: un lemma latino o greco seminato e rimasto senza legami rientra come ogni lemma (Dionysia)
+    passo('togli_seminati_orfani', imp.togli_seminati_orfani)
     passo('aggiungi_lemmi_interi', imp.aggiungi_lemmi_interi)
     if len(args) > 2:
         passo('aggiungi_lemmi_comuni', imp.aggiungi_lemmi_comuni, LINGUA, args[2])
     passo('togli_archi_impossibili', imp.togli_archi_impossibili)
     passo('togli_non_validi', imp.togli_non_validi)
-    passo('togli_seminati_orfani', imp.togli_seminati_orfani)
     st = passo('scrivi', imp.scrivi, args[1])
     print(json.dumps(dict(st), indent=1))
