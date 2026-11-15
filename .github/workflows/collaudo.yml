@@ -1,7 +1,10 @@
 # A ogni modifica: tipi TypeScript, test del seme e test dell'import su un Postgres di prova
 name: Collaudo
+# Solo su main e sulle pull request: un push su un ramo con la sua pull request faceva girare il collaudo due volte,
+# e i minuti di Actions del piano gratuito (2.000 al mese per un repository privato) sono finiti il 14 novembre 2026.
 on:
   push:
+    branches: [main]
   pull_request:
 jobs:
   collaudo:
