@@ -539,6 +539,10 @@ def esc(v):
 DISCENDENTI_DICHIARATI = (500, 0.85)
 
 
+# «alternative form of X», «Glagolitic spelling of X», «Epic and Ionic form of X»: la glossa di una sola variante
+SOLA_VARIANTE = re.compile(r'^(?:[\w-]+,? (?:(?:and|or) )?)*(?:form|spelling|variant|romanization) of ', re.I)
+
+
 class VociChiusura:
     """Le voci di una lingua di chiusura, lasciate nel loro file: in memoria restano la pagina, l'omografo, se è una
     ricostruzione e la posizione della riga, e una voce si legge quando una catena la raggiunge. Tenerle tutte lette
@@ -592,6 +596,7 @@ class Importatore:
         self.comuni = {}             # nella lingua principale, i lemmi senza etimologia che entrano lo stesso (--comuni it=…):
                                      # quelli del lessico di frequenza, perché l'analisi di un testo li riconosca
         self.lette = set()           # le voci di cui si è letta la pagina (voce())
+        self.seminati = set()        # le voci entrate dall'albero dei discendenti (semina_discendenti())
         self.chiuse = set()          # (lingua, posizione) delle voci di chiusura già lette (chiudi())
         self.id_proprio = {}         # voce → l'identificativo che la sua pagina si dà ({{etymon|gem-pro|id=three}})
         self.con_ident = defaultdict(set)   # chiave senza identificativo → le chiavi con (*þrīz → *þrīz@three)
@@ -1641,6 +1646,29 @@ class Importatore:
                 pila.append((prof, figlio))
                 yield genitore, figlio, c[4], c[5], segni
 
+    def sole_varianti(self, lingua):
+        """Le pagine di una lingua di chiusura che sono solo la grafia o la forma alternativa di un'altra parola
+        («alternative form of cwic», «Glagolitic spelling of правъ») e non hanno un'etimologia loro: seminarle farebbe
+        entrare ogni grafia come voce nuova."""
+        idx = self.chiusura[lingua]
+        if 'sole_varianti' not in idx:
+            con_etimologia, varianti = set(idx['voci'].pagine) if hasattr(idx['voci'], 'pagine') else set(), set()
+            if idx.get('file_glosse') and os.path.exists(idx['file_glosse']):
+                for riga in open(idx['file_glosse'], encoding='utf-8'):
+                    c = riga.rstrip('\n').split('\t')
+                    if len(c) > 3 and SOLA_VARIANTE.match(c[3]):
+                        varianti.add(nome_pagina(lingua, c[0]))
+            idx['sole_varianti'] = varianti - con_etimologia
+        return idx['sole_varianti']
+
+    def togli_seminati_orfani(self):
+        """Una parola entrata dall'albero dei discendenti che alla fine non ha né un'etimologia né una parola che ne
+        deriva non collega niente: esce."""
+        legate = {h['esito'] for h in self.ipotesi.values()} | {r['etimo'] for r in self.relazioni}
+        via = {k for k in self.seminati if k in self.lessemi and k not in legate}
+        self.togli(via, 'ipotesi_di_seminati_orfani')
+        self.stat['discendenti_seminati_orfani'] = len(via)
+
     def semina_discendenti(self, percorsi, lingue):
         """Le parole che l'albero dichiara e il dizionario non ha entrano, se il loro genitore è una voce di una delle
         lingue date (i rami antichi: indoeuropeo, protoellenico, greco, protogermanico, protoslavo) e se hanno la loro
@@ -1659,10 +1687,13 @@ class Importatore:
             if pagina not in idx['lemmi'] or pagina in idx['omografi']:
                 self.stat['discendenti_senza_pagina_o_omografi'] += 1
                 continue
+            if pagina in self.sole_varianti(lingua):
+                self.stat['discendenti_sole_varianti'] += 1
+                continue
             ricostruita = parola.startswith('*') or lingua.endswith('-pro')
             if self.chiave_di(lingua, ('*' if ricostruita else '') + pagina) in self.lessemi:
                 continue                    # c'è già (con omografi o identificativi: l'albero non dice quale)
-            self.lessema(lingua, ('*' if ricostruita else '') + pagina)
+            self.seminati.add(self.lessema(lingua, ('*' if ricostruita else '') + pagina))
             nuove += 1
             self.stat[f'discendenti_seminati_{lingua}'] += 1
         self.stat['discendenti_seminati'] += nuove
@@ -2022,5 +2053,6 @@ if __name__ == '__main__':
         passo('aggiungi_lemmi_comuni', imp.aggiungi_lemmi_comuni, LINGUA, args[2])
     passo('togli_archi_impossibili', imp.togli_archi_impossibili)
     passo('togli_non_validi', imp.togli_non_validi)
+    passo('togli_seminati_orfani', imp.togli_seminati_orfani)
     st = passo('scrivi', imp.scrivi, args[1])
     print(json.dumps(dict(st), indent=1))
