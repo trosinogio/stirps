@@ -14,7 +14,7 @@ ramo di Neon.
 | 8 novembre | Un aggiornamento datato usava una funzione prima di definirla: avrebbe fermato il deploy. | L'import di prova in locale. | L'import di prova applica tutti gli aggiornamenti datati (tappa 5). |
 | 8 novembre | Glosse dell'omografo sbagliato (*brew*²), 2.901 segnaposto come glosse, 162 indirizzi nati da traslitterazioni finte. | Giovanni, sul sito. | Il campione delle voci cambiate (tappa 3) e «indirizzi cambiati» nel confronto. |
 | 13 novembre | Le etimologie ad albero di Wiktionary lette male: 16 delle prime 60 cime greche senza etimologia. | Guardando le cime a mano. | La misura delle voci senza etimologia per lingua e le cime più grandi (tappa 2). |
-| 13–14 novembre | Il giro Dati fermo due volte: un passo del parser scalava male, e il registro non diceva quale. | Il workflow fallito. | I tempi e la memoria di ogni passo nel registro (`[parser] …`). |
+| 13–14 novembre | Il giro Dati fermo due volte: il parser teneva in memoria tutte le voci delle lingue di chiusura (7,0 GB, il limite della macchina), e il registro non diceva dove. | Il workflow fallito. | I tempi e la memoria di ogni passo nel registro (`[parser] …`); le voci di chiusura restano nel file (`VociChiusura`): 2,8 GB. |
 
 Da questi errori vengono tre regole:
 
