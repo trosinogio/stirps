@@ -483,20 +483,23 @@ import wiktionary
 imp = Importatore()
 aqua, acqua, agua, eau, ewe = (imp.lessema('la', 'aqua'), imp.lessema('it', 'acqua'), imp.lessema('es', 'agua'),
                                imp.lessema('fr', 'eau'), imp.lessema('fro', 'ewe'))
+agua_pt = imp.lessema('pt', 'água')
 aquarium, canna, canna2, wod = (imp.lessema('en', 'aquarium'), imp.lessema('it', 'canna'), imp.lessema('it', 'canna', omografo=2),
                                 imp.lessema('ine-pro', '*wódr̥'))
 arco(imp, acqua, aqua)
 with open(f'{d}/discendenti.tsv', 'w') as f:
     f.write('aqua\t1\t\t1\tit\tacqua\t\n' 'aqua\t1\t\t1\tes\tagua\t\n' 'aqua\t1\t\t1\tfro\tewe\tunc\n'
             'aqua\t1\t\t2\tfr\teau\t\n' 'aqua\t1\t\t1\ten\taquarium\tbor\n' 'aqua\t1\t\t1\tit\tcanna\t\n'
-            'aqua\t1\t\t1\tine-pro\t*wódr̥\t\n')
+            'aqua\t1\t\t1\tine-pro\t*wódr̥\t\n'
+            # il nome di un ramo senza parola tiene il posto: ciò che gli sta sotto discende da aqua, non dal nodo prima
+            'aqua\t1\t\t1\tit\tacqua\t\n' 'aqua\t1\t\t1\troa-ibe\t\t\n' 'aqua\t1\t\t2\tpt\tágua\t\n')
 wiktionary.DISCENDENTI_DICHIARATI = (5, 0.85)
 imp.collega_discendenti([('la', f'{d}/discendenti.tsv')])
-assert imp.stat['discendenti_regola_non_applicata'] == 2 and not imp.stat['discendenti_collegati'], imp.stat
+assert imp.stat['discendenti_regola_non_applicata'] == 3 and not imp.stat['discendenti_collegati'], imp.stat
 wiktionary.DISCENDENTI_DICHIARATI = (1, 0.85)
 imp.collega_discendenti([('la', f'{d}/discendenti.tsv')])
 nuovi = {(r['esito'], r['etimo'], r['tipo'], r['conf']) for r in imp.relazioni if r['ipotesi'].endswith('#wikt-discendente')}
-assert nuovi == {(agua, aqua, 'eredita', 2), (aquarium, aqua, 'prestito', 2)}, nuovi
+assert nuovi == {(agua, aqua, 'eredita', 2), (aquarium, aqua, 'prestito', 2), (agua_pt, aqua, 'eredita', 2)}, nuovi
 assert imp.ipotesi[agua + '#wikt-discendente']['etichetta'] == 'Wiktionary (discendente dichiarato)'
 wiktionary.DISCENDENTI_DICHIARATI = (500, 0.85)
 PY

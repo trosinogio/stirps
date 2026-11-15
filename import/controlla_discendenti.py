@@ -94,6 +94,9 @@ def main():
             if not pila:
                 continue
             _, lg, pg, og = pila[-1]
+            if not pf.strip():
+                pila.append((prof, lg, pg, og))    # il nome di un ramo: ciò che gli sta sotto discende dal nodo sopra
+                continue
             pila.append((prof, lf, pf, None))
             arco = (lg, pg, lf, pf)
             if arco in visti or (codice_lingua(lg), pg) == (codice_lingua(lf), pf):

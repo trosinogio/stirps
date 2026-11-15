@@ -277,11 +277,14 @@ def discendenti(v):
             if d.get('lang_code') or d.get('word'):
                 et = ' '.join(d.get('tags') or []) + ' ' + ' '.join(d.get('raw_tags') or [])
                 segni = [s for s, parola in SEGNI_DISCENDENTI if parola in et]
-                if d.get('lang_code') and d.get('word'):
-                    yield prof, d['lang_code'], d['word'], segni
+                # un nodo senza parola (solo il nome di una lingua o di un ramo) si scrive lo stesso, vuoto: tiene il
+                # posto nell'albero, altrimenti i suoi figli passerebbero al nodo che lo precede (ποτέ sotto *hwaz)
+                yield prof, d.get('lang_code') or '', d.get('word') or '', segni
                 yield from nodi(d.get('descendants'), prof + 1)
                 continue
             p = d.get('depth') or prof
+            if not any(t.get('name') in MODELLI_DISCENDENTI for t in d.get('templates') or []):
+                yield p, '', '', []
             for t in d.get('templates') or []:
                 if t.get('name') not in MODELLI_DISCENDENTI:
                     continue
@@ -292,6 +295,8 @@ def discendenti(v):
                     if a[str(i)].strip() not in ('', '-'):
                         yield p, a.get('1', ''), a[str(i)].strip(), segni
                     i += 1
+                if i == 2 or all(a[str(j)].strip() in ('', '-') for j in range(2, i)):
+                    yield p, a.get('1', ''), '', segni
     return nodi(v.get('descendants'), 1)
 
 

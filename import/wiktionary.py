@@ -1647,6 +1647,11 @@ class Importatore:
                 genitore = pila[-1][1]
                 segni = set(c[6].split(','))
                 # un nodo incerto o un calco non porta la discendenza nemmeno ai nodi sotto di lui
+                if not c[5].strip():
+                    # un nodo senza parola è il nome di un ramo («Hellenic:»): ciò che gli sta sotto discende dal
+                    # nodo che gli sta sopra
+                    pila.append((prof, None if segni & {'unc', 'clq'} else genitore))
+                    continue
                 figlio = None if segni & {'unc', 'clq'} else voce(c[4], c[5])
                 pila.append((prof, figlio))
                 self.stat['discendenti_archi'] += 1
