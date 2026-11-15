@@ -258,6 +258,10 @@ Il piano Hobby di Vercel è riservato all'uso non commerciale.
 
 Finché le glosse mancano, la pagina mostra quelle di base e le dichiara.
 
+## Licenze
+
+Il codice è software libero con licenza GNU AGPL 3.0 o successiva ([`LICENSE`](LICENSE)); i dati di `dati/` hanno licenza CC BY-SA 4.0, come le loro fonti; i testi della redazione non hanno ancora una licenza. I dettagli e le fonti sono in [`LICENZE.md`](LICENZE.md).
+
 ## Il prototipo statico
 
 Il prototipo pubblicato (https://claude.ai/artifact/EjCxAgGZw1eBKiM9ea6UQi) usa gli stessi testi e lo stesso JSON, incorporati nella pagina: serve per provare l'interfaccia senza database.
