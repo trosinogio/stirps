@@ -1619,8 +1619,13 @@ class Importatore:
             if lingua.endswith('-pro') and not parola.startswith('*'):
                 parola = '*' + parola
             k = self.chiave_di(lingua, parola)
+            base = k
             if omografo and omografo > 1:
                 k = f'{k}:{omografo}'
+            if base in self.con_ident:
+                # una radice con omografe (*wes- «vestire», «pascolare»…): vale solo quella che la pagina dichiara con
+                # il suo identificativo, mai il nodo generico, che mescolerebbe le famiglie
+                k = base + '@' + self.id_proprio[k] if omografo and k in self.id_proprio else None
             l = self.lessemi.get(k)
             if not l or (not omografo and pagine[(l['lingua'], l['lemma'])] > 1):
                 return None

@@ -493,13 +493,19 @@ with open(f'{d}/discendenti.tsv', 'w') as f:
             'aqua\t1\t\t1\tine-pro\t*wódr̥\t\n'
             # il nome di un ramo senza parola tiene il posto: ciò che gli sta sotto discende da aqua, non dal nodo prima
             'aqua\t1\t\t1\tit\tacqua\t\n' 'aqua\t1\t\t1\troa-ibe\t\t\n' 'aqua\t1\t\t2\tpt\tágua\t\n')
+# una radice con omografe: l'arco va alla radice che la pagina dichiara con il suo identificativo, o a nessuna
+vestire, pascolare = imp.lessema('ine-pro', '*wes-', ident='dress'), imp.lessema('ine-pro', '*wes-', ident='graze')
+generica, veste, bosko = imp.lessema('ine-pro', '*wes-'), imp.lessema('grc', 'ἐσθής'), imp.lessema('grc', 'βόσκω')
+imp.id_proprio[generica] = 'dress'
+with open(f'{d}/discendenti_pie.tsv', 'w') as f:
+    f.write('wes-\t1\t1\t1\tgrc\tἐσθής\t\n' 'wes-\t2\t1\t1\tgrc\tβόσκω\t\n')
 wiktionary.DISCENDENTI_DICHIARATI = (5, 0.85)
 imp.collega_discendenti([('la', f'{d}/discendenti.tsv')])
 assert imp.stat['discendenti_regola_non_applicata'] == 3 and not imp.stat['discendenti_collegati'], imp.stat
 wiktionary.DISCENDENTI_DICHIARATI = (1, 0.85)
-imp.collega_discendenti([('la', f'{d}/discendenti.tsv')])
+imp.collega_discendenti([('la', f'{d}/discendenti.tsv'), ('ine-pro', f'{d}/discendenti_pie.tsv')])
 nuovi = {(r['esito'], r['etimo'], r['tipo'], r['conf']) for r in imp.relazioni if r['ipotesi'].endswith('#wikt-discendente')}
-assert nuovi == {(agua, aqua, 'eredita', 2), (aquarium, aqua, 'prestito', 2), (agua_pt, aqua, 'eredita', 2)}, nuovi
+assert nuovi == {(agua, aqua, 'eredita', 2), (aquarium, aqua, 'prestito', 2), (agua_pt, aqua, 'eredita', 2), (veste, vestire, 'eredita', 2)}, nuovi
 assert imp.ipotesi[agua + '#wikt-discendente']['etichetta'] == 'Wiktionary (discendente dichiarato)'
 wiktionary.DISCENDENTI_DICHIARATI = (500, 0.85)
 PY
