@@ -260,6 +260,46 @@ FORMA = re.compile(r'^(?:\([^)]*\)\s*)*(?:'
 NON_PAROLE = {'abbrev', 'symbol', 'character', 'punct'}
 
 
+# I discendenti che la pagina dichiara (sezione «Descendants»): l'albero ramo per ramo, dalla radice o dalla parola
+# antica alle lingue di oggi. Kaikki li dà in due forme: una riga per discendente con la profondità e i modelli
+# ({{desc|la|aqua|bor=1}}), oppure nodi annidati con lingua, parola ed etichette.
+MODELLI_DISCENDENTI = {'desc', 'descendant', 'desctree', 'descendants tree'}
+SEGNI_DISCENDENTI = (('bor', 'borrowed'), ('lbor', 'learned'), ('slb', 'semi-learned'), ('der', 'derived'),
+                     ('clq', 'calque'), ('unc', 'uncertain'), ('inh', 'inherited'))
+
+
+def discendenti(v):
+    """(profondità, lingua, parola, segni) per ogni discendente dichiarato; la profondità parte da 1."""
+    def nodi(lista, prof):
+        for d in lista or []:
+            if not isinstance(d, dict):
+                continue
+            if d.get('lang_code') or d.get('word'):
+                et = ' '.join(d.get('tags') or []) + ' ' + ' '.join(d.get('raw_tags') or [])
+                segni = [s for s, parola in SEGNI_DISCENDENTI if parola in et]
+                # un nodo senza parola (solo il nome di una lingua o di un ramo) si scrive lo stesso, vuoto: tiene il
+                # posto nell'albero, altrimenti i suoi figli passerebbero al nodo che lo precede (ποτέ sotto *hwaz)
+                yield prof, d.get('lang_code') or '', d.get('word') or '', segni
+                yield from nodi(d.get('descendants'), prof + 1)
+                continue
+            p = d.get('depth') or prof
+            if not any(t.get('name') in MODELLI_DISCENDENTI for t in d.get('templates') or []):
+                yield p, '', '', []
+            for t in d.get('templates') or []:
+                if t.get('name') not in MODELLI_DISCENDENTI:
+                    continue
+                a = t.get('args') or {}
+                segni = [s for s, _ in SEGNI_DISCENDENTI if a.get(s) and a.get(s) not in ('0', 'no')]
+                i = 2
+                while str(i) in a:
+                    if a[str(i)].strip() not in ('', '-'):
+                        yield p, a.get('1', ''), a[str(i)].strip(), segni
+                    i += 1
+                if i == 2 or all(a[str(j)].strip() in ('', '-') for j in range(2, i)):
+                    yield p, a.get('1', ''), '', segni
+    return nodi(v.get('descendants'), 1)
+
+
 def non_parola(v):
     w = v.get('word') or ''
     return v.get('pos') in NON_PAROLE or (w.isupper() and sum(c.isalpha() for c in w) > 1)
@@ -596,6 +636,10 @@ if __name__ == '__main__':
     # SENZA: per ogni lemma senza etimologia utile, la causa (diagnosi: perché zoo non ha una catena)
     senza_f = open(os.environ['SENZA'], 'w', encoding='utf-8') if os.environ.get('SENZA') else None
     cause, modelli_ignoti = Counter(), Counter()
+    # DISCENDENTI: l'albero dei discendenti dichiarati da ogni pagina, una riga per nodo: parola, numero
+    # dell'etimologia, se è ricostruita, profondità, lingua e parola del discendente, segni (bor, der, unc…)
+    discendenti_f = open(os.environ['DISCENDENTI'], 'w', encoding='utf-8') if os.environ.get('DISCENDENTI') else None
+    righe_discendenti = pagine_discendenti = 0
     # DIAGNOSI_MODELLI=ety,etymon: alcuni esempi grezzi di quei modelli nel registro, per imparare a leggerli
     diagnosi = set(filter(None, os.environ.get('DIAGNOSI_MODELLI', '').split(',')))
     esempi_diagnosi = Counter()
@@ -621,6 +665,18 @@ if __name__ == '__main__':
         if non_parola(v):
             non_parole += 1
             continue
+        if discendenti_f and v.get('descendants'):
+            ric = '1' if (v.get('original_title') or '').startswith('Reconstruction:') else ''
+            scritte = 0
+            for prof, ld, pd, segni in discendenti(v):
+                pd = pd.replace('\t', ' ').replace('\n', ' ')
+                discendenti_f.write(f"{v['word']}\t{v.get('etymology_number') or 1}\t{ric}\t{prof}\t{ld}\t{pd}\t{','.join(segni)}\n")
+                scritte += 1
+            righe_discendenti += scritte
+            pagine_discendenti += 1
+            if pagine_discendenti <= 2:
+                print('  discendenti, esempio grezzo: ' + json.dumps({'parola': v.get('word'), 'd': v['descendants'][:4]},
+                                                                      ensure_ascii=False)[:1200] + f' → {scritte} righe', file=sys.stderr)
         if varianti_f and (v.get('original_title') or '').startswith('Reconstruction:'):
             for variante, principale, fonte in ricostruzioni_alternative(v):
                 varianti_f.write(f'{variante}\t{principale}\n')
@@ -719,6 +775,8 @@ if __name__ == '__main__':
     print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}; con una radice dichiarata da {{{{ety}}}} {radici_dalla_ety}; varianti senza etimologia legate al lemma {varianti_legate}; basi lette dalla menzione prima del suffisso {basi_dalla_menzione}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}, sigle e simboli esclusi {non_parole}', file=sys.stderr)
+    if discendenti_f:
+        print(f'  discendenti dichiarati: {pagine_discendenti} pagine, {righe_discendenti} righe', file=sys.stderr)
     if varianti_f:
         print(f'  ricostruzioni alternative: {dict(varianti)}', file=sys.stderr)
     if analisi_f:

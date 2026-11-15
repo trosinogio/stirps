@@ -237,6 +237,32 @@ jobs:
           echo "::notice title=Radici omografe::$(head -2 /tmp/omografe.txt | tr '\n' ' ')"
           python3 -c "import json; s = json.load(open('dati/it/rapporto_parser.json')); print('::notice title=Omografe per glossa::' + str({k: v for k, v in s.items() if k.startswith('omografe')}))" || true
 
+      - name: Discendenti dichiarati
+        continue-on-error: true
+        run: |
+          # l'albero dei discendenti di Wiktionary concorda con le etimologie che abbiamo già? (misura, prima di usarlo)
+          cd import
+          python3 controlla_discendenti.py dati/it/tsv 'dati/*/discendenti.tsv' /tmp/discendenti_archi.tsv | tee /tmp/discendenti.txt
+          echo "::notice title=Discendenti::$(head -2 /tmp/discendenti.txt | tr '\n' ' ')"
+          python3 -c "import json; s = json.load(open('dati/it/rapporto_parser.json')); print('::notice title=Discendenti collegati::' + str({k: v for k, v in s.items() if k.startswith('discendenti')}))" || true
+          for f in dati/*/discendenti.tsv; do l=$(basename $(dirname $f)); sed "s/^/$l\t/" $f; done | gzip -9 > /tmp/discendenti.tsv.gz
+          # la sandbox di Claude non scarica gli artefatti: l'albero va anche su un ramo di servizio senza storia
+          rm -rf /tmp/misure && mkdir /tmp/misure && cd /tmp/misure && git init -q && cp /tmp/discendenti.tsv.gz /tmp/discendenti.txt /tmp/discendenti_archi.tsv . 2>/dev/null
+          gzip -9 discendenti_archi.tsv
+          git add -A && git -c user.name=dati -c user.email=dati@users.noreply.github.com commit -qm "Discendenti dichiarati: l'albero e la misura"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:refs/heads/misure-discendenti
+
+      - name: Discendenti (artefatto)
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: discendenti
+          path: |
+            /tmp/discendenti.txt
+            /tmp/discendenti_archi.tsv
+            /tmp/discendenti.tsv.gz
+          retention-days: 14
+
       - name: Glosse delle radici (artefatto)
         continue-on-error: true
         uses: actions/upload-artifact@v4
