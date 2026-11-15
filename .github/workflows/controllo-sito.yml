@@ -12,9 +12,9 @@ jobs:
         run: |
           S=https://dizionario-etimologico.vercel.app
           prova() { curl -s -o /tmp/p.html -w "%{http_code} %{size_download}B" "$S$1"; printf ' %s | ' "$1"; grep -o "$2" /tmp/p.html | head -${3:-2} | tr '\n' ' '; echo; }
-          prova /it/w/grc/pote 'href="/it/w/[a-z-]*/[^"]*"' 8
-          prova /it/w/grc/dokeo 'href="/it/w/[a-z-]*/[^"]*"' 8
-          prova /it/w/it/esteta 'href="/it/w/[a-z-]*/[^"]*"' 8
-          prova /it/w/fro/corir 'href="/it/w/[a-z-]*/[^"]*"' 8
-          prova /it/w/la/crystallus 'href="/it/w/[a-z-]*/[^"]*"' 8
-          prova /it/w/grc/pote 'discendente dichiarato' 1
+          prova /it/w/got/tunthus 'href="/it/w/[a-z-]*/[^"]*"' 6
+          prova /it/w/non/heitr 'href="/it/w/[a-z-]*/[^"]*"' 6
+          prova /it/w/cu/slava 'href="/it/w/[a-z-]*/[^"]*"' 6
+          prova /it/w/ru/хронология 'href="/it/w/[a-z-]*/[^"]*"' 6
+          prova /it/r/ine-pro/h3donts/lingue 'tunthus' 1
+          prova /it 'voci[^<]*' 1
