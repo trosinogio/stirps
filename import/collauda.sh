@@ -561,6 +561,14 @@ assert imp.etimo_presente(v([{'n': 'root', 'a': {'1': 'hit', '2': 'ine-pro', '3'
 assert not imp.etimo_presente(v([{'n': 'cog', 'a': {'1': 'grc', '2': 'ὕδωρ'}}]))
 assert not imp.etimo_presente(v([{'n': 'inh', 'a': {'1': 'hit', '2': 'ine-pro', '3': '*wódr̥'}}], p='name'))
 assert not imp.etimo_presente(v([{'n': 'inh', 'a': {'1': 'hit', '2': 'ine-pro', '3': '*h₂ébʰō'}}]))
+# una lingua con le sole voci che hanno un'etimologia (le romanze): mai un nome proprio, una locuzione o una contrazione;
+# nelle lingue intere (latino) anche i nomi propri
+imp = Importatore()
+imp.con_etimologia, imp.intere = {'es'}, {'la'}
+assert imp.ammessa('es', {'w': 'estornino', 'p': 'noun'})
+assert not imp.ammessa('es', {'w': 'del', 'p': 'contraction'}) and not imp.ammessa('es', {'w': 'Madrid', 'p': 'name'})
+assert not imp.ammessa('es', {'w': 'a menudo', 'p': 'adv'})
+assert imp.ammessa('la', {'w': 'Romanus', 'p': 'name'})
 # un segno di una scrittura non è una parola: il segno sillabico 𐀆 e il numerale 𐄉 escono, la congiunzione 𐀤 resta
 imp = Importatore()
 for lemma, glossa in (('𐀆', 'The Linear B syllabic letter ⟨de⟩.'), ('𐄉', 'three, 3'), ('𐀤', 'and')):

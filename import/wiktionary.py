@@ -1098,13 +1098,15 @@ class Importatore:
 
     def ammessa(self, lingua, v):
         """Una voce entra da sola, senza che una catena la raggiunga, solo se la sua lingua non ha un elenco o se è
-        nell'elenco (le forme più frequenti) o, con --esterni, ha l'etimo in un'altra lingua; e mai un nome proprio o
-        una locuzione."""
+        nell'elenco (le forme più frequenti) o, con --esterni, ha l'etimo in un'altra lingua; e, fuori dalle lingue
+        intere, mai un nome proprio, una locuzione o una contrazione (*del* = *de* + *el*, *j'y*: non sono lemmi)."""
         elenco = self.elenco.get(lingua)
+        if elenco is None and lingua in self.intere:
+            return True
+        if v.get('p') in ('name', 'contraction') or ' ' in v['w'].strip():
+            return False
         if elenco is None:
             return True
-        if v.get('p') == 'name' or ' ' in v['w'].strip():
-            return False
         return v['w'].lower() in elenco or (lingua in self.esterni and etimo_esterno(lingua, v))
 
     def chiudi(self, passi=1):

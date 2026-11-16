@@ -34,9 +34,8 @@ jobs:
         gl:Galician ast:Asturian an:Aragonese co:Corsican lld:Ladin rm:Romansch wa:Walloon frp:Franco-Provençal dlm:Dalmatian
         rup:Aromanian ruq:Megleno-Romanian ruo:Istro-Romanian lad:Ladino egl:Emilian rgn:Romagnol ist:Istriot mxi:Mozarabic
         roa-opt:Old Galician-Portuguese roa-oca:Old Catalan nrf:Norman pcd:Picard'
-      # STIMA (16 novembre 2026, ramo dati-stima-romanze, da non unire): tutte le lingue romanze intere, per misurare
-      # con stima_import.py quanto costa ciascun ambito; le glosse si contano senza tradurle
-      INTERE: la,grc,es,pt,ca,ro,gl,oc,fr,fro,frm,osp,roa-opt,roa-oca,pro,nap,scn,vec,lij,sc,lmo,pms,fur,ast,an,co,lld,rm,wa,frp,dlm,rup,ruq,ruo,lad,egl,rgn,ist,mxi,nrf,pcd
+      INTERE: la,grc
+      # la stima dopo ogni giro (stima_import.py), per le lingue romanze
       STIMA_LINGUE: es,pt,ca,ro,gl,oc,fr,fro,frm,osp,roa-opt,roa-oca,pro,nap,scn,vec,lij,sc,lmo,pms,fur,ast,an,co,lld,rm,wa,frp,dlm,rup,ruq,ruo,lad,egl,rgn,ist,mxi,nrf,pcd
       STIMA_ATTUALE: '1053'
       STIMA_FREQUENZE: es=dati/frequenze_es.tsv.gz,pt=dati/frequenze_pt.tsv.gz,ca=dati/frequenze_ca.tsv.gz,ro=dati/frequenze_ro.tsv.gz,gl=dati/frequenze_gl.tsv.gz,fr=dati/frequenze_fr.tsv.gz
@@ -49,7 +48,9 @@ jobs:
       # entra se un etimo della sua pagina è già nel dizionario (l'ittita: gli alberi citano 386 parole, quasi tutte
       # temi o forme senza pagina, e ne entravano 25; delle 515 pagine ittite 337 hanno un'etimologia)
       RISALI: hit,xcl,ae,txb,xto,gmy,sa,got,cu,lt,sga
-      CON_ETIMOLOGIA: en,de,ru
+      # le lingue romanze con tutte le voci che hanno un'etimologia, senza nomi propri, locuzioni e contrazioni (decisione
+      # di Giovanni, 16 novembre 2026, «ambito B» della stima: 209 mila voci); il francese non ha più l'elenco del lessico comune
+      CON_ETIMOLOGIA: en,de,ru,es,pt,ca,ro,gl,oc,fr,fro,frm,osp,roa-opt,roa-oca,pro,nap,scn,vec,lij,sc,lmo,pms,fur,ast,an,co,lld,rm,wa,frp,dlm,rup,ruq,ruo,lad,egl,rgn,ist,mxi,nrf,pcd
       # dell'inglese, il lessico comune (i lemmi tra le 50 mila forme più frequenti) e le parole con l'etimo fuori
       # dall'inglese (ESTERNI), senza nomi propri né locuzioni
       # la stessa regola per francese, tedesco e russo (stima del 6 novembre 2026: 114 MB invece di 239 per le lingue intere)
@@ -57,7 +58,7 @@ jobs:
       COMUNI: it=../dati/frequenze_it.tsv.gz
       ELENCHI: en=../dati/frequenze_en.tsv.gz de=../dati/frequenze_de.tsv.gz ru=../dati/frequenze_ru.tsv.gz
       ESTERNI: en,de,ru
-      GLOSSE_TRADOTTE: '0'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
+      GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
       # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
       DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq
       # i modelli grezzi di alcune parole, per capire perché la loro etimologia non si legge (le cime greche del 13 novembre)
