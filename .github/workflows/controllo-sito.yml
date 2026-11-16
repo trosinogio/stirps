@@ -12,8 +12,9 @@ jobs:
         run: |
           S=https://dizionario-etimologico.vercel.app
           prova() { curl -s -o /tmp/p.html -w "%{http_code} %{size_download}B" "$S$1"; printf ' %s | ' "$1"; grep -o "$2" /tmp/p.html | head -${3:-2} | tr '\n' ' '; echo; }
-          prova /it/w/got/tunthus 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*' 1
-          prova /it/w/non/heitr 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*' 1
-          prova /it/w/cu/slava 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*' 1
-          prova /it/w/pl/czaszka 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*' 1
-          prova /it/w/got/itan 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*' 1
+          prova /it/w/ro/piept 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
+          prova /it/w/ca/aixella 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
+          prova /it/w/pt/gaivota 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
+          prova /it/w/oc/esquirol 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
+          prova /it/w/es/explicar 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
+          prova /it/r/la/pectus/lingue 'piept' 1
