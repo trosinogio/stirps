@@ -30,8 +30,16 @@ jobs:
         ine-pro:Proto-Indo-European itc-pro:Proto-Italic grk-pro:Proto-Hellenic gem-pro:Proto-Germanic gmw-pro:Proto-West Germanic sla-pro:Proto-Slavic ine-bsl-pro:Proto-Balto-Slavic cel-pro:Proto-Celtic
         nl:Dutch dum:Middle Dutch gml:Middle Low German osx:Old Saxon frk:Frankish got:Gothic yi:Yiddish pl:Polish ga:Irish
         ar:Arabic he:Hebrew sa:Sanskrit hi:Hindi fa:Persian tr:Turkish ota:Ottoman Turkish ja:Japanese
-        lt:Lithuanian sga:Old Irish hit:Hittite xcl:Old Armenian ae:Avestan txb:Tocharian B xto:Tocharian A gmy:Mycenaean Greek'
-      INTERE: la,grc
+        lt:Lithuanian sga:Old Irish hit:Hittite xcl:Old Armenian ae:Avestan txb:Tocharian B xto:Tocharian A gmy:Mycenaean Greek
+        gl:Galician ast:Asturian an:Aragonese co:Corsican lld:Ladin rm:Romansch wa:Walloon frp:Franco-Provençal dlm:Dalmatian
+        rup:Aromanian ruq:Megleno-Romanian ruo:Istro-Romanian lad:Ladino egl:Emilian rgn:Romagnol ist:Istriot mxi:Mozarabic
+        roa-opt:Old Galician-Portuguese roa-oca:Old Catalan nrf:Norman pcd:Picard'
+      # STIMA (16 novembre 2026, ramo dati-stima-romanze, da non unire): tutte le lingue romanze intere, per misurare
+      # con stima_import.py quanto costa ciascun ambito; le glosse si contano senza tradurle
+      INTERE: la,grc,es,pt,ca,ro,gl,oc,fr,fro,frm,osp,roa-opt,roa-oca,pro,nap,scn,vec,lij,sc,lmo,pms,fur,ast,an,co,lld,rm,wa,frp,dlm,rup,ruq,ruo,lad,egl,rgn,ist,mxi,nrf,pcd
+      STIMA_LINGUE: es,pt,ca,ro,gl,oc,fr,fro,frm,osp,roa-opt,roa-oca,pro,nap,scn,vec,lij,sc,lmo,pms,fur,ast,an,co,lld,rm,wa,frp,dlm,rup,ruq,ruo,lad,egl,rgn,ist,mxi,nrf,pcd
+      STIMA_ATTUALE: '1053'
+      STIMA_FREQUENZE: es=dati/frequenze_es.tsv.gz,pt=dati/frequenze_pt.tsv.gz,ca=dati/frequenze_ca.tsv.gz,ro=dati/frequenze_ro.tsv.gz,gl=dati/frequenze_gl.tsv.gz,fr=dati/frequenze_fr.tsv.gz
       # sotto le voci dei rami antichi e del latino entrano anche i discendenti dichiarati che il dizionario non ha
       # (import/wiktionary.py; il latino dal 15 novembre 2026, decisione di Giovanni: le lingue romanze)
       # e sotto il protobaltoslavo e il protoceltico (16 novembre 2026: lituano e irlandese antico, con l'ittita, per il
@@ -41,15 +49,15 @@ jobs:
       # entra se un etimo della sua pagina è già nel dizionario (l'ittita: gli alberi citano 386 parole, quasi tutte
       # temi o forme senza pagina, e ne entravano 25; delle 515 pagine ittite 337 hanno un'etimologia)
       RISALI: hit,xcl,ae,txb,xto,gmy,sa,got,cu,lt,sga
-      CON_ETIMOLOGIA: en,fr,de,ru
+      CON_ETIMOLOGIA: en,de,ru
       # dell'inglese, il lessico comune (i lemmi tra le 50 mila forme più frequenti) e le parole con l'etimo fuori
       # dall'inglese (ESTERNI), senza nomi propri né locuzioni
       # la stessa regola per francese, tedesco e russo (stima del 6 novembre 2026: 114 MB invece di 239 per le lingue intere)
       # l'italiano anche con i lemmi senza etimologia del lessico comune (referto), per l'analisi di un testo
       COMUNI: it=../dati/frequenze_it.tsv.gz
-      ELENCHI: en=../dati/frequenze_en.tsv.gz fr=../dati/frequenze_fr.tsv.gz de=../dati/frequenze_de.tsv.gz ru=../dati/frequenze_ru.tsv.gz
-      ESTERNI: en,fr,de,ru
-      GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
+      ELENCHI: en=../dati/frequenze_en.tsv.gz de=../dati/frequenze_de.tsv.gz ru=../dati/frequenze_ru.tsv.gz
+      ESTERNI: en,de,ru
+      GLOSSE_TRADOTTE: '0'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
       # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
       DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq
       # i modelli grezzi di alcune parole, per capire perché la loro etimologia non si legge (le cime greche del 13 novembre)
@@ -297,13 +305,14 @@ jobs:
 
       - name: Stima dell'import
         continue-on-error: true
-        timeout-minutes: 15
+        timeout-minutes: 30
         run: |
           mkdir -p /tmp/prima
           # rispetto al pacchetto pubblicato, quello di main
           git fetch -q --depth 1 origin main
           for f in lessemi ipotesi relazioni attestazioni; do git show FETCH_HEAD:dati/$f.tsv.gz > /tmp/prima/$f.tsv.gz; done
-          python3 import/stima_import.py /tmp/prima dati nap,es,sla-pro --attuale 850 | tee /tmp/stima.txt
+          python3 import/stima_import.py /tmp/prima dati "${STIMA_LINGUE:-es,pt}" --attuale "${STIMA_ATTUALE:-1053}" \
+            ${STIMA_FREQUENZE:+--frequenze "$STIMA_FREQUENZE"} | tee /tmp/stima.txt
           echo "::notice title=Stima::$(head -4 /tmp/stima.txt | tr '\n' ' ')"
 
       - name: Commit sul ramo
