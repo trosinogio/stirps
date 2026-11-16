@@ -60,7 +60,7 @@ COMPOSTO = re.compile(r"^composée?\s+(?:de|du|d['’])\s*" + _PAROLA + r"\s*,?\
                       + _PAROLA + r"\s*$", re.I)
 CON_AFFISSO = re.compile(r"^(?:dérivé|dérivée)\s+(?:de|du|d['’])\s*" + _PAROLA + r"\s*,?\s+avec\s+le\s+(?:suffixe|préfixe)\s+"
                          r"(-?[^\W\d_][\w-]*-?)\s*$", re.I)
-DA_PAROLA = re.compile(r"^(?:dérivé|dérivée|dérivé\s+de|dérivée\s+de|de|déverbal\s+de|dénominal\s+de|diminutif\s+de|augmentatif\s+de|"
+DA_PAROLA = re.compile(r"^(?:dérivé|dérivée|dérivé\s+de|dérivée\s+de|de|du\s+verbe|neutre\s+substantivé\s+de|déverbal\s+de|dénominal\s+de|diminutif\s+de|augmentatif\s+de|"
                        r"péjoratif\s+de|féminin\s+de|participe\s+passé\s+de|participe\s+présent\s+de|substantivation\s+de|"
                        r"nominalisation\s+de|apocope\s+de|aphérèse\s+de|abréviation\s+de|troncation\s+de)\s*(?:d['’])?\s*"
                        + _PAROLA + r"\s*$", re.I)
@@ -99,8 +99,33 @@ def senza_quantita(w):
     return unicodedata.normalize('NFC', ''.join(c for c in unicodedata.normalize('NFD', w) if c not in '\u0304\u0306'))
 
 
+# un composto greco scritto con traslitterazione e glossa: «Composé de ἀντί, antí (« opposé ») et de πόλις, pólis (« ville »)»,
+# «Composé de δῆμος, dêmos (« peuple »), σθένος, sthénos (« force ») et -ης, -ēs»: valgono le parole in alfabeto greco,
+# nell'ordine, fino a «littéralement» o alla fine della frase; un suffisso (-ης) non è un elemento
+COMPOSTO_GRECO = re.compile(r"^composée?\s+(?:de|du|d['’])\s*", re.I)
+PAROLA_GRECA = re.compile(r"(?<![\w-])(-?[\u0370-\u03ff\u1f00-\u1fff]+-?)(?![\w])")
+
+
+def composto_greco(t):
+    m = COMPOSTO_GRECO.match(t)
+    if not m:
+        return []
+    resto = re.split(r"[;.]|littéralement|voir\b|apparenté", t[m.end():], maxsplit=1, flags=re.I)[0]
+    resto = re.sub(r"«[^»]*»|\[[^\]]*\]", ' ', resto)                  # le glosse e le traslitterazioni tra parentesi quadre
+    if not re.search(r"\bet\b", resto):
+        return []
+    parti = [w for w in PAROLA_GRECA.findall(resto) if not w.startswith('-')]
+    if len(parti) < 2 or len(parti) > 3 or any(w.endswith('-') for w in parti[1:]):
+        return []
+    return [(i, 'grc', w.rstrip('-'), 'composizione', None, 3) for i, w in enumerate(parti, 1)]
+
+
 def _leggi(testo, parola, propria):
     t = pulisci(testo)
+    if propria == 'grc' and not DUBBIO.search(t.split(';')[0].split('. ')[0]):
+        righe = composto_greco(t)
+        if righe:
+            return righe
     if not t or DUBBIO.search(t.split(';')[0].split('. ')[0]):
         return []
     m = DALLA_LINGUA.match(t)
@@ -122,6 +147,8 @@ def _leggi(testo, parola, propria):
     m = CON_AFFISSO.match(frase)
     if m and m.group(1).lower() not in NON_ETIMI and m.group(1).lower() != parola.lower():
         return [(1, propria, m.group(1), 'derivazione', m.group(2), 3)]
+    if re.search(r"\bcombiné|\bet\s+(?:du|de)\s+(?:verbe|suffixe|préfixe)\b", t.split(';')[0].split('. ')[0], re.I):
+        return []                              # «Du verbe φύω combiné avec le verbe εἴλω»: l'etimo è solo una parte
     frase = frase.split(',')[0].strip()
     m = DA_PAROLA.match(frase)
     if m and m.group(1).lower() not in LINGUE and m.group(1).lower() not in NON_ETIMI and m.group(1).lower() != parola.lower():
