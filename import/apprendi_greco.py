@@ -39,6 +39,10 @@ def righe(percorso):
         return [r.rstrip('\n').split('\t') for r in f if r.strip()]
 
 
+def e_affisso(lemma):
+    return lemma.startswith('-') or lemma.endswith('-')
+
+
 def lcp(a, b):
     i = 0
     while i < min(len(a), len(b)) and a[i] == b[i]:
@@ -133,7 +137,18 @@ def main():
     # l'oro: gli etimi greci delle voci greche, dalle ipotesi accolte di Wiktionary e dall'LSJ
     accolte = {c[0] for c in righe(ipotesi_p) if len(c) > 3 and c[3] == 'accolta'}
     oro, ordine_oro, con_etimo = defaultdict(set), defaultdict(dict), set()
-    for c in righe(relazioni_p):
+    # tutta la catena accolta, in ogni lingua, per sapere se due parole stanno nella stessa famiglia: γνῶσις e
+    # διαγιγνώσκω salgono tutte e due a γιγνώσκω e a *ǵneh₃-, anche se nessuna delle due è l'etimo dell'altra. Un affisso
+    # (-σις, ἀ-) non è un antenato comune
+    sopra, chiavi_di = defaultdict(set), defaultdict(set)
+    for k, v in chiavi.items():
+        if v[0] == 'grc':
+            chiavi_di[v[1]].add(k)
+    tutte_rel = righe(relazioni_p)
+    for c in tutte_rel:
+        if len(c) > 3 and c[1] in accolte and c[3] in chiavi and not e_affisso(chiavi[c[3]][1]):
+            sopra[c[2]].add(c[3])
+    for c in tutte_rel:
         if len(c) < 6 or c[1] not in accolte or c[2] not in chiavi or chiavi[c[2]][0] != 'grc':
             continue
         if c[4] == 'variante':
@@ -164,10 +179,26 @@ def main():
             memo[(l, prof)] = s
         return memo[(l, prof)]
 
+    memo_catena = {}
+
+    def catena(lemma):
+        """Le voci della parola e tutti i loro antenati accolti, in ogni lingua, fino alla cima."""
+        if lemma not in memo_catena:
+            visti, fronte = set(chiavi_di.get(lemma, ())), list(chiavi_di.get(lemma, ()))
+            while fronte:
+                x = fronte.pop()
+                for e in sopra.get(x, ()):
+                    if e not in visti:
+                        visti.add(e)
+                        fronte.append(e)
+            memo_catena[lemma] = visti
+        return memo_catena[lemma]
+
     def esito(prev, l):
-        """(esatta, stessa famiglia): ogni elemento previsto è un etimo, o ha un antenato comune con un etimo."""
+        """(esatta, stessa famiglia): ogni elemento previsto è un etimo, o ha un antenato comune con un etimo: tre passi tra
+        parole greche (σηπτός → σήπω), o la catena accolta fino alla cima."""
         esatta = set(prev) <= oro[l]
-        fam = bool(oro[l]) and all(any(antenati(p) & antenati(e) for e in oro[l]) for p in prev)
+        fam = bool(oro[l]) and all(any(antenati(p) & antenati(e) or catena(p) & catena(e) for e in oro[l]) for p in prev)
         return esatta, esatta or fam
 
     note = sorted(l for l in con_etimo if comune(l, None) and not l.startswith('-') and not l.endswith('-'))
@@ -251,6 +282,42 @@ def main():
           f'nella famiglia giusta {pct(conta["mano_famiglia"], conta["mano"])}', file=sys.stderr)
     for s in sbagli:
         print('    sbaglio: ' + s, file=sys.stderr)
+    if '--diagnosi-prefissi' in sys.argv:
+        # per ogni prefisso appreso: quante volte scatta, quante esatte e nella famiglia, e se è scelto; poi le voci senza
+        # etimologia che hanno la forma di un prefisso davanti a una parola greca, e perché la regola non le prende
+        print('  prefissi appresi (scatta, esatte, famiglia, scelto):', file=sys.stderr)
+        for r in sorted((r for r in scatta if r[0] == 'P'), key=lambda r: -scatta[r])[:40]:
+            print(f'    {r[1]}-: {scatta[r]}, {esatte[r]}, {famiglia[r]}, {"sì" if r in prec else "no"}', file=sys.stderr)
+        for pre in ('επι', 'προ', 'δια', 'ανα', 'α', 'κατα', 'απο', 'συν'):
+            r, sb = ('P', pre), []
+            for l in addestra:
+                for rr, prev in scatti(l):
+                    if rr == r and not esito(prev, l)[1] and len(sb) < 8:
+                        sb.append(f'{l} → {prev[0]}, oro {"/".join(sorted(oro[l]))}')
+            print(f'    sbagli di {pre}-: ' + '; '.join(sb), file=sys.stderr)
+        senza = [l for k, (lingua, l, pos, _) in greche.items() if l not in con_etimo]
+        motivi, esempi = Counter(), defaultdict(list)
+        for l in senza:
+            n = nudo(l)
+            trovato = None
+            for i in range(2, min(8, len(n) - 3)):
+                if n[i:] in lessico and lessico[n[i:]] - {l}:
+                    trovato = (n[:i], lessico[n[i:]] - {l})
+                    break
+            if not trovato:
+                continue
+            pre, basi = trovato
+            r = ('P', pre)
+            motivo = ('base ambigua' if len(basi) > 1 else 'prefisso mai visto' if r not in m.P
+                      else 'prefisso con pochi casi' if scatta[r] < SUPPORTO else 'prefisso sotto la soglia' if r not in prec
+                      else 'preso')
+            motivi[motivo] += 1
+            if len(esempi[motivo]) < 6:
+                esempi[motivo].append(f'{l} = {pre}- + {"/".join(sorted(basi))[:40]}')
+        print(f'  voci senza etimologia con la forma prefisso + parola: {sum(motivi.values())} su {len(senza)}: {dict(motivi)}',
+              file=sys.stderr)
+        for k, v in esempi.items():
+            print(f'    {k}: ' + '; '.join(v), file=sys.stderr)
     if solo_rapporto:
         return
     # 4. le voci greche senza etimologia: la previsione migliore, al posto delle righe greche di analisi_composti.py
