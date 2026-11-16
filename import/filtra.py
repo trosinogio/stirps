@@ -115,7 +115,7 @@ def albero_ety(s):
 
 def prima_forma(t):
     '''La prima di più forme scritte insieme: «*iowos, *iowez-» → «*iowos», «*h₂ér-ti-s ~ *h₂r̥-téy-s» → «*h₂ér-ti-s».'''
-    return re.split(r'\s*[~,;/]\s*|\s+(?:or|and)\s+', (t or '').strip(), maxsplit=1)[0].strip()
+    return re.split(r'\s*[~,;/`]\s*|\s+(?:or|and)\s+', (t or '').strip(), maxsplit=1)[0].strip()
 
 
 def termine_ety(x, lingua):
