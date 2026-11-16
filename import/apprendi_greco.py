@@ -8,6 +8,9 @@ insegnano tre tipi di regole, sulle forme senza accenti né spiriti:
 - secondo elemento di un composto: λαμπαδηφόρος < λαμπάς + φέρω insegna «-φοροσ è φέρω» (C, φοροσ), anche quando la
   forma cambia, che è quello che le regole scritte a mano non sanno fare.
 Anche le regole scritte a mano (analisi_composti.py) entrano nella prova, una per prefisso o suffisso.
+Una regola sola, scritta a mano ma misurata come le altre, per i verbi composti, che quasi mai hanno un'etimologia
+(διατάσσω, ἀποδέχομαι): verbo = preverbio + verbo (V), con il preverbio più lungo e l'elisione solo davanti a vocale.
+Il 16 novembre 2026: 801 casi in addestramento, nella famiglia giusta l'89%, e l'88% sul campione tenuto da parte.
 
 Ogni regola si misura dove scatta, sulle voci note dell'80% di addestramento. Una previsione è esatta se la base è un
 etimo greco della voce; è della stessa famiglia se la base e l'etimo hanno un antenato comune nel greco (εὔσηπτος =
@@ -27,6 +30,28 @@ from collections import Counter, defaultdict
 
 from analisi_composti import analizza, comune, nudo
 
+# verbo = preverbio + verbo (διατάσσω = δια- + τάσσω): i preverbi veri, con l'elisione solo davanti a vocale (δι-ἔρχομαι,
+# καθ-αιρέω) e la forma piena davanti a consonante (κατα-λύω, non κατ- + ἀλύω); περι- e προ- non si elidono
+VOCALI = set('αεηιουω')
+PREVERBI_PIENI = ('αμφι', 'ανα', 'αντι', 'απο', 'δια', 'επι', 'κατα', 'μετα', 'παρα', 'υπερ', 'υπο', 'εκ')
+PREVERBI_ELISI = ('αμφ', 'αν', 'αντ', 'ανθ', 'απ', 'αφ', 'δι', 'επ', 'εφ', 'κατ', 'καθ', 'μετ', 'μεθ', 'παρ', 'υπ', 'υφ', 'εξ')
+PREVERBI_SEMPRE = ('περι', 'προσ', 'προ', 'εισ', 'εν', 'εμ', 'εγ', 'ελ', 'συν', 'συμ', 'συγ', 'συλ', 'συσ')
+PREVERBI = sorted(PREVERBI_PIENI + PREVERBI_ELISI + PREVERBI_SEMPRE, key=len, reverse=True)
+DESINENZE_VERBALI = ('ω', 'ομαι', 'μαι', 'μι')
+
+
+def preverbio(n):
+    """Il preverbio più lungo con cui comincia la forma n di un verbo, se ciò che resta può essere un verbo."""
+    if not n.endswith(DESINENZE_VERBALI):
+        return None
+    for p in PREVERBI:
+        resto = n[len(p):]
+        if not n.startswith(p) or len(resto) < 3:
+            continue
+        if p in PREVERBI_PIENI and resto[0] in VOCALI or p in PREVERBI_ELISI and resto[0] not in VOCALI:
+            continue
+        return p
+    return None
 SUPPORTO, PRECISIONE, ESATTEZZA = 5, 0.85, 0.5
 VOCALI_DI_UNIONE = 'οιαυ'
 # le finali con cui un tema diventa una parola, per il primo elemento di un composto (μοσχ- → μόσχος)
@@ -37,6 +62,10 @@ def righe(percorso):
     apri = gzip.open if percorso.endswith('.gz') else open
     with apri(percorso, 'rt', encoding='utf-8') as f:
         return [r.rstrip('\n').split('\t') for r in f if r.strip()]
+
+
+def e_affisso(lemma):
+    return lemma.startswith('-') or lemma.endswith('-')
 
 
 def lcp(a, b):
@@ -104,6 +133,11 @@ class Modello:
                 base = self.unico(n[i:], lemma)
                 if base:
                     out.append((('P', n[:i]), (base,)))
+        p = preverbio(n)
+        if p:
+            base = self.unico(n[len(p):], lemma)
+            if base and nudo(base).endswith(DESINENZE_VERBALI):
+                out.append((('V', 'preverbio'), (base,)))
         for k in range(3, len(n) - 2):
             if n[k:] in self.C:
                 secondo, forma = self.C[n[k:]]
@@ -133,7 +167,18 @@ def main():
     # l'oro: gli etimi greci delle voci greche, dalle ipotesi accolte di Wiktionary e dall'LSJ
     accolte = {c[0] for c in righe(ipotesi_p) if len(c) > 3 and c[3] == 'accolta'}
     oro, ordine_oro, con_etimo = defaultdict(set), defaultdict(dict), set()
-    for c in righe(relazioni_p):
+    # tutta la catena accolta, in ogni lingua, per sapere se due parole stanno nella stessa famiglia: γνῶσις e
+    # διαγιγνώσκω salgono tutte e due a γιγνώσκω e a *ǵneh₃-, anche se nessuna delle due è l'etimo dell'altra. Un affisso
+    # (-σις, ἀ-) non è un antenato comune
+    sopra, chiavi_di = defaultdict(set), defaultdict(set)
+    for k, v in chiavi.items():
+        if v[0] == 'grc':
+            chiavi_di[v[1]].add(k)
+    tutte_rel = righe(relazioni_p)
+    for c in tutte_rel:
+        if len(c) > 3 and c[1] in accolte and c[3] in chiavi and not e_affisso(chiavi[c[3]][1]):
+            sopra[c[2]].add(c[3])
+    for c in tutte_rel:
         if len(c) < 6 or c[1] not in accolte or c[2] not in chiavi or chiavi[c[2]][0] != 'grc':
             continue
         if c[4] == 'variante':
@@ -164,10 +209,26 @@ def main():
             memo[(l, prof)] = s
         return memo[(l, prof)]
 
+    memo_catena = {}
+
+    def catena(lemma):
+        """Le voci della parola e tutti i loro antenati accolti, in ogni lingua, fino alla cima."""
+        if lemma not in memo_catena:
+            visti, fronte = set(chiavi_di.get(lemma, ())), list(chiavi_di.get(lemma, ()))
+            while fronte:
+                x = fronte.pop()
+                for e in sopra.get(x, ()):
+                    if e not in visti:
+                        visti.add(e)
+                        fronte.append(e)
+            memo_catena[lemma] = visti
+        return memo_catena[lemma]
+
     def esito(prev, l):
-        """(esatta, stessa famiglia): ogni elemento previsto è un etimo, o ha un antenato comune con un etimo."""
+        """(esatta, stessa famiglia): ogni elemento previsto è un etimo, o ha un antenato comune con un etimo: tre passi tra
+        parole greche (σηπτός → σήπω), o la catena accolta fino alla cima."""
         esatta = set(prev) <= oro[l]
-        fam = bool(oro[l]) and all(any(antenati(p) & antenati(e) for e in oro[l]) for p in prev)
+        fam = bool(oro[l]) and all(any(antenati(p) & antenati(e) or catena(p) & catena(e) for e in oro[l]) for p in prev)
         return esatta, esatta or fam
 
     note = sorted(l for l in con_etimo if comune(l, None) and not l.startswith('-') and not l.endswith('-'))
@@ -235,6 +296,9 @@ def main():
         conta['previsioni'] += 1
         conta['esatte'] += e
         conta['famiglia'] += f
+        conta['tipo', p[0][0]] += 1
+        conta['tipo_esatte', p[0][0]] += e
+        conta['tipo_famiglia', p[0][0]] += f
         conta[fonte] += 0
         conta['da_' + fonte] += 1
         if not f and len(sbagli) < 10:
@@ -249,8 +313,76 @@ def main():
           f'esatte {pct(conta["esatte"], conta["previsioni"])}, nella famiglia giusta {pct(conta["famiglia"], conta["previsioni"])}; '
           f'tutte le regole a mano, senza scelta: {conta["mano"]} previsioni, esatte {pct(conta["mano_esatte"], conta["mano"])}, '
           f'nella famiglia giusta {pct(conta["mano_famiglia"], conta["mano"])}', file=sys.stderr)
+    print('  per tipo di regola (prova: previsioni, esatte, famiglia): ' + '; '.join(
+        f'{t} {conta["tipo", t]} {pct(conta["tipo_esatte", t], conta["tipo", t])} {pct(conta["tipo_famiglia", t], conta["tipo", t])}'
+        for t in sorted({k[1] for k in conta if isinstance(k, tuple) and k[0] == 'tipo'}))
+        + f'; V in addestramento: {scatta["V", "preverbio"]} casi, esatte {pct(esatte["V", "preverbio"], scatta["V", "preverbio"])}, '
+        f'famiglia {pct(famiglia["V", "preverbio"], scatta["V", "preverbio"])}', file=sys.stderr)
     for s in sbagli:
         print('    sbaglio: ' + s, file=sys.stderr)
+    if '--diagnosi-prefissi' in sys.argv:
+        # per ogni prefisso appreso: quante volte scatta, quante esatte e nella famiglia, e se è scelto; poi le voci senza
+        # etimologia che hanno la forma di un prefisso davanti a una parola greca, e perché la regola non le prende
+        print('  prefissi appresi (scatta, esatte, famiglia, scelto):', file=sys.stderr)
+        for r in sorted((r for r in scatta if r[0] == 'P'), key=lambda r: -scatta[r])[:40]:
+            print(f'    {r[1]}-: {scatta[r]}, {esatte[r]}, {famiglia[r]}, {"sì" if r in prec else "no"}', file=sys.stderr)
+        # i soli verbi con un verbo per base (διατάσσω = δια- + τάσσω): i verbi composti sono il vuoto vero
+        verbo = lambda x: nudo(x).endswith(('ω', 'ομαι', 'μαι', 'μι'))
+        vs, ve, vf, vtot = Counter(), Counter(), Counter(), Counter()
+        for gruppo, voci in (('addestra', addestra), ('prova', sorted(prova))):
+            for l in voci:
+                if not verbo(l):
+                    continue
+                for rr, prev in scatti(l):
+                    if rr[0] == 'P' and all(verbo(b) for b in prev):
+                        e, f = esito(prev, l)
+                        vs[gruppo, rr[1]] += 1; ve[gruppo, rr[1]] += e; vf[gruppo, rr[1]] += f
+                        vtot[gruppo, 's'] += 1; vtot[gruppo, 'e'] += e; vtot[gruppo, 'f'] += f
+        print(f'  verbo = preverbio + verbo: addestramento {vtot["addestra", "s"]}, esatte {pct(vtot["addestra", "e"], vtot["addestra", "s"])}, '
+              f'famiglia {pct(vtot["addestra", "f"], vtot["addestra", "s"])}; prova {vtot["prova", "s"]}, esatte {pct(vtot["prova", "e"], vtot["prova", "s"])}, '
+              f'famiglia {pct(vtot["prova", "f"], vtot["prova", "s"])}', file=sys.stderr)
+        print('    per preverbio (addestramento: scatta, esatte, famiglia): ' + '; '.join(
+            f'{p}- {vs["addestra", p]} {ve["addestra", p]} {vf["addestra", p]}' for (_, p) in sorted((k for k in vs if k[0] == 'addestra'), key=lambda k: -vs[k])[:25]), file=sys.stderr)
+        sbv = [f'{l} → {prev[0]}, oro {"/".join(sorted(oro[l]))}' for l in addestra if verbo(l)
+               for rr, prev in scatti(l) if rr[0] == 'P' and all(verbo(b) for b in prev) and not esito(prev, l)[1]]
+        print('    sbagli: ' + '; '.join(sbv[:25]), file=sys.stderr)
+        vsenza = Counter()
+        for k, (lingua, l, pos, _) in greche.items():
+            if l in con_etimo or not verbo(l):
+                continue
+            c = [(rr, prev) for rr, prev in scatti(l) if rr[0] == 'P' and all(verbo(b) for b in prev)]
+            vsenza['con la forma' if c else 'senza'] += 1
+        print(f'    verbi senza etimologia: {dict(vsenza)}', file=sys.stderr)
+        for pre in ('επι', 'προ', 'δια', 'ανα', 'α', 'κατα', 'απο', 'συν'):
+            r, sb = ('P', pre), []
+            for l in addestra:
+                for rr, prev in scatti(l):
+                    if rr == r and not esito(prev, l)[1] and len(sb) < 8:
+                        sb.append(f'{l} → {prev[0]}, oro {"/".join(sorted(oro[l]))}')
+            print(f'    sbagli di {pre}-: ' + '; '.join(sb), file=sys.stderr)
+        senza = [l for k, (lingua, l, pos, _) in greche.items() if l not in con_etimo]
+        motivi, esempi = Counter(), defaultdict(list)
+        for l in senza:
+            n = nudo(l)
+            trovato = None
+            for i in range(2, min(8, len(n) - 3)):
+                if n[i:] in lessico and lessico[n[i:]] - {l}:
+                    trovato = (n[:i], lessico[n[i:]] - {l})
+                    break
+            if not trovato:
+                continue
+            pre, basi = trovato
+            r = ('P', pre)
+            motivo = ('base ambigua' if len(basi) > 1 else 'prefisso mai visto' if r not in m.P
+                      else 'prefisso con pochi casi' if scatta[r] < SUPPORTO else 'prefisso sotto la soglia' if r not in prec
+                      else 'preso')
+            motivi[motivo] += 1
+            if len(esempi[motivo]) < 6:
+                esempi[motivo].append(f'{l} = {pre}- + {"/".join(sorted(basi))[:40]}')
+        print(f'  voci senza etimologia con la forma prefisso + parola: {sum(motivi.values())} su {len(senza)}: {dict(motivi)}',
+              file=sys.stderr)
+        for k, v in esempi.items():
+            print(f'    {k}: ' + '; '.join(v), file=sys.stderr)
     if solo_rapporto:
         return
     # 4. le voci greche senza etimologia: la previsione migliore, al posto delle righe greche di analisi_composti.py
@@ -269,7 +401,8 @@ def main():
             nuove.append(('analisi:' + k, 'grc', lemma, 2, 'grc', prev[1], 'composizione', None, 'analisi'))
         else:
             # l'affisso con gli accenti della voce: -ησις, non -ησισ (nudo() toglie solo segni, e ς diventa σ)
-            affisso = r[1] if r[0] == 'mano' else lemma[:len(r[1])] + '-' if r[0] == 'P' else '-' + lemma[-len(r[1]):]
+            affisso = r[1] if r[0] == 'mano' else lemma[:len(r[1])] + '-' if r[0] == 'P' \
+                else lemma[:len(preverbio(nudo(lemma)))] + '-' if r[0] == 'V' else '-' + lemma[-len(r[1]):]
             nuove.append(('analisi:' + k, 'grc', lemma, 1, 'grc', prev[0], 'derivazione', affisso, 'analisi'))
     prima = sum(1 for c in etimi if len(c) > 8 and c[8] == 'analisi' and c[1] == 'grc' and c[3] == '1')
     with open(etimi_p, 'w', encoding='utf-8') as out:

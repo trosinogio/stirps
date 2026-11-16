@@ -325,6 +325,13 @@ mg.S['ιζω'].add('οσ'); mg.S['ξισ'].add('σσω'); mg.S['οω'].add('οσ
 assert mg.scatti('σκοτιζω', 'σκοτίζω') == [(('S', 'ιζω', 'οσ'), ('σκότος',))]
 assert mg.scatti('κηρυξισ', 'κήρυξις') == [(('S', 'ξισ', 'σσω'), ('κηρύσσω',))]
 assert mg.scatti('ομοιοω', 'ὁμοιόω') == [], 'due basi con la stessa forma: nessuna previsione'
+# verbo = preverbio + verbo: il preverbio più lungo, eliso solo davanti a vocale; la base dev'essere un verbo
+from apprendi_greco import preverbio
+assert preverbio('καταλυω') == 'κατα' and preverbio('καθαιρεω') == 'καθ' and preverbio('διερχομαι') == 'δι'
+assert preverbio('τερπω') is None and preverbio('διαταξισ') is None and preverbio('περιαγω') == 'περι'
+mv = Modello({'λυω': {'λύω'}, 'αλυω': {'ἀλύω'}, 'ταξισ': {'τάξις'}}, {})
+assert mv.scatti('καταλυω', 'καταλύω') == [(('V', 'preverbio'), ('λύω',))], 'κατα- + λύω, non κατ- + ἀλύω'
+assert mv.scatti('διαταξισ', 'διάταξις') == [], 'un nome non è un verbo composto'
 # ricostruzioni alternative: *gʰeh₁bʰ- è una variante di *gʰebʰ- (Wiktionary lo dice), e habeō e give stanno in una
 # famiglia; il passaggio resta anche se la variante è una radice. *ker- e *ḱer- non si toccano
 from filtra import ricostruzioni_alternative as ra
@@ -544,6 +551,22 @@ assert imp.semina_discendenti(percorsi, {'ine-pro', 'grc'}) == 0, 'la seconda vo
 assert imp.stat['discendenti_sole_varianti'] == 2, imp.stat
 imp.togli_seminati_orfani()
 assert not any(l['lingua'] == 'got' for l in imp.lessemi.values()) and imp.stat['discendenti_seminati_orfani'] == 1
+# le lingue antiche del confronto entrano anche dal basso (--risali): un lemma ittita entra se un etimo della sua pagina
+# (o la radice che dichiara) è già nel dizionario; non per un confronto, non un nome proprio, non un etimo nuovo
+imp = Importatore()
+imp.lessema('ine-pro', '*wódr̥'); imp.lessema('ine-pro', '*(s)ker-', ident='cut')
+v = lambda tpl, p='noun', w='𒉿𒀀𒋻': {'w': w, 'p': p, 'tpl': tpl}
+assert imp.etimo_presente(v([{'n': 'inh', 'a': {'1': 'hit', '2': 'ine-pro', '3': '*wódr̥'}}]))
+assert imp.etimo_presente(v([{'n': 'root', 'a': {'1': 'hit', '2': 'ine-pro', '3': '*(s)ker-'}}]))
+assert not imp.etimo_presente(v([{'n': 'cog', 'a': {'1': 'grc', '2': 'ὕδωρ'}}]))
+assert not imp.etimo_presente(v([{'n': 'inh', 'a': {'1': 'hit', '2': 'ine-pro', '3': '*wódr̥'}}], p='name'))
+assert not imp.etimo_presente(v([{'n': 'inh', 'a': {'1': 'hit', '2': 'ine-pro', '3': '*h₂ébʰō'}}]))
+# un segno di una scrittura non è una parola: il segno sillabico 𐀆 e il numerale 𐄉 escono, la congiunzione 𐀤 resta
+imp = Importatore()
+for lemma, glossa in (('𐀆', 'The Linear B syllabic letter ⟨de⟩.'), ('𐄉', 'three, 3'), ('𐀤', 'and')):
+    imp.lessema('gmy', lemma, glossa=glossa)
+imp.togli_non_validi()
+assert {l['lemma'] for l in imp.lessemi.values()} == {'𐀤'}, imp.lessemi.keys()
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \

@@ -360,6 +360,10 @@ LETTERE['fr'] = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZæÆœ�
 LETTERE['de'] = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZßẞ')
 LETTERE['ru'] = set('абвгдежзийклмнопрстуфхцчшщъыьэюяАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ')   # ё e й: е e и con il segno
 NON_LEMMA = re.compile(r'[()\[\]{}<>“”"=|]')
+# un segno di una scrittura, non una parola: i segni sillabici della lineare B (𐀆 «the Linear B syllabic letter ⟨de⟩»;
+# 𐀤 qe «e» è invece una parola) e i numerali egei (𐄉 «tre»)
+SEGNO_DI_SCRITTURA = re.compile(r'^the \S+(?: \S+)? syllabic (?:letter|sign)\b', re.I)
+NUMERALI_EGEI = re.compile(r'^[\U00010100-\U0001013F]+$')
 
 
 def etimo_esterno(lingua, v):
@@ -598,6 +602,7 @@ class Importatore:
         self.lette = set()           # le voci di cui si è letta la pagina (voce())
         self.seminati = set()        # le voci entrate dall'albero dei discendenti (semina_discendenti())
         self.chiuse = set()          # (lingua, posizione) delle voci di chiusura già lette (chiudi())
+        self.risalita = set()        # lingue antiche (--risali hit,xcl): entra il lemma con un etimo già nel dizionario
         self.id_proprio = {}         # voce → l'identificativo che la sua pagina si dà ({{etymon|gem-pro|id=three}})
         self.con_ident = defaultdict(set)   # chiave senza identificativo → le chiavi con (*þrīz → *þrīz@three)
         self.con_etimologia = set()  # lingue di chiusura di cui entrano tutte le voci con un'etimologia, ma non i lemmi
@@ -1111,6 +1116,7 @@ class Importatore:
             nuove = 0
             for lingua, idx in self.chiusura.items():
                 intera = passo == 0 and (lingua in self.intere or lingua in self.con_etimologia)
+                risale = passo == 0 and lingua in self.risalita and not intera
                 voci = idx['voci']
                 for i in range(len(voci)):
                     if (lingua, i) in fatte:
@@ -1125,25 +1131,50 @@ class Importatore:
                         kb = chiave(lc, termine, omo)
                         # *oktō citato solo come *oktō@eight: la pagina si legge lo stesso (non per le radici omografe)
                         raggiunta = kb in self.lessemi or (kb in self.con_ident and not termine.endswith('-'))
-                        if not raggiunta and not (intera and not rec):
+                        if not raggiunta and not ((intera or risale) and not rec):
                             continue
                         v = v or voci.leggi(i)
-                        if raggiunta or self.ammessa(lingua, v):
+                        if raggiunta or (intera and self.ammessa(lingua, v)) or (risale and self.etimo_presente(v)):
                             fatte.add((lingua, i))
                             self.voce(v, lingua_voce=lc, parola=termine)
                             nuove += 1
                             if not raggiunta:
-                                self.stat[f'intere_{lingua}'] += 1
+                                self.stat[f'{"risaliti" if risale else "intere"}_{lingua}'] += 1
                             break
             self.stat[f'chiusura_passo_{passo + 1}'] += nuove
             if not nuove:
                 break
 
 
+    def etimo_presente(self, v):
+        """Le lingue antiche del confronto (--risali: ittita, armeno antico, avestico…) entrano solo con le parole che
+        stanno in una famiglia: un lemma la cui pagina non è raggiunta da nessuna catena entra se uno dei suoi etimi (o la
+        radice che dichiara) è già una voce del dizionario. Mai un nome proprio o una locuzione; i confronti («cognate»)
+        non contano."""
+        if v.get('p') == 'name' or ' ' in v['w'].strip():
+            return False
+        for t in v.get('tpl') or []:
+            n, a = t.get('n'), t.get('a') or {}
+            if n in CATENA:
+                lingua, termini = a.get('2'), [a.get('3')]
+            elif n == 'root':
+                lingua, termini = a.get('2'), [a.get(str(i)) for i in range(3, 6)]
+            else:
+                continue
+            for x in termini:
+                x = pulisci_parte(x)[0] if x else ''
+                if lingua and x and x != '-':
+                    k = self.chiave_di(lingua, x)
+                    if k in self.lessemi or k in self.con_ident:
+                        return True
+        return False
+
     def togli_non_validi(self):
         """Le voci che non sono parole (lemma_valido) escono, con gli archi che le toccano; un'ipotesi che resta senza
         archi esce anch'essa: meglio nessuna etimologia che una catena attraverso un frammento di testo."""
-        via = {k for k, l in self.lessemi.items() if not lemma_valido(l['lingua'], l['lemma'], l['ricostruito'])}
+        via = {k for k, l in self.lessemi.items() if not lemma_valido(l['lingua'], l['lemma'], l['ricostruito'])
+               or NUMERALI_EGEI.match(l['lemma'] or '')
+               or (l['glosse'] and all(SEGNO_DI_SCRITTURA.match(g) for g in l['glosse']))}
         self.togli(via, 'ipotesi_tolte_non_valide')
         self.stat['voci_non_valide'] = len(via)
 
@@ -1954,10 +1985,11 @@ if __name__ == '__main__':
     # wiktionary.py lemmi.jsonl uscita/ [glosse.tsv] [--chiudi la=lemmi.jsonl,glosse.tsv,forme.tsv]… [--passi N]
     #               [--forme-base it=forme.tsv]
     #               [--discendenti la=discendenti.tsv]…
-    #               [--semina-discendenti ine-pro,grk-pro,grc,gem-pro,sla-pro]
+    #               [--semina-discendenti ine-pro,grk-pro,grc,gem-pro,sla-pro] [--risali hit,xcl,ae]
     #               [--intere la,grc] [--con-etimologia en] [--elenco en=../dati/frequenze_en.tsv.gz] [--esterni en]
     #               [--glosse-precedenti ../dati/lessemi.tsv.gz]
     args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti, comuni = [], [], 1, set(), set(), {}, set(), {}, {}
+    risali = set()      # --risali hit,xcl: lingue antiche di cui entrano i lemmi con un etimo già nel dizionario
     semina = set()      # --semina-discendenti ine-pro,grc: sotto le voci di queste lingue entrano anche le parole nuove
     discendenti = []    # --discendenti la=discendenti.tsv: gli alberi dei discendenti dichiarati (filtra.py con DISCENDENTI)
     forme_base = None   # --forme-base it=forme.tsv: le forme flesse della lingua di partenza (filtra.py con FORME)
@@ -1988,6 +2020,8 @@ if __name__ == '__main__':
             esterni = {c for c in next(it_).split(',') if c}
         elif x == '--semina-discendenti':
             semina = {c for c in next(it_).split(',') if c}
+        elif x == '--risali':
+            risali = {c for c in next(it_).split(',') if c}
         elif x == '--discendenti':
             discendenti.append(tuple(next(it_).split('=', 1)))
         elif x == '--forme-base':
@@ -1998,6 +2032,7 @@ if __name__ == '__main__':
             args.append(x)
     imp = Importatore()
     imp.intere = intere
+    imp.risalita = risali
     imp.con_etimologia = con_etimologia
     imp.elenco = elenchi
     imp.comuni = comuni
