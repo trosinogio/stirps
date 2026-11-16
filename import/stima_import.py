@@ -14,7 +14,6 @@ import gzip, os, random, sys
 from collections import Counter, defaultdict
 
 BYTE = {'lessema': 510, 'ipotesi': 425, 'relazione': 355, 'mv_famiglia': 100, 'glossa': 340, 'attestazione': 336}
-LIMITE_MB = 1024         # il piano gratuito di Neon (1 GB; era 0,5)
 MODERNE = ('it', 'en', 'fr', 'de', 'ru', 'es', 'pt')
 
 
@@ -99,7 +98,7 @@ if __name__ == '__main__':
           f'attestazioni {d_att:+}')
     print(f'spazio in più: {base:.0f} MB senza glosse tradotte, {con_glosse:.0f} MB con le glosse italiane di {da_tradurre} voci')
     if attuale is not None:
-        print(f'database: {attuale:.0f} MB → {attuale + base:.0f}–{attuale + con_glosse:.0f} MB (limite del piano gratuito {LIMITE_MB} MB)')
+        print(f'database: {attuale:.0f} MB → {attuale + base:.0f}–{attuale + con_glosse:.0f} MB (piano Launch di Neon: lo spazio si paga a consumo)')
     per = Counter(d_less[k][1] for k in nuove) - Counter(p_less[k][1] for k in tolte)
     print('voci nuove per lingua:', ', '.join(f'{l} {n}' for l, n in per.most_common(15)))
 
@@ -159,7 +158,11 @@ if __name__ == '__main__':
         print('  lingua del primo etimo:', dict(Counter((d_less.get(primo[k]) or ['', '?'])[1] for k in con).most_common(10)))
         comune = lambda r: r[6] != 'np' and ' ' not in r[2]
         fuori = lambda r: r[0] in primo and (d_less.get(primo[r[0]]) or ['', lingua])[1] != lingua
+        # «in una famiglia»: la catena accolta arriva a una cima che il dizionario ha già (la regola delle lingue classiche)
+        in_famiglia = lambda r: r[0] in primo and catena(primo, r[0])[-1] in p_less
         ambiti = [('tutte', proprie), ('senza nomi propri né locuzioni', [r for r in proprie if comune(r)]),
+                  ('con un\'etimologia, senza nomi propri né locuzioni', [r for r in proprie if comune(r) and r[0] in primo]),
+                  ('in una famiglia che c\'è già, senza nomi propri né locuzioni', [r for r in proprie if comune(r) and in_famiglia(r)]),
                   ('etimo fuori dalla lingua, senza nomi propri né locuzioni', [r for r in proprie if comune(r) and fuori(r)])]
         if lingua in freq:
             ambiti.append((f'lessico comune ({len(freq[lingua])} forme)', [r for r in proprie if comune(r) and r[2].lower() in freq[lingua]]))
