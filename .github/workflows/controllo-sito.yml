@@ -12,9 +12,7 @@ jobs:
         run: |
           S=https://dizionario-etimologico.vercel.app
           prova() { curl -s -o /tmp/p.html -w "%{http_code} %{size_download}B" "$S$1"; printf ' %s | ' "$1"; grep -o "$2" /tmp/p.html | head -${3:-2} | tr '\n' ' '; echo; }
-          prova /it/w/ro/piept 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
-          prova /it/w/ca/aixella 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
-          prova /it/w/pt/gaivota 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
-          prova /it/w/oc/esquirol 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
-          prova /it/w/es/explicar 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
-          prova /it/r/la/pectus/lingue 'piept' 1
+          prova /it/w/grc/kopazo 'href="/it/w/[a-z-]*/[^"]*"\|Wiktionnaire' 5
+          prova /it/w/grc/aponemo 'href="/it/w/[a-z-]*/[^"]*"\|Wiktionnaire' 5
+          prova /it/w/grc/murionumos 'href="/it/w/[a-z-]*/[^"]*"\|Wiktionnaire' 5
+          prova /it/w/grc/diphreuo 'href="/it/w/[a-z-]*/[^"]*"\|Wiktionnaire' 5
