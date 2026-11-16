@@ -33,12 +33,19 @@ jobs:
         lt:Lithuanian sga:Old Irish hit:Hittite xcl:Old Armenian ae:Avestan txb:Tocharian B xto:Tocharian A gmy:Mycenaean Greek
         gl:Galician ast:Asturian an:Aragonese co:Corsican lld:Ladin rm:Romansch wa:Walloon frp:Franco-Provençal dlm:Dalmatian
         rup:Aromanian ruq:Megleno-Romanian ruo:Istro-Romanian lad:Ladino egl:Emilian rgn:Romagnol ist:Istriot mxi:Mozarabic
-        roa-opt:Old Galician-Portuguese roa-oca:Old Catalan nrf:Norman pcd:Picard'
-      INTERE: la,grc
+        roa-opt:Old Galician-Portuguese roa-oca:Old Catalan nrf:Norman pcd:Picard
+        hbo:Biblical Hebrew arc:Aramaic syc:Classical Syriac akk:Akkadian uga:Ugaritic phn:Phoenician xpu:Punic gez:Geez
+        am:Amharic ti:Tigrinya tig:Tigre mt:Maltese sem-pro:Proto-Semitic sem-wes-pro:Proto-West Semitic arz:Egyptian Arabic
+        ary:Moroccan Arabic apc:North Levantine Arabic ajp:South Levantine Arabic acm:Iraqi Arabic aeb:Tunisian Arabic
+        xsa:Sabaean tmr:Jewish Babylonian Aramaic myz:Classical Mandaic jpa:Jewish Palestinian Aramaic sam:Samaritan Aramaic
+        aii:Assyrian Neo-Aramaic tru:Turoyo'
+      # STIMA (16 novembre 2026, ramo dati-stima-semitiche, da non unire): tutte le lingue semitiche intere, per misurare
+      # con stima_import.py quanto costa ciascun ambito; le glosse si contano senza tradurle
+      INTERE: la,grc,ar,he,hbo,arc,syc,akk,uga,phn,xpu,gez,am,ti,tig,mt,sem-pro,sem-wes-pro,arz,ary,apc,ajp,acm,aeb,xsa,tmr,myz,jpa,sam,aii,tru
       # la stima dopo ogni giro (stima_import.py), per le lingue romanze
-      STIMA_LINGUE: es,pt,ca,ro,gl,oc,fr,fro,frm,osp,roa-opt,roa-oca,pro,nap,scn,vec,lij,sc,lmo,pms,fur,ast,an,co,lld,rm,wa,frp,dlm,rup,ruq,ruo,lad,egl,rgn,ist,mxi,nrf,pcd
-      STIMA_ATTUALE: '1053'
-      STIMA_FREQUENZE: es=dati/frequenze_es.tsv.gz,pt=dati/frequenze_pt.tsv.gz,ca=dati/frequenze_ca.tsv.gz,ro=dati/frequenze_ro.tsv.gz,gl=dati/frequenze_gl.tsv.gz,fr=dati/frequenze_fr.tsv.gz
+      STIMA_LINGUE: ar,he,hbo,arc,syc,akk,uga,phn,xpu,gez,am,ti,tig,mt,sem-pro,sem-wes-pro,arz,ary,apc,ajp,acm,aeb,xsa,tmr,myz,jpa,sam,aii,tru
+      STIMA_ATTUALE: '1653'
+      STIMA_FREQUENZE: ar=dati/frequenze_ar.tsv.gz,he=dati/frequenze_he.tsv.gz
       # sotto le voci dei rami antichi e del latino entrano anche i discendenti dichiarati che il dizionario non ha
       # (import/wiktionary.py; il latino dal 15 novembre 2026, decisione di Giovanni: le lingue romanze)
       # e sotto il protobaltoslavo e il protoceltico (16 novembre 2026: lituano e irlandese antico, con l'ittita, per il
@@ -58,9 +65,9 @@ jobs:
       COMUNI: it=../dati/frequenze_it.tsv.gz
       ELENCHI: en=../dati/frequenze_en.tsv.gz de=../dati/frequenze_de.tsv.gz ru=../dati/frequenze_ru.tsv.gz
       ESTERNI: en,de,ru
-      GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
+      GLOSSE_TRADOTTE: '0'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
       # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
-      DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq
+      DIAGNOSI_MODELLI: ar-root,he-root,sem-root
       # i modelli grezzi di alcune parole, per capire perché la loro etimologia non si legge (le cime greche del 13 novembre)
       DIAGNOSI_PAROLE: φωνή,σῆμα,ζῷον,ὄνυμα,προτί,ζώς,πρός
       # le glosse con cui le pagine citano le radici ricostruite, per il controllo delle radici omografe
