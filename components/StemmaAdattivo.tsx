@@ -6,6 +6,8 @@ import { TESTI, type Lang } from '@/lib/i18n';
 import { classeArco, classeRamo, fmt, G } from '@/lib/forme';
 import { costruisciAlbero, dimensioni, dividiFigli, nomiNascondibili, type NodoAlbero } from '@/lib/albero';
 import type { NodoPiatto } from '@/lib/tipi';
+import StemmaVerticale from '@/components/StemmaVerticale';
+import { useFamiglia } from '@/components/useFamiglia';
 
 const CHIAVE_NOMI = 'stirps.stemma.nomi';   // la scelta del lettore sui nomi propri, solo nel suo browser
 
@@ -32,6 +34,19 @@ export default function StemmaAdattivo({ lang, nodi, nascosti, lingue, base, chi
   const [indice, setIndice] = useState(0);
   const ctrl = useRef<HTMLDivElement>(null);
   const orizzontale = largo && !!nodi;
+  // una famiglia grande arriva con i primi due livelli; la famiglia intera si chiede quando il lettore cerca, filtra o apre
+  // un ramo («N discendenti»), e allora l'albero si completa qui, con i rami profondi chiusi
+  const grande = !nodi;
+  const { nodi: tutti, stato, carica } = useFamiglia(lang, base.split('/r/')[1] ?? '', nodi);
+  const [aperti, setAperti] = useState<Set<number>>(() => new Set());
+  const [daMostrare, setDaMostrare] = useState<number | null>(null);
+  const completo = grande && stato === 'pronto' && !!tutti;
+  useEffect(() => { if (grande && (q.trim() || lingua || livelli === 3)) carica(); }, [grande, q, lingua, livelli, carica]);
+  useEffect(() => {
+    if (!completo || daMostrare == null) return;
+    ctrl.current?.querySelector(`[data-nodo="${daMostrare}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    setDaMostrare(null);
+  }, [completo, daMostrare]);
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 760px)');
     const f = () => setLargo(mq.matches);
@@ -71,7 +86,7 @@ export default function StemmaAdattivo({ lang, nodi, nascosti, lingue, base, chi
     box.dataset.livelli = livelli == null ? '' : String(livelli);
     setConta(cerca ? [trovati, 0] : null);
     setIndice(0);
-  }, [q, lingua, livelli, orizzontale]);
+  }, [q, lingua, livelli, orizzontale, completo]);
   // Invio: la prossima parola trovata, al centro dello schermo
   const prossima = () => {
     const box = ctrl.current;
@@ -127,9 +142,22 @@ export default function StemmaAdattivo({ lang, nodi, nascosti, lingue, base, chi
           )}
         </div>
       </div>
-      <div className="stemma-ctrl" ref={ctrl} data-nomi={nomi ? 'si' : 'no'}>
+      <div className="stemma-ctrl" ref={ctrl} data-nomi={nomi ? 'si' : 'no'} onClickCapture={(e) => {
+        // nella fase di cattura, prima del Link: il ramo si apre qui invece di cambiare pagina
+        if (!grande || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        const a = (e.target as Element).closest('a.quanti[data-id]');
+        if (!a) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const id = Number(a.getAttribute('data-id'));
+        setAperti((v) => new Set(v).add(id));
+        setDaMostrare(id);
+        carica();
+      }}>
+        {grande && stato === 'carica' && <p className="sintesi-nota" aria-live="polite">{s.carica}</p>}
         {orizzontale ? <StemmaOrizzontale lang={lang} nodi={nodi!} nomi={nomi} q={q} lingua={lingua} livelli={livelli}
-          onConta={(a, b) => { setConta(q.trim() ? [a, b] : null); setIndice(0); }} /> : children}
+          onConta={(a, b) => { setConta(q.trim() ? [a, b] : null); setIndice(0); }} />
+          : completo ? <StemmaVerticale lang={lang} nodi={tutti!} chiusiDa={2} aperti={aperti} /> : children}
       </div>
     </>
   );
