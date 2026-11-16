@@ -29,11 +29,14 @@ jobs:
         nap:Neapolitan scn:Sicilian vec:Venetan lij:Ligurian sc:Sardinian lmo:Lombard pms:Piedmontese fur:Friulian es:Spanish osp:Old Spanish pt:Portuguese ca:Catalan oc:Occitan pro:Old Occitan ro:Romanian
         ine-pro:Proto-Indo-European itc-pro:Proto-Italic grk-pro:Proto-Hellenic gem-pro:Proto-Germanic gmw-pro:Proto-West Germanic sla-pro:Proto-Slavic ine-bsl-pro:Proto-Balto-Slavic cel-pro:Proto-Celtic
         nl:Dutch dum:Middle Dutch gml:Middle Low German osx:Old Saxon frk:Frankish got:Gothic yi:Yiddish pl:Polish ga:Irish
-        ar:Arabic he:Hebrew sa:Sanskrit hi:Hindi fa:Persian tr:Turkish ota:Ottoman Turkish ja:Japanese'
+        ar:Arabic he:Hebrew sa:Sanskrit hi:Hindi fa:Persian tr:Turkish ota:Ottoman Turkish ja:Japanese
+        lt:Lithuanian sga:Old Irish hit:Hittite'
       INTERE: la,grc
       # sotto le voci dei rami antichi e del latino entrano anche i discendenti dichiarati che il dizionario non ha
       # (import/wiktionary.py; il latino dal 15 novembre 2026, decisione di Giovanni: le lingue romanze)
-      SEMINA_DISCENDENTI: ine-pro,grk-pro,grc,gem-pro,sla-pro,la
+      # e sotto il protobaltoslavo e il protoceltico (16 novembre 2026: lituano e irlandese antico, con l'ittita, per il
+      # confronto indoeuropeo, solo con le parole che stanno in una famiglia)
+      SEMINA_DISCENDENTI: ine-pro,grk-pro,grc,gem-pro,sla-pro,la,ine-bsl-pro,cel-pro
       CON_ETIMOLOGIA: en,fr,de,ru
       # dell'inglese, il lessico comune (i lemmi tra le 50 mila forme più frequenti) e le parole con l'etimo fuori
       # dall'inglese (ESTERNI), senza nomi propri né locuzioni
