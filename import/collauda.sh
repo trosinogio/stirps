@@ -325,6 +325,13 @@ mg.S['ιζω'].add('οσ'); mg.S['ξισ'].add('σσω'); mg.S['οω'].add('οσ
 assert mg.scatti('σκοτιζω', 'σκοτίζω') == [(('S', 'ιζω', 'οσ'), ('σκότος',))]
 assert mg.scatti('κηρυξισ', 'κήρυξις') == [(('S', 'ξισ', 'σσω'), ('κηρύσσω',))]
 assert mg.scatti('ομοιοω', 'ὁμοιόω') == [], 'due basi con la stessa forma: nessuna previsione'
+# verbo = preverbio + verbo: il preverbio più lungo, eliso solo davanti a vocale; la base dev'essere un verbo
+from apprendi_greco import preverbio
+assert preverbio('καταλυω') == 'κατα' and preverbio('καθαιρεω') == 'καθ' and preverbio('διερχομαι') == 'δι'
+assert preverbio('τερπω') is None and preverbio('διαταξισ') is None and preverbio('περιαγω') == 'περι'
+mv = Modello({'λυω': {'λύω'}, 'αλυω': {'ἀλύω'}, 'ταξισ': {'τάξις'}}, {})
+assert mv.scatti('καταλυω', 'καταλύω') == [(('V', 'preverbio'), ('λύω',))], 'κατα- + λύω, non κατ- + ἀλύω'
+assert mv.scatti('διαταξισ', 'διάταξις') == [], 'un nome non è un verbo composto'
 # ricostruzioni alternative: *gʰeh₁bʰ- è una variante di *gʰebʰ- (Wiktionary lo dice), e habeō e give stanno in una
 # famiglia; il passaggio resta anche se la variante è una radice. *ker- e *ḱer- non si toccano
 from filtra import ricostruzioni_alternative as ra
