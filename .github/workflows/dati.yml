@@ -91,17 +91,18 @@ jobs:
           cat /tmp/confronto.txt
           echo "::notice title=Due Wiktionary::$(head -1 /tmp/confronto.txt)"
 
-      - name: Etimologie del Wiktionnaire e confronto per il francese
+      - name: Etimologie del Wiktionnaire e confronto per il francese e il greco antico
         run: |
           cd import
           # le etimologie francesi del Wiktionnaire (etimi_wiktionnaire.py), come per il Wikizionario. Il dump è grande:
           # si legge mentre si scarica, e le righe entrano solo se lo scaricamento arriva in fondo
           rm -f /tmp/etimi_fr.tsv
           if curl -sf "https://kaikki.org/frwiktionary/All%20languages%20combined/kaikki.org-dictionary-all.jsonl" \
-               | python3 etimi_wiktionnaire.py /tmp/etimi_fr.tsv dati/it/tsv/lessemi.tsv dati/it/tsv/dizionari.tsv 2> /tmp/wiktionnaire.txt; then
+               | LINGUE_WIKTIONNAIRE=fr,grc GREZZE=/tmp/grezze_wiktionnaire.tsv \
+                 python3 etimi_wiktionnaire.py /tmp/etimi_fr.tsv dati/it/tsv/lessemi.tsv dati/it/tsv/dizionari.tsv 2> /tmp/wiktionnaire.txt; then
             cat /tmp/etimi_fr.tsv >> dati/it/tsv/etimi_dizionari.tsv
             cat /tmp/wiktionnaire.txt
-            echo "::notice title=Wiktionnaire::$(head -1 /tmp/wiktionnaire.txt)"
+            echo "::notice title=Wiktionnaire::$(grep '^etimologie del Wiktionnaire' /tmp/wiktionnaire.txt | tr '\n' ' ')"
           else
             cat /tmp/wiktionnaire.txt || true
             echo "::warning title=Wiktionnaire::dump non scaricabile: restano le etimologie del Wiktionnaire del pacchetto di main"
@@ -113,6 +114,17 @@ jobs:
             dati/it/tsv/relazioni.tsv fr Wiktionnaire 2> /tmp/confronto_fr.txt
           cat /tmp/confronto_fr.txt
           echo "::notice title=Wiktionary e Wiktionnaire::$(head -1 /tmp/confronto_fr.txt)"
+          # il greco antico del Wiktionnaire (15 novembre 2026): stessa regola dei due Wiktionary, sulla parola greca
+          python3 confronta_wikizionario.py dati/it/tsv/etimi_dizionari.tsv dati/it/tsv/lessemi.tsv dati/it/tsv/ipotesi.tsv \
+            dati/it/tsv/relazioni.tsv grc Wiktionnaire 2> /tmp/confronto_grc.txt
+          cat /tmp/confronto_grc.txt
+          echo "::notice title=Wiktionary e Wiktionnaire (greco antico)::$(head -1 /tmp/confronto_grc.txt)"
+          # la sandbox di Claude non scarica gli artefatti: le frasi grezze del greco e il registro su un ramo di servizio
+          if [ -s /tmp/grezze_wiktionnaire.tsv ]; then
+            rm -rf /tmp/misure_wn && mkdir /tmp/misure_wn && cp /tmp/grezze_wiktionnaire.tsv /tmp/wiktionnaire.txt /tmp/confronto_grc.txt /tmp/misure_wn/
+            (cd /tmp/misure_wn && git init -q && git add -A && git -c user.name=dati -c user.email=dati@users.noreply.github.com commit -qm "Wiktionnaire: frasi grezze e conti" \
+              && git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:refs/heads/misure-wiktionnaire) || true
+          fi
 
       - name: Voci vere per il banco di prova
         run: |

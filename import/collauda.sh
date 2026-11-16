@@ -295,6 +295,15 @@ assert lw('dal greco anecumène', 'anecumene') == [] and lw('dal greco παλαi
 assert lw('dal greco ϕωνητικός', 'fonetico') == [(1, 'grc', 'φωνητικός', 'generico', 3)]
 assert lw('dal latino tardo, aciarium', 'acciaio') == [], 'l\'aggettivo della varietà non è l\'etimo'
 assert lw('forse dal latino X', 'x') == [] and lw('composto da ago e puntura', 'agopuntura')[1][2] == 'puntura'
+# il Wiktionnaire per il greco antico: i composti scritti con traslitterazione e glossa, il verbo, mai un etimo solo in
+# parte («combiné avec»), mai un etimo greco in caratteri latini; il francese resta com'era
+from etimi_wiktionnaire import leggi as lwn
+assert [e for _, _, e, _, _, _ in lwn("Composé de ἀντί, antí (« opposé ») et de πόλις, pólis (« ville »).", 'Ἀντίπολις', 'grc')] == ['ἀντί', 'πόλις']
+assert [e for _, _, e, _, _, _ in lwn("Composé de δῆμος, dêmos (« peuple »), σθένος, sthénos (« force ») et -ης, -ēs.", 'Δημοσθένης', 'grc')] == ['δῆμος', 'σθένος']
+assert lwn("Du verbe χαίρω, khaírō (« se réjouir »).", 'χαῖρε', 'grc') == [(1, 'grc', 'χαίρω', 'derivazione', None, 3)]
+assert lwn("Du verbe φύω, phúô (« naître ») combiné avec le verbe εἴλω.", 'φυλή', 'grc') == []
+assert lwn("Dérivé de logos.", 'λογικός', 'grc') == [] and lwn("De l’indo-européen commun *bʰer-.", 'φέρω', 'grc') == []
+assert lwn("Dérivé de chant, avec le suffixe -eur.", 'chanteur') == [(1, 'fr', 'chant', 'derivazione', '-eur', 3)]
 # i due Wiktionary: concordano anche con un'altra forma di citazione o più in alto nella catena; due analisi italiane
 # diverse non sono un disaccordo; un'altra lingua d'origine sì
 from confronta_wikizionario import classifica as cw

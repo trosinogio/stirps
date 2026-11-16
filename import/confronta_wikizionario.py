@@ -138,7 +138,7 @@ def main():
     tutte = righe(etimi_p)
     per_parola = defaultdict(list)
     for c in tutte:
-        if len(c) > 8 and c[8] in (fonte, fonte + '-vedi'):
+        if len(c) > 8 and c[8] in (fonte, fonte + '-vedi') and c[1] == propria:   # il Wiktionnaire ha voci francesi e greche
             per_parola[c[0]].append(c)
     esito, conta, esempi = {}, Counter(), defaultdict(list)
     for chiave, rr in per_parola.items():

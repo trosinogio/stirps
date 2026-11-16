@@ -22,7 +22,7 @@ DMF, DEAF (non Étymonaute, che è costruito sul Wiktionnaire).
     curl -s https://kaikki.org/frwiktionary/All%20languages%20combined/kaikki.org-dictionary-all.jsonl \
         | python3 etimi_wiktionnaire.py etimi.tsv [lessemi.tsv dizionari.tsv]
 """
-import json, re, sys, unicodedata
+import json, os, random, re, sys, unicodedata
 from collections import Counter
 
 from etimi_wikizionario import LATINA, SCRITTURA, carica_voci, esc
@@ -60,7 +60,7 @@ COMPOSTO = re.compile(r"^composée?\s+(?:de|du|d['’])\s*" + _PAROLA + r"\s*,?\
                       + _PAROLA + r"\s*$", re.I)
 CON_AFFISSO = re.compile(r"^(?:dérivé|dérivée)\s+(?:de|du|d['’])\s*" + _PAROLA + r"\s*,?\s+avec\s+le\s+(?:suffixe|préfixe)\s+"
                          r"(-?[^\W\d_][\w-]*-?)\s*$", re.I)
-DA_PAROLA = re.compile(r"^(?:dérivé|dérivée|dérivé\s+de|dérivée\s+de|de|déverbal\s+de|dénominal\s+de|diminutif\s+de|augmentatif\s+de|"
+DA_PAROLA = re.compile(r"^(?:dérivé|dérivée|dérivé\s+de|dérivée\s+de|de|du\s+verbe|neutre\s+substantivé\s+de|déverbal\s+de|dénominal\s+de|diminutif\s+de|augmentatif\s+de|"
                        r"péjoratif\s+de|féminin\s+de|participe\s+passé\s+de|participe\s+présent\s+de|substantivation\s+de|"
                        r"nominalisation\s+de|apocope\s+de|aphérèse\s+de|abréviation\s+de|troncation\s+de)\s*(?:d['’])?\s*"
                        + _PAROLA + r"\s*$", re.I)
@@ -81,10 +81,51 @@ def pulisci(testo):
     return NOME_INIZIALE.sub('', DATA.sub('', t).strip())
 
 
-def leggi(testo, parola):
+def leggi(testo, parola, propria='fr'):
     """Le righe (ordine, lingua, etimo, tipo, affisso, certezza) di una frase del Wiktionnaire, o [] se non è una frase
-    che sappiamo leggere. Conta la prima frase, fino al punto e virgola o al punto; per «Du latin X, …» basta l'inizio."""
+    che sappiamo leggere. Conta la prima frase, fino al punto e virgola o al punto; per «Du latin X, …» basta l'inizio.
+    propria è la lingua della parola: fr, o grc per le voci di greco antico («Dérivé de λόγος, avec le suffixe -ικός»),
+    dove un etimo della stessa lingua dev'essere scritto in greco."""
+    righe = _leggi(testo, parola, propria)
+    if propria in SCRITTURA:
+        righe = [(o, l, senza_quantita(e) if l == propria else e, tp, aff, c) for o, l, e, tp, aff, c in righe]
+        if any(l == propria and not SCRITTURA[propria].match(e) for _, l, e, _, _, _ in righe):
+            return []
+    return righe
+
+
+def senza_quantita(w):
+    """Il titolo della pagina di una parola greca: senza macron e brevi (ἀγορᾱ́ → ἀγορά)."""
+    return unicodedata.normalize('NFC', ''.join(c for c in unicodedata.normalize('NFD', w) if c not in '\u0304\u0306'))
+
+
+# un composto greco scritto con traslitterazione e glossa: «Composé de ἀντί, antí (« opposé ») et de πόλις, pólis (« ville »)»,
+# «Composé de δῆμος, dêmos (« peuple »), σθένος, sthénos (« force ») et -ης, -ēs»: valgono le parole in alfabeto greco,
+# nell'ordine, fino a «littéralement» o alla fine della frase; un suffisso (-ης) non è un elemento
+COMPOSTO_GRECO = re.compile(r"^composée?\s+(?:de|du|d['’])\s*", re.I)
+PAROLA_GRECA = re.compile(r"(?<![\w-])(-?[\u0370-\u03ff\u1f00-\u1fff]+-?)(?![\w])")
+
+
+def composto_greco(t):
+    m = COMPOSTO_GRECO.match(t)
+    if not m:
+        return []
+    resto = re.split(r"[;.]|littéralement|voir\b|apparenté", t[m.end():], maxsplit=1, flags=re.I)[0]
+    resto = re.sub(r"«[^»]*»|\[[^\]]*\]", ' ', resto)                  # le glosse e le traslitterazioni tra parentesi quadre
+    if not re.search(r"\bet\b", resto):
+        return []
+    parti = [w for w in PAROLA_GRECA.findall(resto) if not w.startswith('-')]
+    if len(parti) < 2 or len(parti) > 3 or any(w.endswith('-') for w in parti[1:]):
+        return []
+    return [(i, 'grc', w.rstrip('-'), 'composizione', None, 3) for i, w in enumerate(parti, 1)]
+
+
+def _leggi(testo, parola, propria):
     t = pulisci(testo)
+    if propria == 'grc' and not DUBBIO.search(t.split(';')[0].split('. ')[0]):
+        righe = composto_greco(t)
+        if righe:
+            return righe
     if not t or DUBBIO.search(t.split(';')[0].split('. ')[0]):
         return []
     m = DALLA_LINGUA.match(t)
@@ -98,66 +139,83 @@ def leggi(testo, parola):
         if lingua in ('grc', 'gkm', 'el'):
             etimo = etimo.replace('ϕ', 'φ').replace('ϑ', 'θ')
         # una parola francese da un'altra francese («du français X») è una derivazione, non un prestito
-        return [(1, lingua, etimo, 'derivazione' if lingua == 'fr' else 'generico', None, 3)]
+        return [(1, lingua, etimo, 'derivazione' if lingua == propria else 'generico', None, 3)]
     frase = re.split(r'[;.:(]', t, maxsplit=1)[0].strip()
     m = COMPOSTO.match(frase)
     if m and m.group(1).lower() not in LINGUE and m.group(1).lower() not in NON_ETIMI:
-        return [(1, 'fr', m.group(1), 'composizione', None, 3), (2, 'fr', m.group(2), 'composizione', None, 3)]
+        return [(1, propria, m.group(1), 'composizione', None, 3), (2, propria, m.group(2), 'composizione', None, 3)]
     m = CON_AFFISSO.match(frase)
     if m and m.group(1).lower() not in NON_ETIMI and m.group(1).lower() != parola.lower():
-        return [(1, 'fr', m.group(1), 'derivazione', m.group(2), 3)]
+        return [(1, propria, m.group(1), 'derivazione', m.group(2), 3)]
+    if re.search(r"\bcombiné|\bet\s+(?:du|de)\s+(?:verbe|suffixe|préfixe)\b", t.split(';')[0].split('. ')[0], re.I):
+        return []                              # «Du verbe φύω combiné avec le verbe εἴλω»: l'etimo è solo una parte
     frase = frase.split(',')[0].strip()
     m = DA_PAROLA.match(frase)
     if m and m.group(1).lower() not in LINGUE and m.group(1).lower() not in NON_ETIMI and m.group(1).lower() != parola.lower():
-        return [(1, 'fr', m.group(1), 'derivazione', None, 3)]
+        return [(1, propria, m.group(1), 'derivazione', None, 3)]
     m = VEDI.match(frase)
     if m and m.group(1).lower() != parola.lower():
-        return [(1, 'fr', m.group(1), 'generico', None, 2)]
+        return [(1, propria, m.group(1), 'generico', None, 2)]
     return []
 
 
 if __name__ == '__main__':
+    # LINGUE_WIKTIONNAIRE=fr,grc: le lingue delle voci da leggere (per default il solo francese); GREZZE=file: un campione
+    # delle frasi grezze delle lingue diverse dal francese, per imparare a leggerle
+    proprie = [x for x in os.environ.get('LINGUE_WIKTIONNAIRE', 'fr').split(',') if x]
+    grezze = open(os.environ['GREZZE'], 'w', encoding='utf-8') if os.environ.get('GREZZE') else None
     out = open(sys.argv[1], 'a', encoding='utf-8')
     voci = carica_voci(sys.argv[2:])
-    conta, esempi, non_lette, viste, lingue = Counter(), [], Counter(), set(), Counter()
+    conta = {p: Counter() for p in proprie}
+    esempi, non_lette = {p: [] for p in proprie}, {p: Counter() for p in proprie}
+    viste, lingue, caso = set(), Counter(), random.Random(7)
     for riga in sys.stdin:
         try:
             v = json.loads(riga)
         except Exception:
             continue
-        parola = v.get('word')
-        lingue[v.get('lang_code')] += 1
-        if v.get('lang_code') != 'fr' or not parola or parola in viste:
+        parola, propria = v.get('word'), v.get('lang_code')
+        lingue[propria] += 1
+        if propria not in conta or not parola or (propria, parola) in viste:
             continue
+        if propria in SCRITTURA:
+            parola = senza_quantita(parola)
         testi = [x for x in (v.get('etymology_texts') or ([v['etymology_text']] if v.get('etymology_text') else []))
                  if pulisci(x)]
         if not testi:
+            conta[propria]['senza etimologia'] += 1
             continue
-        if conta['con etimologia'] < 3:              # per la diagnosi: com'è fatta una voce del dump
-            print('  grezza: ' + json.dumps({'word': parola, 'etymology_texts': testi[:2]}, ensure_ascii=False)[:300],
+        c = conta[propria]
+        if c['con etimologia'] < 3:              # per la diagnosi: com'è fatta una voce del dump
+            print(f'  grezza ({propria}): ' + json.dumps({'word': parola, 'etymology_texts': testi[:2]}, ensure_ascii=False)[:300],
                   file=sys.stderr)
-        viste.add(parola)                      # una voce per parola: la prima etimologia, come nel Wiktionnaire
-        righe = leggi(testi[0], parola)
-        conta['con etimologia'] += 1
+        if grezze and propria != 'fr' and caso.random() < 0.15:
+            grezze.write(f"{propria}\t{parola}\t{' '.join(str(testi[0]).split())[:400]}\n")
+        viste.add((propria, parola))           # una voce per parola: la prima etimologia, come nel Wiktionnaire
+        righe = leggi(testi[0], parola, propria)
+        c['con etimologia'] += 1
         if not righe:
-            conta['non lette'] += 1
+            c['non lette'] += 1
             # per la diagnosi: come comincia una frase che non sappiamo leggere («Dérivé de», «Du latin», «Mot»…)
-            non_lette[' '.join(pulisci(testi[0]).split()[:2]).lower()] += 1
+            non_lette[propria][' '.join(pulisci(testi[0]).split()[:2]).lower()] += 1
             continue
-        if voci is not None and ((('fr', unicodedata.normalize('NFC', parola)) not in voci)
+        if voci is not None and (((propria, unicodedata.normalize('NFC', parola)) not in voci)
                                  or any((l, unicodedata.normalize('NFC', e)) not in voci for _, l, e, _, _, _ in righe)):
-            conta['non voci'] += 1
+            c['non voci'] += 1
             continue
-        conta[righe[0][3]] += 1
-        if len(esempi) < 25 and conta['lette'] % 200 == 0:
-            esempi.append(f'{parola}: {pulisci(testi[0])[:90]} → ' + ' + '.join(f'{l}:{e}' for _, l, e, _, _, _ in righe))
-        conta['lette'] += 1
+        c[righe[0][3]] += 1
+        if len(esempi[propria]) < 25 and c['lette'] % (200 if propria == 'fr' else 20) == 0:
+            esempi[propria].append(f'{parola}: {pulisci(testi[0])[:90]} → ' + ' + '.join(f'{l}:{e}' for _, l, e, _, _, _ in righe))
+        c['lette'] += 1
         for ordine, lingua, etimo, tipo, affisso, certezza in righe:
-            out.write('\t'.join(esc(x) for x in (f'wiktionnaire:fr:{parola}', 'fr', parola, ordine, lingua,
+            out.write('\t'.join(esc(x) for x in (f'wiktionnaire:{propria}:{parola}', propria, parola, ordine, lingua,
                                                  unicodedata.normalize('NFC', etimo), tipo, affisso,
                                                  'Wiktionnaire' if certezza == 3 else 'Wiktionnaire-vedi')) + '\n')
-    print(f'etimologie del Wiktionnaire: {dict(conta)}', file=sys.stderr)
-    print(f'  voci lette per lingua: {dict(lingue.most_common(5))}', file=sys.stderr)
-    for e in esempi:
-        print('  ' + e, file=sys.stderr)
-    print('  inizi non letti più frequenti: ' + '; '.join(f'{k} ({n})' for k, n in non_lette.most_common(20)), file=sys.stderr)
+    for p in proprie:
+        print(f'etimologie del Wiktionnaire ({p}): {dict(conta[p])}', file=sys.stderr)
+    print(f'  voci lette per lingua: {dict(lingue.most_common(8))}', file=sys.stderr)
+    for p in proprie:
+        for e in esempi[p]:
+            print(f'  {p} ' + e, file=sys.stderr)
+        print(f'  {p}, inizi non letti più frequenti: ' + '; '.join(f'{k} ({n})' for k, n in non_lette[p].most_common(30)),
+              file=sys.stderr)
