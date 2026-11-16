@@ -241,6 +241,12 @@ svg.selezione .st-nodo:not(.evid){opacity:.3}
 svg.mappa{display:block;width:100%;height:auto}
 .terra{fill:var(--terra)}
 .m-arco{fill:none;stroke:var(--ink-2)}
+.mappa .m-arco{opacity:.45;transition:opacity .15s}
+.mappa .m-arco.acceso{opacity:1}
+.mappa .m-arco.spento{opacity:.06}
+.m-luogo{cursor:pointer;outline:none}
+.m-luogo.spento{opacity:.25}
+.mappa-elenco li.attivo .sigla{text-decoration:underline}
 .m-punto{fill:var(--pig);stroke:var(--foglio)}
 .m-guida{stroke:var(--ink-3)}
 .m-lab{paint-order:stroke;stroke:var(--foglio);stroke-linejoin:round}
