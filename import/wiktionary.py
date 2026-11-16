@@ -360,6 +360,10 @@ LETTERE['fr'] = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZæÆœ�
 LETTERE['de'] = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZßẞ')
 LETTERE['ru'] = set('абвгдежзийклмнопрстуфхцчшщъыьэюяАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ')   # ё e й: е e и con il segno
 NON_LEMMA = re.compile(r'[()\[\]{}<>“”"=|]')
+# un segno di una scrittura, non una parola: i segni sillabici della lineare B (𐀆 «the Linear B syllabic letter ⟨de⟩»;
+# 𐀤 qe «e» è invece una parola) e i numerali egei (𐄉 «tre»)
+SEGNO_DI_SCRITTURA = re.compile(r'^the \S+(?: \S+)? syllabic (?:letter|sign)\b', re.I)
+NUMERALI_EGEI = re.compile(r'^[\U00010100-\U0001013F]+$')
 
 
 def etimo_esterno(lingua, v):
@@ -1168,7 +1172,9 @@ class Importatore:
     def togli_non_validi(self):
         """Le voci che non sono parole (lemma_valido) escono, con gli archi che le toccano; un'ipotesi che resta senza
         archi esce anch'essa: meglio nessuna etimologia che una catena attraverso un frammento di testo."""
-        via = {k for k, l in self.lessemi.items() if not lemma_valido(l['lingua'], l['lemma'], l['ricostruito'])}
+        via = {k for k, l in self.lessemi.items() if not lemma_valido(l['lingua'], l['lemma'], l['ricostruito'])
+               or NUMERALI_EGEI.match(l['lemma'] or '')
+               or (l['glosse'] and all(SEGNO_DI_SCRITTURA.match(g) for g in l['glosse']))}
         self.togli(via, 'ipotesi_tolte_non_valide')
         self.stat['voci_non_valide'] = len(via)
 

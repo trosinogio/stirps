@@ -561,6 +561,12 @@ assert imp.etimo_presente(v([{'n': 'root', 'a': {'1': 'hit', '2': 'ine-pro', '3'
 assert not imp.etimo_presente(v([{'n': 'cog', 'a': {'1': 'grc', '2': 'ὕδωρ'}}]))
 assert not imp.etimo_presente(v([{'n': 'inh', 'a': {'1': 'hit', '2': 'ine-pro', '3': '*wódr̥'}}], p='name'))
 assert not imp.etimo_presente(v([{'n': 'inh', 'a': {'1': 'hit', '2': 'ine-pro', '3': '*h₂ébʰō'}}]))
+# un segno di una scrittura non è una parola: il segno sillabico 𐀆 e il numerale 𐄉 escono, la congiunzione 𐀤 resta
+imp = Importatore()
+for lemma, glossa in (('𐀆', 'The Linear B syllabic letter ⟨de⟩.'), ('𐄉', 'three, 3'), ('𐀤', 'and')):
+    imp.lessema('gmy', lemma, glossa=glossa)
+imp.togli_non_validi()
+assert {l['lemma'] for l in imp.lessemi.values()} == {'𐀤'}, imp.lessemi.keys()
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \
