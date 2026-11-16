@@ -85,8 +85,9 @@ assert variante_di({'word': 'amamus', 'lang_code': 'la', 'senses': [{'glosses': 
 assert not porta_etimo({'name': 'suffix', 'args': {'1': 'grc', '2': '', '3': 'τής'}}), '{{suffix|grc||τής}} non ha una base'
 assert not porta_etimo({'name': 'der', 'args': {'1': 'grc', '2': 'qsb-grc', '3': '-'}}), 'il sostrato senza parola non è un etimo'
 # più forme in <alt:>: la prima; una frase al posto del termine non è un etimo
-from filtra import termine_ety, base_dalla_menzione
+from filtra import termine_ety, base_dalla_menzione, prima_forma
 assert termine_ety('itc-ala:<alt:*iowos, *iowez->', 'la')[:2] == ('itc-ala', '*iowos') and termine_ety('ine-pro:<alt:*h₂ér-ti-s ~ *h₂r̥-téy-s>', 'x')[1] == '*h₂ér-ti-s'
+assert prima_forma('*kérp-t ` *kr̥p-énti') == '*kérp-t', 'due forme separate dall’accento grave'
 assert da_ety({'args': {'1': 'la', '2': ':from', '3': 'trivius and trivium'}}, 'la') is None, 'una frase non è un etimo'
 # «lie + -ing» scritto {{m|en|lie}} {{suffix|en||ing}}: la base è la menzione che precede
 lying = {'etymology_templates': [{'name': 'm', 'args': {'1': 'en', '2': 'lie', '4': 'to rest'}}, {'name': 'suffix', 'args': {'1': 'en', '2': '', '3': 'ing'}}]}
