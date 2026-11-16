@@ -49,7 +49,9 @@ url=https://$(jq -r .url <<< "$dep")
 echo "deploy $did ($destinazione): $url"
 
 stato=""
-for _ in $(seq 1 150); do
+# fino a 40 minuti: la build rifà l'import quando cambia il pacchetto dati, e con le lingue romanze (16 novembre 2026)
+# l'import dura circa 13 minuti; con 10 minuti di attesa la pubblicazione si dava per fallita mentre Vercel finiva
+for _ in $(seq 1 600); do
   stato=$(curl -sS "${riprova[@]}" -H "$aut" "$api/v13/deployments/$did?$squadra" | jq -r '.readyState // .status')
   case "$stato" in READY|ERROR|CANCELED) break;; esac
   sleep 4
