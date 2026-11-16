@@ -544,6 +544,16 @@ assert imp.semina_discendenti(percorsi, {'ine-pro', 'grc'}) == 0, 'la seconda vo
 assert imp.stat['discendenti_sole_varianti'] == 2, imp.stat
 imp.togli_seminati_orfani()
 assert not any(l['lingua'] == 'got' for l in imp.lessemi.values()) and imp.stat['discendenti_seminati_orfani'] == 1
+# le lingue antiche del confronto entrano anche dal basso (--risali): un lemma ittita entra se un etimo della sua pagina
+# (o la radice che dichiara) è già nel dizionario; non per un confronto, non un nome proprio, non un etimo nuovo
+imp = Importatore()
+imp.lessema('ine-pro', '*wódr̥'); imp.lessema('ine-pro', '*(s)ker-', ident='cut')
+v = lambda tpl, p='noun', w='𒉿𒀀𒋻': {'w': w, 'p': p, 'tpl': tpl}
+assert imp.etimo_presente(v([{'n': 'inh', 'a': {'1': 'hit', '2': 'ine-pro', '3': '*wódr̥'}}]))
+assert imp.etimo_presente(v([{'n': 'root', 'a': {'1': 'hit', '2': 'ine-pro', '3': '*(s)ker-'}}]))
+assert not imp.etimo_presente(v([{'n': 'cog', 'a': {'1': 'grc', '2': 'ὕδωρ'}}]))
+assert not imp.etimo_presente(v([{'n': 'inh', 'a': {'1': 'hit', '2': 'ine-pro', '3': '*wódr̥'}}], p='name'))
+assert not imp.etimo_presente(v([{'n': 'inh', 'a': {'1': 'hit', '2': 'ine-pro', '3': '*h₂ébʰō'}}]))
 PY
 LINGUA=it python3 wiktionary.py esempio/lemmi.jsonl esempio/tsv esempio/glosse.tsv \
   --chiudi la=esempio/la_lemmi.jsonl,esempio/la_glosse.tsv,esempio/la_forme.tsv \
