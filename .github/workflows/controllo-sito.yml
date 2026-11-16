@@ -12,8 +12,8 @@ jobs:
         run: |
           S=https://dizionario-etimologico.vercel.app
           prova() { curl -s -o /tmp/p.html -w "%{http_code} %{size_download}B" "$S$1"; printf ' %s | ' "$1"; grep -o "$2" /tmp/p.html | head -${3:-2} | tr '\n' ' '; echo; }
-          prova /it/w/sga/beo 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
-          prova /it/w/sga/sid 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
-          prova /it/w/lt/melzti 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
-          prova /it/w/lt/mieras 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
-          prova /it/r/ine-pro/h2melg/lingue 'melžti\|melzti' 1
+          prova /it/w/gmy/akoro 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
+          prova /it/w/hit/waasseezzi 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
+          prova /it/w/xcl/geran 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
+          prova /it/w/ae/pa%CE%B4a 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
+          prova /it/w/grc/diatasso 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/w/[a-z-]*/[^"]*"' 5
