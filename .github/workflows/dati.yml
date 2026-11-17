@@ -33,12 +33,18 @@ jobs:
         lt:Lithuanian sga:Old Irish hit:Hittite xcl:Old Armenian ae:Avestan txb:Tocharian B xto:Tocharian A gmy:Mycenaean Greek
         gl:Galician ast:Asturian an:Aragonese co:Corsican lld:Ladin rm:Romansch wa:Walloon frp:Franco-Provençal dlm:Dalmatian
         rup:Aromanian ruq:Megleno-Romanian ruo:Istro-Romanian lad:Ladino egl:Emilian rgn:Romagnol ist:Istriot mxi:Mozarabic
-        roa-opt:Old Galician-Portuguese roa-oca:Old Catalan nrf:Norman pcd:Picard'
-      INTERE: la,grc
+        roa-opt:Old Galician-Portuguese roa-oca:Old Catalan nrf:Norman pcd:Picard
+        sv:Swedish da:Danish nb:Norwegian Bokmål nn:Norwegian Nynorsk no:Norwegian is:Icelandic fo:Faroese fy:West Frisian ofs:Old Frisian
+        af:Afrikaans lb:Luxembourgish nds:Low German nds-de:German Low German nds-nl:Dutch Low Saxon sco:Scots odt:Old Dutch
+        gmq-osw:Old Swedish gmq-oda:Old Danish li:Limburgish gsw:Alemannic German bar:Bavarian pdc:Pennsylvania German stq:Saterland Frisian
+        frr:North Frisian ovd:Elfdalian nrn:Norn cim:Cimbrian yol:Yola pdt:Plautdietsch gmq-pro:Proto-Norse lng:Lombardic vls:West Flemish zea:Zealandic'
+      # STIMA (17 novembre 2026, ramo dati-stima-germaniche, da non unire): tutte le lingue germaniche intere, inglese e
+      # tedesco compresi, per misurare con stima_import.py quanto costa ciascun ambito; le glosse si contano senza tradurle
+      INTERE: la,grc,en,de,nl,sv,da,nb,nn,no,is,fo,fy,af,lb,yi,sco,nds,nds-de,nds-nl,li,gsw,bar,pdc,stq,frr,ovd,nrn,cim,yol,pdt,vls,zea,ang,enm,non,gmh,goh,dum,gml,osx,odt,ofs,gmq-osw,gmq-oda,got,frk,lng
       # la stima dopo ogni giro (stima_import.py), per le lingue romanze
-      STIMA_LINGUE: ro,ar,he,fr,es
-      STIMA_ATTUALE: '1053'
-      STIMA_FREQUENZE: es=dati/frequenze_es.tsv.gz,pt=dati/frequenze_pt.tsv.gz,ca=dati/frequenze_ca.tsv.gz,ro=dati/frequenze_ro.tsv.gz,gl=dati/frequenze_gl.tsv.gz,fr=dati/frequenze_fr.tsv.gz
+      STIMA_LINGUE: en,de,nl,sv,da,nb,nn,no,is,fo,fy,af,lb,yi,sco,nds,nds-de,nds-nl,li,gsw,bar,pdc,stq,frr,ovd,nrn,cim,yol,pdt,vls,zea,ang,enm,non,gmh,goh,dum,gml,osx,odt,ofs,gmq-osw,gmq-oda,got,frk,lng
+      STIMA_ATTUALE: '1493'
+      STIMA_FREQUENZE: en=dati/frequenze_en.tsv.gz,de=dati/frequenze_de.tsv.gz,nl=dati/frequenze_nl.tsv.gz,sv=dati/frequenze_sv.tsv.gz,da=dati/frequenze_da.tsv.gz,nb=dati/frequenze_no.tsv.gz,no=dati/frequenze_no.tsv.gz,nn=dati/frequenze_no.tsv.gz,is=dati/frequenze_is.tsv.gz
       # sotto le voci dei rami antichi e del latino entrano anche i discendenti dichiarati che il dizionario non ha
       # (import/wiktionary.py; il latino dal 15 novembre 2026, decisione di Giovanni: le lingue romanze)
       # e sotto il protobaltoslavo e il protoceltico (16 novembre 2026: lituano e irlandese antico, con l'ittita, per il
@@ -50,15 +56,15 @@ jobs:
       RISALI: hit,xcl,ae,txb,xto,gmy,sa,got,cu,lt,sga
       # le lingue romanze con tutte le voci che hanno un'etimologia, senza nomi propri, locuzioni e contrazioni (decisione
       # di Giovanni, 16 novembre 2026, «ambito B» della stima: 209 mila voci); il francese non ha più l'elenco del lessico comune
-      CON_ETIMOLOGIA: en,de,ru,es,pt,ca,ro,gl,oc,fr,fro,frm,osp,roa-opt,roa-oca,pro,nap,scn,vec,lij,sc,lmo,pms,fur,ast,an,co,lld,rm,wa,frp,dlm,rup,ruq,ruo,lad,egl,rgn,ist,mxi,nrf,pcd
+      CON_ETIMOLOGIA: ru,es,pt,ca,ro,gl,oc,fr,fro,frm,osp,roa-opt,roa-oca,pro,nap,scn,vec,lij,sc,lmo,pms,fur,ast,an,co,lld,rm,wa,frp,dlm,rup,ruq,ruo,lad,egl,rgn,ist,mxi,nrf,pcd
       # dell'inglese, il lessico comune (i lemmi tra le 50 mila forme più frequenti) e le parole con l'etimo fuori
       # dall'inglese (ESTERNI), senza nomi propri né locuzioni
       # la stessa regola per francese, tedesco e russo (stima del 6 novembre 2026: 114 MB invece di 239 per le lingue intere)
       # l'italiano anche con i lemmi senza etimologia del lessico comune (referto), per l'analisi di un testo
       COMUNI: it=../dati/frequenze_it.tsv.gz
-      ELENCHI: en=../dati/frequenze_en.tsv.gz de=../dati/frequenze_de.tsv.gz ru=../dati/frequenze_ru.tsv.gz
-      ESTERNI: en,de,ru
-      GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
+      ELENCHI: ru=../dati/frequenze_ru.tsv.gz
+      ESTERNI: ru
+      GLOSSE_TRADOTTE: '0'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
       # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
       DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq
       # i modelli grezzi di alcune parole, per capire perché la loro etimologia non si legge (le cime greche del 13 novembre)
