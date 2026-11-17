@@ -11,6 +11,7 @@ import { BarraRami, intercala, Legenda, VoceLink } from '@/components/comuni';
 import StemmaAdattivo from '@/components/StemmaAdattivo';
 import StemmaVerticale from '@/components/StemmaVerticale';
 import Mappa from '@/components/Mappa';
+import TrovaPercorso from '@/components/TrovaPercorso';
 import SintesiFamiglia from '@/components/SintesiFamiglia';
 import type { NodoPiatto, Scheda } from '@/lib/tipi';
 
@@ -150,6 +151,7 @@ export default async function Radice({ params }: { params: Promise<{ lang: strin
           </div>
         )}
       </header>
+      {discendenti.length > 1 && <TrovaPercorso lang={lang} slug={L.slug} nodi={grande ? null : nodi} />}
       <nav className="schede" aria-label={t.vistaFamiglia}>
         {schede.map(([k, testo, href]) => <Link key={k} href={href} aria-current={k === vista ? 'page' : undefined}>{testo}</Link>)}
       </nav>

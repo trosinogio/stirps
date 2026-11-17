@@ -121,7 +121,11 @@ export interface Testi {
   strumentiStemma: {
     titolo: string; cerca: string; trovati: (n: number, nascosti: number) => string; nessuno: string; prossima: string;
     lingue: string; tutte: string; altre: string; generazioni: string; tutteGen: string; risali: (x: string) => string;
-    paroleIn: (lingua: string) => string;
+    paroleIn: (lingua: string) => string; carica: string;
+  };
+  percorso: {
+    titolo: string; cerca: string; carica: string; nessuna: string; chiudi: string;
+    dallaRadice: (radice: string, parola: string, passi: number) => string; apriRamo: (n: number) => string;
   };
   legame: (tipo: string) => string;
   tipiConnessione: Record<string, string>;
@@ -321,7 +325,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
       altreLingueNota: 'Per ogni lingua, prima le parole più vicine all’origine.',
       apriFamiglia: (l) => `Apri la famiglia di ${l}`,
     },
-    stemmaRidotto: 'Una famiglia grande: qui i primi due livelli. Ogni ramo si apre nella sua pagina.',
+    stemmaRidotto: 'Una famiglia grande: qui i primi due livelli. Il numero dei discendenti apre il ramo sul posto, e la ricerca guarda in tutta la famiglia.',
     vistaFamiglia: 'Vista della famiglia',
     nessunDiscendente: 'Nei dati attuali nessuna parola discende da questa forma.',
     apriVoceDi: (l) => `Apri la voce di ${l}`,
@@ -349,7 +353,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     nessunaParola: 'Nessuna parola corrisponde.',
     apriStemmaDi: (l) => `Apri lo stemma di ${l}`,
     mappaPochi: 'Servono almeno due lingue con un luogo per disegnare una mappa. Le protolingue non hanno una collocazione.',
-    mappaNota: 'Luoghi indicativi, un punto per lingua; le frecce vanno dalla forma più antica alla più recente.',
+    mappaNota: 'Luoghi indicativi. Un punto riunisce le fasi e le varietà di una lingua che hanno lo stesso luogo («+2»); passando su un punto o su una riga dell’elenco si accendono i suoi passaggi e compaiono i nomi nascosti. Le frecce vanno dalla forma più antica alla più recente.',
     mappaProto: ' Le protolingue non hanno una collocazione e non compaiono.',
     mappaAria: 'Mappa dei passaggi tra le lingue',
     formaRicostruita: 'forma ricostruita',
@@ -403,6 +407,13 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
       trovati: (n, h) => `${n.toLocaleString('it-IT')} ${n === 1 ? 'trovata' : 'trovate'}${h ? `, ${h} nelle liste` : ''}`,
       lingue: 'Lingua', tutte: 'Tutte', altre: 'Altre lingue…', generazioni: 'Generazioni', tutteGen: 'tutte',
       risali: (x) => `Risali alla famiglia di ${x}`, paroleIn: (l) => `Tutte le parole in ${l}`,
+      carica: 'Carico tutta la famiglia…',
+    },
+    percorso: {
+      titolo: 'Trova il percorso', cerca: 'Trova il percorso di una parola dalla radice…', carica: 'carico le parole…',
+      nessuna: 'nessuna parola della famiglia', chiudi: 'chiudi',
+      dallaRadice: (r, p, k) => `Da ${r} a ${p}: ${k} ${k === 1 ? 'passaggio' : 'passaggi'}`,
+      apriRamo: (n) => `${n.toLocaleString('it-IT')} ${n === 1 ? 'parola deriva' : 'parole derivano'} da qui`,
     },
     legame: (t) => `legame ${t} con`,
     tipiConnessione: { culturale: 'culturale', semantica: 'semantico', omonimia: 'di omonimia', paronimia: 'di paronimia', falso_amico: 'di falso amico', altro: '' },
@@ -584,7 +595,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
       altreLingueNota: 'For each language, the words closest to the origin come first.',
       apriFamiglia: (l) => `Open the family of ${l}`,
     },
-    stemmaRidotto: 'A large family: the first two levels are shown here. Each branch opens on its own page.',
+    stemmaRidotto: 'A large family: the first two levels are shown here. The number of descendants opens the branch in place, and the search looks through the whole family.',
     vistaFamiglia: 'Family view',
     nessunDiscendente: 'In the current data no word descends from this form.',
     apriVoceDi: (l) => `Open the entry for ${l}`,
@@ -612,7 +623,7 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
     nessunaParola: 'No word matches.',
     apriStemmaDi: (l) => `Open the stemma of ${l}`,
     mappaPochi: 'A map needs at least two languages with a location. Proto-languages have no location.',
-    mappaNota: 'Approximate locations, one point per language; arrows run from the older form to the newer one.',
+    mappaNota: 'Approximate locations. A point gathers the stages and varieties of a language that share a location (“+2”); hovering a point or a row of the list highlights its transfers and shows hidden names. Arrows run from the older form to the newer one.',
     mappaProto: ' Proto-languages have no location and are not shown.',
     mappaAria: 'Map of the transfers between languages',
     formaRicostruita: 'reconstructed form',
@@ -666,6 +677,13 @@ export const TESTI: Record<Lang, Testi> = /*@@TESTI*/{
       trovati: (n, h) => `${n.toLocaleString('en-GB')} found${h ? `, ${h} in the lists` : ''}`,
       lingue: 'Language', tutte: 'All', altre: 'Other languages…', generazioni: 'Generations', tutteGen: 'all',
       risali: (x) => `Go up to the family of ${x}`, paroleIn: (l) => `All the words in ${l}`,
+      carica: 'Loading the whole family…',
+    },
+    percorso: {
+      titolo: 'Find the path', cerca: 'Find the path of a word from the root…', carica: 'loading the words…',
+      nessuna: 'no word of the family', chiudi: 'close',
+      dallaRadice: (r, p, k) => `From ${r} to ${p}: ${k} ${k === 1 ? 'step' : 'steps'}`,
+      apriRamo: (n) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'word comes' : 'words come'} from here`,
     },
     legame: (t) => `${t} link with`,
     tipiConnessione: { culturale: 'cultural', semantica: 'semantic', omonimia: 'homonymy', paronimia: 'paronymy', falso_amico: 'false-friend', altro: '' },

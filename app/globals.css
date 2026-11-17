@@ -236,11 +236,39 @@ svg.selezione .st-nodo:not(.evid){opacity:.3}
 .parola-l .gl{font-size:14.5px}
 @media (max-width:560px){.riga-lingua{grid-template-columns:1fr}}
 
+/* trova il percorso */
+.percorso{margin:18px 0 6px;position:relative}
+.percorso-campo{display:flex;align-items:center;gap:10px}
+.percorso-campo .st-cerca{flex:1;max-width:520px}
+.percorso-trovate{position:absolute;z-index:5;list-style:none;margin:4px 0 0;padding:4px 0;background:var(--foglio);border:1px solid var(--filo);border-radius:6px;box-shadow:0 6px 20px rgb(0 0 0 / .12);width:min(520px,100%);max-height:360px;overflow:auto}
+.percorso-trovate li{padding:5px 12px;cursor:pointer;display:flex;gap:6px;align-items:baseline}
+.percorso-trovate li[aria-selected=true]{background:var(--carta,rgb(0 0 0 / .05))}
+.percorso-trovate .lemma{color:var(--pig);font-size:17px}
+.percorso-trovate .sigla,.percorso-trovate .gl{font:13px var(--sans);color:var(--ink-3)}
+.percorso-esito{margin-top:12px;border:1px solid var(--filo);border-radius:6px;padding:12px 16px;background:var(--foglio)}
+.percorso-titolo{font:14px var(--sans);color:var(--ink-2);margin:0 0 8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.percorso-catena{list-style:none;margin:0;padding:0}
+.percorso-catena li{display:flex;flex-direction:column;padding-left:14px;border-left:2px solid var(--pig)}
+.percorso-catena .passo{font:12.5px var(--sans);color:var(--ink-3);padding:3px 0 2px;font-style:italic}
+.percorso-catena .nodo{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;padding:2px 0}
+.percorso-catena .voce .lemma{color:var(--pig);font-size:18px}
+.percorso-catena li.arrivo .voce .lemma{font-weight:700}
+.percorso-catena .sigla,.percorso-catena .gl{font:13px var(--sans);color:var(--ink-3)}
+.percorso-catena .quanti{font:12.5px var(--sans)}
+.stemma-v details.ramo-chiuso>summary{cursor:pointer;font:13px var(--sans);color:var(--ink-3);list-style:none;margin:2px 0 0 4px}
+.stemma-v details.ramo-chiuso>summary::before{content:'▸ '}
+.stemma-v details.ramo-chiuso[open]>summary::before{content:'▾ '}
 /* mappa */
 .mappa-wrap{border:1px solid var(--filo);border-radius:6px;background:var(--foglio);overflow:hidden;margin-top:12px}
 svg.mappa{display:block;width:100%;height:auto}
 .terra{fill:var(--terra)}
 .m-arco{fill:none;stroke:var(--ink-2)}
+.mappa .m-arco{opacity:.45;transition:opacity .15s}
+.mappa .m-arco.acceso{opacity:1}
+.mappa .m-arco.spento{opacity:.06}
+.m-luogo{cursor:pointer;outline:none}
+.m-luogo.spento{opacity:.25}
+.mappa-elenco li.attivo .sigla{text-decoration:underline}
 .m-punto{fill:var(--pig);stroke:var(--foglio)}
 .m-guida{stroke:var(--ink-3)}
 .m-lab{paint-order:stroke;stroke:var(--foglio);stroke-linejoin:round}
