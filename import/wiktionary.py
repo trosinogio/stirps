@@ -462,7 +462,9 @@ def antenato_lingua(c):
     c = base_lingua(c)
     if c in ROMANZE:
         return 'la'
-    if c in ('la', 'osc', 'xum', 'xfa', 'itc-ola'):
+    # con le lingue sabelliche minori (sabino, piceno meridionale, volsco, equo, marso, vestino): senza, *h₂nḗr «uomo»
+    # risultava preso in prestito dal sabino nerō (dalla pagina di Nero), e la famiglia indoeuropea finiva sotto una parola sabina
+    if c in ('la', 'osc', 'xum', 'xfa', 'itc-ola', 'sbv', 'spx', 'xvo', 'xae', 'xmr', 'xvs'):
         return 'itc-pro'
     if c in ('el', 'gkm'):
         return 'grc'
@@ -621,6 +623,11 @@ class Importatore:
             lingua, termine = codice_lingua(m.group(1)), m.group(2)
         # due grafie in un rimando («minuzza//minuzzare», «lě / *li»): vale la prima
         termine = re.split(r'\s*//\s*|\s+/\s+', termine)[0]
+        # «*h₃ed- (bite)»: una radice con il suo identificativo tra parentesi, come nei nomi delle categorie di Wiktionary;
+        # letta così diventava una voce a sé (54 voci, 77 archi: *mey- (change), *peḱ- (pluck))
+        m = re.fullmatch(r'(\*\S+-) \(([a-z][a-z ]*)\)', termine)
+        if m:
+            termine, ident = m.group(1), ident or m.group(2)
         termine = nome_pagina(lingua, termine)
         ric = termine.startswith('*')
         if not ric and lingua in VARIETA_ATTESTATE:
@@ -1355,12 +1362,20 @@ class Importatore:
         self.formazioni_ambigue = {m(k) for k in self.formazioni_ambigue}
         self.stat['identificativi_uniti'] = len(mappa)
 
+    def ha_pagina(self, k):
+        """La voce ha una sua pagina nel dump della sua lingua di chiusura, anche senza etimologia (elenco delle pagine)."""
+        l = self.lessemi.get(k) or {}
+        idx = self.chiusura.get(l.get('lingua'))
+        return bool(idx) and nome_pagina(l['lingua'], l['lemma']) in idx['lemmi']
+
     def risolvi_intermedi(self):
         for esito, conta in self.intermedi.items():
             if esito in self.ipotesi:     # la voce ha già una sua etimologia
                 continue
-            if esito in self.lette and self.lessemi.get(esito, {}).get('lingua') == 'ine-pro':
-                # *tréyes: la sua pagina non dà un etimo, e una catena di un'altra pagina non gliene dà uno
+            if self.lessemi.get(esito, {}).get('lingua') == 'ine-pro' and (esito in self.lette or self.ha_pagina(esito)):
+                # *tréyes: la sua pagina non dà un etimo, e una catena di un'altra pagina non gliene dà uno. Conta che la
+                # pagina ci sia, anche senza etimologia (e allora il filtro non la passa da leggere): *h₂nḗr prendeva
+                # «borrowed from Sabine nerō» dalla frase dopo la sua catena nella pagina di Nero
                 self.stat['intermedi_pie_senza_etimo'] += 1
                 continue
             # gli anelli impossibili non si offrono nemmeno come alternative

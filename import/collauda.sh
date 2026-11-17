@@ -581,6 +581,28 @@ imp.voce({'w': 'preot', 'p': 'noun', 't': 'Vulgar Latin preb(i)ter, popular vari
     {'n': 'inh', 'a': {'1': 'ro', '2': 'la', '3': 'presbyter'}, 'e': 'Latin presbyter'}]}, lingua_voce='ro')
 archi = {(r['esito'].split(':', 2)[2], r['etimo'].split(':', 2)[2], r['affisso']) for r in imp.relazioni}
 assert archi == {('agăța', '*accaptiare', 'a-'), ('preot', 'presbyter', None)}, archi
+# una parola indoeuropea con la sua pagina, anche senza etimologia, non prende un etimo dalla catena di un'altra pagina: nella
+# pagina di Nero «… from *h₂nḗr. … It is possible that the term was borrowed from Sabine nerō» non fa di *h₂nḗr un prestito
+# dal sabino; e il sabino discende dal protoitalico
+from wiktionary import antenato_lingua, nome_pagina
+assert antenato_lingua('sbv') == 'itc-pro'
+imp = Importatore()
+imp.chiusura['ine-pro'] = {'voci': [], 'omografi': {}, 'forme': {}, 'participi': {}, 'flesse': {}, 'file_glosse': None,
+                           'lemmi': {nome_pagina('ine-pro', 'h₂nḗr')}}
+imp.voce({'w': 'Nero', 'p': 'name', 'g': ['Nero'], 'tpl': [
+    {'n': 'inh', 'a': {'1': 'la', '2': 'itc-pro', '3': '*nēr'}, 'e': 'Proto-Italic *nēr'},
+    {'n': 'der', 'a': {'1': 'la', '2': 'ine-pro', '3': '*h₂nḗr'}, 'e': 'Proto-Indo-European *h₂nḗr'},
+    {'n': 'bor', 'a': {'1': 'la', '2': 'sbv', '3': 'nerō'}, 'e': 'Sabine nerō'}],
+    't': 'From Proto-Italic *nēr, from Proto-Indo-European *h₂nḗr. It is possible that the term was borrowed from Sabine nerō.'}, lingua_voce='la')
+imp.risolvi_intermedi()
+assert not [h for h in imp.ipotesi.values() if h['esito'] == imp.chiave_di('ine-pro', '*h₂nḗr')]
+assert [h for h in imp.ipotesi.values() if h['esito'] == imp.chiave_di('itc-pro', '*nēr')], 'il passaggio *nēr < *h₂nḗr resta'
+# una radice con l'identificativo tra parentesi, come nei nomi delle categorie («*h₃ed- (bite)»), è la radice omografa con
+# quell'identificativo, non una voce a sé; una forma ricostruita che non è una radice resta com'è
+imp = Importatore()
+assert imp.lessema('ine-pro', '*h₃ed- (bite)') == imp.lessema('ine-pro', '*h₃ed-', ident='bite') == 'enwikt:ine-pro:*h₃ed-@bite'
+assert imp.lessemi['enwikt:ine-pro:*h₃ed-@bite']['lemma'] == 'h₃ed-'
+assert imp.lessema('la-vul', '*veranum (tempus)') == 'enwikt:la-vul:*veranum (tempus)'
 # il Wiktionnaire scrive l'etimo latino all'infinito («Du latin calculare»): va alla voce del dizionario, alla prima persona
 from etimi_wiktionnaire import verbo_latino
 _v = {('la', 'calculo'), ('la', 'loquor'), ('la', 'rosa')}
