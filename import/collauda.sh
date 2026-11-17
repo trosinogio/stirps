@@ -591,6 +591,16 @@ assert antenato_lingua('sbv') == 'itc-pro'
 from wiktionary import discende_da
 assert discende_da('en', 'ang') and discende_da('sv', 'non') and discende_da('af', 'nl') and discende_da('en', 'gem-pro')
 assert not discende_da('ang', 'en') and not discende_da('non', 'sv') and not discende_da('de', 'yi') and not discende_da('da', 'nb')
+# il ripiego sulla radice dichiarata: nella stessa lingua la cima ha la forma della radice (*trémti < *trem-, *puH-yós
+# < *pewH-, *ḱád-e-ti < *ḱh₂d-, *teh₂tis < *(s)teh₂-), non *úp < *men- né *dwóh₁ < *pel-
+from wiktionary import ha_la_forma_della_radice as _hf
+assert _hf('trémti', 'trem-') and _hf('puH-yós', 'pewH-') and _hf('ḱád-e-ti', 'ḱh₂d-') and _hf('teh₂tis', '(s)teh₂-')
+assert _hf('h₁wogʷʰ-eye-ti', 'h₁wegʷʰ-') and _hf('wi-wǵʰ-é-ti', 'weǵʰ-') and _hf('káput', 'kap-')
+assert not _hf('úp', 'men-') and not _hf('dwóh₁', 'pel-') and not _hf('dóru', 'weyd-')
+# un lemma di sole cifre o segni non è una parola
+from wiktionary import senza_lettere
+assert senza_lettere('24') and senza_lettere('+') and senza_lettere('++') and senza_lettere('🎻') and senza_lettere('1-2-3')
+assert not senza_lettere('ἄλφα') and not senza_lettere('18-enne') and not senza_lettere('h₂ner') and not senza_lettere('')
 # e la tabella delle lingue porta quell'antenato anche per le germaniche non curate (svedese < svedese antico)
 import tempfile
 imp = Importatore()

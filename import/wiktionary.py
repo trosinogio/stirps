@@ -525,6 +525,41 @@ def forma_ricostruita(l):
     return 'tema' if '-' in l['lemma'].strip('-') else 'radice'
 
 
+def senza_lettere(t):
+    """Un lemma fatto solo di cifre, segni e simboli non è una parola (it:24, sv:+, mul:++, un'emoji); i caratteri che
+    Python non conosce (scritture recenti) non contano come segni."""
+    return bool(t) and all(unicodedata.category(c)[0] in 'NPSZ' or unicodedata.category(c) == 'Cf' for c in t)
+
+
+def scheletro(forma):
+    """Le consonanti di una forma ricostruita, in ordine, per confrontare una parola con la sua radice: le laringali,
+    i segmenti facoltativi («(s)», «(H)», «⁽ʷ⁾»), gli accenti e la labializzazione non contano, e nel grado zero w e y
+    valgono u e i (*puH-yós e *pewH-)."""
+    f = unicodedata.normalize('NFD', forma.split('@')[0].lstrip('*'))
+    f = re.sub(r'\([^)]*\)|⁽[^⁾]*⁾', '', f)
+    f = re.sub('[̥̩́̀̄̆͂ʷ]', '', f)
+    f = re.sub(r'h[₁₂₃]|H', '', unicodedata.normalize('NFC', f)).replace('u', 'w').replace('i', 'y')
+    out = []
+    for ch in unicodedata.normalize('NFC', f):
+        if ch in 'aeoāēōəɨ' or not (ch.isalpha() or ch == 'ʰ'):
+            continue
+        if ch == 'ʰ' and out:
+            out[-1] += ch
+        else:
+            out.append(ch)
+    return out
+
+
+def ha_la_forma_della_radice(parola, radice):
+    """Le consonanti della radice compaiono, in ordine, nella parola (*trémti e *trem-; non *úp e *men-)."""
+    p, r = scheletro(parola), scheletro(radice)
+    i = 0
+    for c in p:
+        if i < len(r) and c == r[i]:
+            i += 1
+    return i == len(r)
+
+
 def discende_da(a, b):
     """La lingua a discende (strettamente) dalla lingua b."""
     b, visti = base_lingua(b), set()
@@ -1214,7 +1249,7 @@ class Importatore:
         """Le voci che non sono parole (lemma_valido) escono, con gli archi che le toccano; un'ipotesi che resta senza
         archi esce anch'essa: meglio nessuna etimologia che una catena attraverso un frammento di testo."""
         via = {k for k, l in self.lessemi.items() if not lemma_valido(l['lingua'], l['lemma'], l['ricostruito'])
-               or NUMERALI_EGEI.match(l['lemma'] or '')
+               or NUMERALI_EGEI.match(l['lemma'] or '') or senza_lettere(l['lemma'])
                or (l['glosse'] and all(SEGNO_DI_SCRITTURA.match(g) for g in l['glosse']))}
         self.togli(via, 'ipotesi_tolte_non_valide')
         self.stat['voci_non_valide'] = len(via)
@@ -1660,6 +1695,18 @@ class Importatore:
                 continue
             if n1 < 2 and not diretti[cima][radice] and sotto[cima] >= CIMA_GRANDE:
                 self.stat['radici_con_un_solo_voto_lontano'] += 1
+                continue
+            # un affisso o un segno non prende una radice per ripiego (*-ónts, «+»): i voti vengono dalle parole che lo
+            # contengono, e dichiarano la radice della loro base
+            lc = self.lessemi[cima]
+            if lc['lemma'].startswith('-') or not re.search(r'[^\W\d_]', lc['lemma']):
+                self.stat['radici_per_un_affisso'] += 1
+                continue
+            # nella stessa lingua la cima ha la forma della sua radice: *dwóh₁ «due» non viene da *pel- «piegare»
+            # (twofold), *úp non viene da *men- (i composti con mind); il 17 novembre 2026 23 archi su 1.043, due su tre sbagliati
+            if lc['ricostruito'] and lc['lingua'] == self.lessemi[radice]['lingua'] \
+                    and not ha_la_forma_della_radice(lc['lemma'], self.lessemi[radice]['lemma']):
+                self.stat['radici_senza_la_forma_della_cima'] += 1
                 continue
             kh = cima + '#wikt-radice'
             self.ipotesi[kh] = {'chiave': kh, 'esito': cima, 'etichetta': 'Wiktionary (radice dichiarata)', 'stato': 'accolta',
