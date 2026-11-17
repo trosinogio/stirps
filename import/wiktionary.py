@@ -451,6 +451,19 @@ ROMANZE = {'it', 'fr', 'es', 'pt', 'ro', 'ca', 'oc', 'fro', 'frm', 'pro', 'gl', 
            'osp', 'roa-ole', 'wa', 'nrf', 'mfe', 'ht'}
 GERMANICHE = {'en', 'ang', 'enm', 'sco', 'de', 'gmh', 'goh', 'gsw', 'lb', 'yi', 'nl', 'dum', 'odt', 'osx', 'nds', 'gml',
               'fy', 'ofs', 'lng', 'frk', 'got', 'non', 'is', 'fo', 'sv', 'da', 'no', 'nb', 'nn', 'gmw-pro', 'gmq-pro', 'gme-pro'}
+# Dentro le lingue germaniche, l'antenato immediato: con tutte le lingue germaniche al protogermanico un arco rovesciato tra
+# inglese e antico inglese, o tra svedese e norreno, non si vedeva, e un discendente dichiarato (inglese sotto l'antico
+# inglese) non era un'eredità. Le altre germaniche discendono direttamente dal protogermanico.
+ANTENATI_GERMANICI = {
+    'en': 'enm', 'sco': 'enm', 'yol': 'enm', 'enm': 'ang', 'ang': 'gmw-pro',
+    'de': 'gmh', 'gsw': 'gmh', 'bar': 'gmh', 'lb': 'gmh', 'yi': 'gmh', 'cim': 'gmh', 'pdc': 'gmh', 'ksh': 'gmh',
+    'swg': 'gmh', 'wae': 'gmh', 'vmf': 'gmh', 'gmw-cfr': 'gmh', 'gmw-rfr': 'gmh', 'hrx': 'gmh', 'gmh': 'goh', 'goh': 'gmw-pro',
+    'nl': 'dum', 'li': 'dum', 'zea': 'dum', 'vls': 'dum', 'af': 'nl', 'dum': 'odt', 'odt': 'gmw-pro', 'frk': 'gmw-pro',
+    'nds': 'gml', 'nds-de': 'gml', 'nds-nl': 'gml', 'pdt': 'gml', 'gml': 'osx', 'osx': 'gmw-pro',
+    'fy': 'ofs', 'stq': 'ofs', 'frr': 'ofs', 'ofs': 'gmw-pro', 'lng': 'gmw-pro',
+    'sv': 'gmq-osw', 'gmq-osw': 'non', 'da': 'gmq-oda', 'gmq-oda': 'non',
+    'nb': 'non', 'nn': 'non', 'no': 'non', 'is': 'non', 'fo': 'non', 'nrn': 'non', 'ovd': 'non', 'non': 'gmq-pro',
+    'gmq-pro': 'gem-pro', 'gmw-pro': 'gem-pro'}
 CELTICHE = {'ga', 'sga', 'mga', 'gd', 'gv', 'cy', 'wlm', 'owl', 'br', 'xbm', 'obt', 'kw', 'xtg', 'xcg', 'xce', 'cel-bry-pro'}
 SLAVE = {'ru', 'orv', 'uk', 'be', 'pl', 'cs', 'sk', 'sl', 'hr', 'sr', 'sh', 'bg', 'mk', 'cu', 'dsb', 'hsb', 'zlw-pro'}
 INDOIRANICHE = {'sa', 'pi', 'pra', 'hi', 'ur', 'bn', 'inc-pro', 'fa', 'pal', 'peo', 'ae', 'xpr', 'ku', 'ps', 'os', 'ira-pro'}
@@ -470,6 +483,8 @@ def antenato_lingua(c):
         return 'grc'
     if c == 'grc':
         return 'grk-pro'
+    if c in ANTENATI_GERMANICI:
+        return ANTENATI_GERMANICI[c]
     if c in GERMANICHE:
         return 'gem-pro'
     if c in CELTICHE:
@@ -508,6 +523,44 @@ def forma_ricostruita(l):
     if not l.get('ricostruito') or not l['lemma'].endswith('-'):
         return None
     return 'tema' if '-' in l['lemma'].strip('-') else 'radice'
+
+
+LATINO_ESTESO = re.compile("[A-Za-zÀ-ɏḀ-ỿɐ-ʯʰ-˿ᴀ-ᶿⱠ-Ɀ꜠-ꟿ₀-₉⁰-⁹̀-ͯ'’ .·()/⁽⁾~=+*\\-]+")
+
+
+def senza_lettere(t):
+    """Un lemma fatto solo di cifre, segni e simboli non è una parola (it:24, sv:+, mul:++, un'emoji); i caratteri che
+    Python non conosce (scritture recenti) non contano come segni."""
+    return bool(t) and all(unicodedata.category(c)[0] in 'NPSZ' or unicodedata.category(c) == 'Cf' for c in t)
+
+
+def scheletro(forma):
+    """Le consonanti di una forma ricostruita, in ordine, per confrontare una parola con la sua radice: le laringali,
+    i segmenti facoltativi («(s)», «(H)», «⁽ʷ⁾»), gli accenti e la labializzazione non contano, e nel grado zero w e y
+    valgono u e i (*puH-yós e *pewH-)."""
+    f = unicodedata.normalize('NFD', forma.split('@')[0].lstrip('*'))
+    f = re.sub(r'\([^)]*\)|⁽[^⁾]*⁾', '', f)
+    f = re.sub('[̥̩́̀̄̆͂ʷ]', '', f)
+    f = re.sub(r'h[₁₂₃]|H', '', unicodedata.normalize('NFC', f)).replace('u', 'w').replace('i', 'y')
+    out = []
+    for ch in unicodedata.normalize('NFC', f):
+        if ch in 'aeoāēōəɨ' or not (ch.isalpha() or ch == 'ʰ'):
+            continue
+        if ch == 'ʰ' and out:
+            out[-1] += ch
+        else:
+            out.append(ch)
+    return out
+
+
+def ha_la_forma_della_radice(parola, radice):
+    """Le consonanti della radice compaiono, in ordine, nella parola (*trémti e *trem-; non *úp e *men-)."""
+    p, r = scheletro(parola), scheletro(radice)
+    i = 0
+    for c in p:
+        if i < len(r) and c == r[i]:
+            i += 1
+    return i == len(r)
 
 
 def discende_da(a, b):
@@ -636,6 +689,10 @@ class Importatore:
         # un lemma già in alfabeto latino non ha traslitterazione: quella che arriva è un pezzo di glossa o di codice
         # («liquid lard(?)» per tucca, «ablative of <i …>manus</i>» per manu) e finirebbe nell'indirizzo della voce
         if translit and re.fullmatch(r"[\sA-Za-zÀ-ɏḀ-ỿ'’·.\-]+", lemma or ''):
+            translit = None
+        # né una forma ricostruita in alfabeto latino con pedici, lettere modificatrici e diacritici (*bʰōw- «literally»,
+        # *-éh₂ «forms action nouns»: facevano ine-pro/literally), né un pezzo di HTML (l'egiziano pr-ꜥꜣ)
+        if translit and ('<' in translit or (ric and LATINO_ESTESO.fullmatch(lemma or ''))):
             translit = None
         if not ric and base_lingua(lingua) == 'grc' and lemma and all(c in CIPRIOTA for c in lemma):
             lingua = 'grc-arp'          # sillabario cipriota: greco arcadocipriota, con il suo indice
@@ -1108,7 +1165,15 @@ class Importatore:
             return prima
         if l.get('propria') and l['glosse'].get(l['propria']):
             return l['propria']
-        return l['glosse'].most_common(1)[0][0]
+        glosse = l['glosse']
+        if l['ricostruito']:
+            # per una forma ricostruita una glossa che è un affisso è il suo discendente, non il suo senso (*-kos «-y»,
+            # dalle pagine inglesi): senza un'altra candidata nessuna glossa, e nel database resta quella che c'è
+            glosse = Counter({g: n for g, n in glosse.items() if not re.fullmatch(r'-\S+|\S+-', g.strip())})
+            if not glosse:
+                self.stat['glosse_affisso_scartate'] += 1
+                return None
+        return glosse.most_common(1)[0][0]
 
     def nomi_tedeschi(self):
         """In tedesco la maiuscola è dei nomi comuni: una voce con la maiuscola, di una parola, senza voce nel dump e senza
@@ -1199,7 +1264,7 @@ class Importatore:
         """Le voci che non sono parole (lemma_valido) escono, con gli archi che le toccano; un'ipotesi che resta senza
         archi esce anch'essa: meglio nessuna etimologia che una catena attraverso un frammento di testo."""
         via = {k for k, l in self.lessemi.items() if not lemma_valido(l['lingua'], l['lemma'], l['ricostruito'])
-               or NUMERALI_EGEI.match(l['lemma'] or '')
+               or NUMERALI_EGEI.match(l['lemma'] or '') or senza_lettere(l['lemma'])
                or (l['glosse'] and all(SEGNO_DI_SCRITTURA.match(g) for g in l['glosse']))}
         self.togli(via, 'ipotesi_tolte_non_valide')
         self.stat['voci_non_valide'] = len(via)
@@ -1646,6 +1711,15 @@ class Importatore:
             if n1 < 2 and not diretti[cima][radice] and sotto[cima] >= CIMA_GRANDE:
                 self.stat['radici_con_un_solo_voto_lontano'] += 1
                 continue
+            # nella stessa lingua la cima ha la forma della sua radice: *dwóh₁ «due» non viene da *pel- «piegare»
+            # (twofold), *úp non viene da *men- (i composti con mind). Il 17 novembre 2026 toglie 26 archi su circa 1.100:
+            # una dozzina sbagliati, che trascinavano famiglie intere, e otto giusti ma piccoli (*téḱsneh₂ < *tetḱ-, metatesi).
+            # Gli affissi no: -stasis < *steh₂-, -γένεια < *ǵenh₁- vengono da una parola, e il ripiego è quasi sempre giusto
+            lc = self.lessemi[cima]
+            if lc['ricostruito'] and lc['lingua'] == self.lessemi[radice]['lingua'] \
+                    and not ha_la_forma_della_radice(lc['lemma'], self.lessemi[radice]['lemma']):
+                self.stat['radici_senza_la_forma_della_cima'] += 1
+                continue
             kh = cima + '#wikt-radice'
             self.ipotesi[kh] = {'chiave': kh, 'esito': cima, 'etichetta': 'Wiktionary (radice dichiarata)', 'stato': 'accolta',
                                 'confidenza': 2, 'origine': 'etimo', 'nota': None}
@@ -1907,6 +1981,11 @@ class Importatore:
                             var = pref          # en-US, grc-dor, scn-old, fro-nor: varietà della lingua madre
                         if c in ('oc-pro', 'oc-pro-old'):
                             var = 'oc'
+                    # le germaniche non curate con il loro antenato (svedese < svedese antico): senza, nel database
+                    # un'eredità svedese < svedese antico diventava un legame generico (eredita_fuori_genealogia)
+                    if c in ANTENATI_GERMANICI:
+                        ant = ANTENATI_GERMANICI[c]
+                        fam, ramo = fam or 'indoeuropea', ramo or 'germanica'
                 # ricostruita: -pro su un codice di famiglia (oc-pro è il provenzale, non una protolingua)
                 ric = c.endswith('-pro') and len(c.split('-')[0]) >= 3
                 f.write('\t'.join(esc(x) for x in (c, nit, sit, nen, sen, fam, ramo, ant, var, 't' if ric else 'f', lat, lon)) + '\n')

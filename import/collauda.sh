@@ -586,6 +586,40 @@ assert archi == {('agăța', '*accaptiare', 'a-'), ('preot', 'presbyter', None)}
 # dal sabino; e il sabino discende dal protoitalico
 from wiktionary import antenato_lingua, nome_pagina
 assert antenato_lingua('sbv') == 'itc-pro'
+# dentro le lingue germaniche l'antenato immediato: l'inglese discende dall'antico inglese, lo svedese dal norreno, l'afrikaans
+# dall'olandese; non il contrario, e lo yiddish non è un antenato del tedesco
+from wiktionary import discende_da
+assert discende_da('en', 'ang') and discende_da('sv', 'non') and discende_da('af', 'nl') and discende_da('en', 'gem-pro')
+assert not discende_da('ang', 'en') and not discende_da('non', 'sv') and not discende_da('de', 'yi') and not discende_da('da', 'nb')
+# il ripiego sulla radice dichiarata: nella stessa lingua la cima ha la forma della radice (*trémti < *trem-, *puH-yós
+# < *pewH-, *ḱád-e-ti < *ḱh₂d-, *teh₂tis < *(s)teh₂-), non *úp < *men- né *dwóh₁ < *pel-
+from wiktionary import ha_la_forma_della_radice as _hf
+assert _hf('trémti', 'trem-') and _hf('puH-yós', 'pewH-') and _hf('ḱád-e-ti', 'ḱh₂d-') and _hf('teh₂tis', '(s)teh₂-')
+assert _hf('h₁wogʷʰ-eye-ti', 'h₁wegʷʰ-') and _hf('wi-wǵʰ-é-ti', 'weǵʰ-') and _hf('káput', 'kap-')
+assert not _hf('úp', 'men-') and not _hf('dwóh₁', 'pel-') and not _hf('dóru', 'weyd-')
+# una forma ricostruita in alfabeto latino non ha traslitterazione (*bʰōw- «literally»), e nessuna voce ne ha una di HTML;
+# le altre scritture la tengono
+imp = Importatore()
+assert imp.lessemi[imp.lessema('ine-pro', '*bʰōw-', translit='literally')]['translit'] is None
+assert imp.lessemi[imp.lessema('egy', 'pr-ꜥꜣ', translit='<i class="Latn mention">pr-ꜥꜣ</i>')]['translit'] is None
+assert imp.lessemi[imp.lessema('got', '*𐌲𐌰𐌱𐌹𐌻𐌰', translit='*gabila')]['translit'] == '*gabila'
+# per una forma ricostruita una glossa che è un affisso è il suo discendente (*-kos «-y»), non il suo senso
+imp = Importatore()
+_k = imp.lessema('ine-pro', '*-kos', glossa='-y')
+assert imp.scegli_glossa(imp.lessemi[_k]) is None
+imp.lessema('ine-pro', '*-kos', glossa='adjectival suffix')
+assert imp.scegli_glossa(imp.lessemi[_k]) == 'adjectival suffix'
+# un lemma di sole cifre o segni non è una parola
+from wiktionary import senza_lettere
+assert senza_lettere('24') and senza_lettere('+') and senza_lettere('++') and senza_lettere('🎻') and senza_lettere('1-2-3')
+assert not senza_lettere('ἄλφα') and not senza_lettere('18-enne') and not senza_lettere('h₂ner') and not senza_lettere('')
+# e la tabella delle lingue porta quell'antenato anche per le germaniche non curate (svedese < svedese antico)
+import tempfile
+imp = Importatore()
+imp.lessema('sv', 'djur'); imp.lessema('gmq-osw', 'diur')
+_d = tempfile.mkdtemp(); imp.scrivi(_d)
+_l = {r.split('\t')[0]: r.rstrip('\n').split('\t') for r in open(_d + '/lingue.tsv', encoding='utf-8')}
+assert _l['sv'][5:8] == ['indoeuropea', 'germanica', 'gmq-osw'] and _l['gmq-osw'][7] == 'non', (_l['sv'], _l['gmq-osw'])
 imp = Importatore()
 imp.chiusura['ine-pro'] = {'voci': [], 'omografi': {}, 'forme': {}, 'participi': {}, 'flesse': {}, 'file_glosse': None,
                            'lemmi': {nome_pagina('ine-pro', 'h₂nḗr')}}
