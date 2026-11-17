@@ -27,7 +27,9 @@ from collections import Counter, defaultdict
 
 CATENA = {'inh': 'eredita', 'inh+': 'eredita', 'bor': 'prestito', 'bor+': 'prestito', 'ubor': 'prestito', 'obor': 'prestito',
           'lbor': 'prestito_dotto', 'slbor': 'semidotto', 'der': 'generico', 'der+': 'generico', 'uder': 'generico',
-          'cal': 'calco', 'calque': 'calco', 'sl': 'calco_semantico', 'psm': 'calco'}
+          'cal': 'calco', 'calque': 'calco', 'sl': 'calco_semantico', 'psm': 'calco',
+          # la parola semitica e la sua radice triconsonantica (filtra.py, radice_semitica): كِتَاب < ك ت ب
+          'radice': 'derivazione'}
 LOCALI = {'bf': 'retroformazione', 'back-form': 'retroformazione', 'clipping': 'accorciamento', 'ellipsis': 'accorciamento',
           'named-after': 'deonimico', 'deverbal': 'derivazione',
           # una voce senza etimologia che è la variante di un'altra (filtra.py, variante_di): ὄνυμα < ὄνομα
@@ -460,7 +462,9 @@ def antenato_lingua(c):
     c = base_lingua(c)
     if c in ROMANZE:
         return 'la'
-    if c in ('la', 'osc', 'xum', 'xfa', 'itc-ola'):
+    # con le lingue sabelliche minori (sabino, piceno meridionale, volsco, equo, marso, vestino): senza, *h₂nḗr «uomo»
+    # risultava preso in prestito dal sabino nerō (dalla pagina di Nero), e la famiglia indoeuropea finiva sotto una parola sabina
+    if c in ('la', 'osc', 'xum', 'xfa', 'itc-ola', 'sbv', 'spx', 'xvo', 'xae', 'xmr', 'xvs'):
         return 'itc-pro'
     if c in ('el', 'gkm'):
         return 'grc'
@@ -619,6 +623,11 @@ class Importatore:
             lingua, termine = codice_lingua(m.group(1)), m.group(2)
         # due grafie in un rimando («minuzza//minuzzare», «lě / *li»): vale la prima
         termine = re.split(r'\s*//\s*|\s+/\s+', termine)[0]
+        # «*h₃ed- (bite)»: una radice con il suo identificativo tra parentesi, come nei nomi delle categorie di Wiktionary;
+        # letta così diventava una voce a sé (54 voci, 77 archi: *mey- (change), *peḱ- (pluck))
+        m = re.fullmatch(r'(\*\S+-) \(([a-z][a-z ]*)\)', termine)
+        if m:
+            termine, ident = m.group(1), ident or m.group(2)
         termine = nome_pagina(lingua, termine)
         ric = termine.startswith('*')
         if not ric and lingua in VARIETA_ATTESTATE:
@@ -718,6 +727,7 @@ class Importatore:
         catena_attiva = True
         primo = True
         alternative = []                # le altre ipotesi del testo, un etimo ciascuna, con certezza al massimo 2
+        in_attesa = None                # «{{af|ro|a-}} + {{inh|ro|la-vul|*accaptiāre}}»: il prefisso aspetta la base
         for t in tpl:
             n, a, e = t['n'], t['a'], t.get('e') or ''
             pos_t = testo.find(e, cursore) if e else -1
@@ -783,7 +793,9 @@ class Importatore:
                     self.stat['composti_di_elementi'] += 1
                 if not basi:
                     self.stat['solo_affissi'] += 1
-                    catena_attiva = False
+                    # un prefisso senza base (agăța = a- + *accaptiāre): l'etimo dopo il «+» è la base, e la catena
+                    # non si ferma; senza un «+» dopo, si ferma come prima
+                    in_attesa = affissi
                     continue
                 tipo = 'derivazione' if len(basi) == 1 else 'composizione'
                 for i, (b, lb) in enumerate(basi, 1):
@@ -835,6 +847,9 @@ class Importatore:
                 if not lingua or not termine or termine == '-':
                     continue
                 termine = pulisci_parte(termine)[0]
+                if in_attesa is not None and not (primo and '+' in connettore):
+                    catena_attiva = False      # il prefisso non ha trovato la sua base: la catena si ferma
+                    continue
                 if '<' in termine or '>' in termine:
                     self.stat['termini_con_modificatori_annidati'] += 1
                     continue
@@ -863,6 +878,11 @@ class Importatore:
                 if not tr and mostra is None and re.search(r'[^\x00-\u024f]', termine):
                     m = re.search(re.escape(termine) + r' \(([^,“”()]+)', e)
                     tr = m.group(1).strip() if m else None
+                if primo and not lemma_valido(codice_lingua(lingua) or lingua, termine, termine.startswith('*')):
+                    # «{{inh+|ro|la-vul||preb(i)ter}} or … {{inh|ro|la|presbyter}}» (preot): un primo etimo che non è una
+                    # forma valida uscirebbe con tutta l'ipotesi; vale l'etimo successivo
+                    self.stat['primi_etimi_non_validi_saltati'] += 1
+                    continue
                 self.nome_lingua(t, termine, mostra)
                 lingua, termine, omo_t, forma_extra = self.risolvi(lingua, termine, mostra)
                 mostra = mostra or forma_extra
@@ -887,10 +907,14 @@ class Importatore:
                     self.stat['primi_anelli_alternativi'] += 1
                 if primo:
                     if kt != k0:
-                        archi.append({'etimo': kt, 'esito': k0, 'tipo': tipo, 'ordine': 1, 'affisso': None,
+                        archi.append({'etimo': kt, 'esito': k0, 'tipo': tipo, 'ordine': 1,
+                                      'affisso': ' '.join(in_attesa) if in_attesa else None,
                                       'conf': min(conf, conf_voce), 'forma': mostra})
+                        if in_attesa:
+                            self.stat['prefissi_con_la_base_dopo_il_piu'] += 1
                         if glossa_t and termine.startswith('*') and termine.endswith('-'):
                             self.glossa_arco.setdefault((k0, kt), glossa_t)
+                    in_attesa = None
                     primo, prec = False, kt
                     continue
                 # «три (… ultimately from *tréyes) + зуб (… ultimately from *ǵómbʰos)»: dopo un «+», o dentro una
@@ -1338,12 +1362,20 @@ class Importatore:
         self.formazioni_ambigue = {m(k) for k in self.formazioni_ambigue}
         self.stat['identificativi_uniti'] = len(mappa)
 
+    def ha_pagina(self, k):
+        """La voce ha una sua pagina nel dump della sua lingua di chiusura, anche senza etimologia (elenco delle pagine)."""
+        l = self.lessemi.get(k) or {}
+        idx = self.chiusura.get(l.get('lingua'))
+        return bool(idx) and nome_pagina(l['lingua'], l['lemma']) in idx['lemmi']
+
     def risolvi_intermedi(self):
         for esito, conta in self.intermedi.items():
             if esito in self.ipotesi:     # la voce ha già una sua etimologia
                 continue
-            if esito in self.lette and self.lessemi.get(esito, {}).get('lingua') == 'ine-pro':
-                # *tréyes: la sua pagina non dà un etimo, e una catena di un'altra pagina non gliene dà uno
+            if self.lessemi.get(esito, {}).get('lingua') == 'ine-pro' and (esito in self.lette or self.ha_pagina(esito)):
+                # *tréyes: la sua pagina non dà un etimo, e una catena di un'altra pagina non gliene dà uno. Conta che la
+                # pagina ci sia, anche senza etimologia (e allora il filtro non la passa da leggere): *h₂nḗr prendeva
+                # «borrowed from Sabine nerō» dalla frase dopo la sua catena nella pagina di Nero
                 self.stat['intermedi_pie_senza_etimo'] += 1
                 continue
             # gli anelli impossibili non si offrono nemmeno come alternative

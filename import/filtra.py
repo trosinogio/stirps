@@ -4,7 +4,7 @@ from collections import Counter
 LINGUA = os.environ.get('LINGUA', 'it')
 UTILI = {'inh', 'inh+', 'bor', 'bor+', 'lbor', 'slbor', 'ubor', 'obor', 'der', 'der+', 'uder', 'cal', 'calque', 'sl', 'psm',
          'bf', 'back-form', 'clipping', 'ellipsis', 'af', 'affix', 'suffix', 'prefix', 'confix', 'compound', 'blend',
-         'named-after', 'onom', 'onomatopoeic', 'unk', 'unc', 'root', 'doublet', 'dbt', 'it-deverbal', 'etydate', 'deverbal'}
+         'named-after', 'onom', 'onomatopoeic', 'unk', 'unc', 'root', 'doublet', 'dbt', 'it-deverbal', 'etydate', 'deverbal', 'radice'}
 MENZIONI = {'m', 'l', 'm+', 'mention', 'link', 'l-self'}
 # abbreviazioni dei modelli classici, con gli stessi argomenti
 ALIAS = {'suf': 'suffix', 'pre': 'prefix', 'com': 'compound', 'com+': 'compound', 'con': 'confix', 'univ': 'af',
@@ -16,7 +16,7 @@ ALIAS = {'suf': 'suffix', 'pre': 'prefix', 'com': 'compound', 'com+': 'compound'
 # i modelli che portano un etimo (gli altri utili sono radici, date, doppioni, origini ignote…)
 CON_ETIMO = {'inh', 'inh+', 'bor', 'bor+', 'lbor', 'slbor', 'ubor', 'obor', 'der', 'der+', 'uder', 'cal', 'calque', 'sl',
              'psm', 'bf', 'back-form', 'clipping', 'ellipsis', 'af', 'affix', 'suffix', 'prefix', 'confix', 'compound',
-             'blend', 'it-deverbal', 'deverbal'}
+             'blend', 'it-deverbal', 'deverbal', 'radice'}
 # {{ety}} e {{etymon}}, il sistema nuovo di Wiktionary (21.527 voci latine a novembre 2026): argomento 1 la lingua della
 # voce, poi parole chiave con i due punti (:inh, :bor, :af…) seguite dai loro termini, «lingua:termine<id:…><alt:…><t:…>»
 # o solo «termine» se è della stessa lingua; senza parola chiave vale :from. Dicono solo il primo livello: gli etimi
@@ -224,6 +224,31 @@ def da_ety(t, lingua):
                 args[dove] = mod[k]
         return {'name': nome, 'args': args, 'expansion': ''}
     return None
+# Le radici semitiche: la parola araba, ebraica o maltese dichiara la sua radice triconsonantica ({{etymon|ar|:root|ك ت ب}},
+# {{ar-root|ك ت ب}}, il riquadro {{ar-rootbox}}, {{he-root}}, {{mt-root}}). Quando la pagina non dà un altro etimo, la parola
+# viene dalla sua radice, che è la cima della famiglia (كِتَاب, مَكْتَب, كَتَبَ sotto ك ت ب): senza, il 16 novembre 2026,
+# 191 mila voci arabe restavano senza etimologia.
+MODELLI_RADICE = {'ar-root': 'ar', 'ar-rootbox': 'ar', 'he-root': 'he', 'he-rootbox': 'he', 'mt-root': 'mt', 'mt-rootbox': 'mt'}
+
+
+def radice_semitica(tpl, lingua):
+    """La radice che la voce dichiara, come modello «radice» (una derivazione): None se non ne dichiara una."""
+    for t in tpl:
+        n, a = t.get('name'), t.get('args') or {}
+        if n in ('ety', 'etymon'):
+            vals = [v.strip() for k, v in sorted(((int(k), v) for k, v in a.items() if k.isdigit() and int(k) >= 2 and v and v.strip()))]
+            for i, x in enumerate(vals):
+                if x.split('<')[0] == ':root' and i + 1 < len(vals) and not vals[i + 1].startswith(':'):
+                    r = vals[i + 1].split('<')[0].strip()
+                    if r:
+                        return {'name': 'radice', 'args': {'1': lingua, '2': (a.get('1') or lingua).strip(), '3': r}, 'expansion': ''}
+        elif n in MODELLI_RADICE:
+            r = (a.get('1') or '').strip()
+            if r and MODELLI_RADICE[n] == lingua:
+                return {'name': 'radice', 'args': {'1': lingua, '2': lingua, '3': r}, 'expansion': ''}
+    return None
+
+
 DA_TESTO = re.compile(r'^\s*(from|derived from|deverbal from|back-formation from)\b', re.I)
 # Le etimologie scritte solo a parole, senza modelli («Deverbal of domandare», «Past participle of trovare»,
 # «From Latin dominus», «From divertire +‎ -ente»): i nomi delle lingue che si leggono nel testo
@@ -623,7 +648,7 @@ def forme_per_analisi(v):
 
 
 if __name__ == '__main__':
-    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = non_parole = dal_testo = radici_dalla_ety = varianti_legate = basi_dalla_menzione = 0
+    n = tenuti = flesse = senza = promosse = flesse_dalla_glossa = dalla_ety = non_parole = dal_testo = radici_dalla_ety = varianti_legate = basi_dalla_menzione = dalle_radici = 0
     esempi_testo = 0
     out = open(sys.argv[1], 'w', encoding='utf-8')
     glosse = open(sys.argv[2], 'w', encoding='utf-8')
@@ -722,6 +747,9 @@ if __name__ == '__main__':
             if conv:
                 classici = [conv] + classici
                 dalla_ety += 1
+            elif (conv := radice_semitica(tpl, LINGUA)):
+                classici = [conv] + classici
+                dalle_radici += 1
             else:
                 conv = base_dalla_menzione(v, LINGUA)
                 if conv:
@@ -772,7 +800,7 @@ if __name__ == '__main__':
                               'se': dati_scheda(v),
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
-    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}; con una radice dichiarata da {{{{ety}}}} {radici_dalla_ety}; varianti senza etimologia legate al lemma {varianti_legate}; basi lette dalla menzione prima del suffisso {basi_dalla_menzione}), forme flesse {flesse} '
+    print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}; con una radice dichiarata da {{{{ety}}}} {radici_dalla_ety}; varianti senza etimologia legate al lemma {varianti_legate}; basi lette dalla menzione prima del suffisso {basi_dalla_menzione}; dalla radice semitica {dalle_radici}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}, sigle e simboli esclusi {non_parole}', file=sys.stderr)
     if discendenti_f:

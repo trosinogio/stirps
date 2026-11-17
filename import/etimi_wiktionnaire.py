@@ -81,6 +81,28 @@ def pulisci(testo):
     return NOME_INIZIALE.sub('', DATA.sub('', t).strip())
 
 
+# l'infinito di un verbo latino e la sua prima persona, la forma dei lemmi latini (calculare → calculo, docere → doceo,
+# audire → audio, legere → lego, hortari → hortor, vereri → vereor, loqui → loquor): le regole del confronto tra i due Wiktionary
+INFINITI = [('āre', ('ō', 'o')), ('are', ('o',)), ('ēre', ('eō', 'eo')), ('ere', ('eo', 'o', 'io')), ('īre', ('iō', 'io')), ('ire', ('io',)),
+            ('ārī', ('or',)), ('ari', ('or',)), ('ērī', ('eor',)), ('eri', ('eor',)), ('īrī', ('ior',)), ('iri', ('ior',)), ('ī', ('or',)), ('i', ('or',))]
+
+
+def verbo_latino(e, voci):
+    """La voce latina del dizionario per un etimo all'infinito; l'etimo com'è se è già una voce o se nessuna forma lo è."""
+    n = unicodedata.normalize('NFC', e)
+    if ('la', n) in voci:
+        return e
+    piano = ''.join(c for c in unicodedata.normalize('NFD', n) if unicodedata.category(c) != 'Mn')
+    for fine, sostituti in INFINITI:
+        for forma in (n, piano):
+            if forma.endswith(fine) and len(forma) > len(fine) + 1:
+                for x in sostituti:
+                    cand = unicodedata.normalize('NFC', forma[:-len(fine)] + x)
+                    if ('la', cand) in voci:
+                        return cand
+    return e
+
+
 def leggi(testo, parola, propria='fr'):
     """Le righe (ordine, lingua, etimo, tipo, affisso, certezza) di una frase del Wiktionnaire, o [] se non è una frase
     che sappiamo leggere. Conta la prima frase, fino al punto e virgola o al punto; per «Du latin X, …» basta l'inizio.
@@ -199,6 +221,9 @@ if __name__ == '__main__':
             # per la diagnosi: come comincia una frase che non sappiamo leggere («Dérivé de», «Du latin», «Mot»…)
             non_lette[propria][' '.join(pulisci(testi[0]).split()[:2]).lower()] += 1
             continue
+        if voci is not None:
+            # «Du latin calculare» (calculer): l'infinito latino va alla voce del dizionario, alla prima persona (calculo)
+            righe = [(o, l, verbo_latino(e, voci) if l == 'la' else e, t, a, k) for o, l, e, t, a, k in righe]
         if voci is not None and (((propria, unicodedata.normalize('NFC', parola)) not in voci)
                                  or any((l, unicodedata.normalize('NFC', e)) not in voci for _, l, e, _, _, _ in righe)):
             c['non voci'] += 1

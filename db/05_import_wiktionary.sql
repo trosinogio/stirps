@@ -100,10 +100,17 @@ begin
   r := r || jsonb_build_object('voci_dei_dizionari_cedute', n);
   create temp table m_les (chiave text primary key, id bigint not null) on commit drop;
   insert into m_les select s.chiave, l.id from stg_lessema s join lessema l on l.id_esterno = s.chiave;
+  -- per lingua, lemma e numero d'omografo solo una riga che nessun'altra voce del pacchetto ha già preso per
+  -- identificativo: se i numeri d'omografo cambiano tra due pacchetti, *kap-@head (omografo 2 nel pacchetto nuovo)
+  -- finiva nella riga di *kap-@seize (omografo 2 nel vecchio), e due radici diverse diventavano una famiglia sola (*kap-²,
+  -- 3.929 parole; il 17 novembre 2026 260 voci fuse così). La voce senza riga entra come voce nuova, all'omografo libero.
   insert into m_les
   select s.chiave, l.id from stg_lessema s
     join lessema l on l.lingua = s.lingua and l.lemma = s.lemma and l.omografo = s.omografo
    where not exists (select 1 from m_les m where m.chiave = s.chiave)
+     and not exists (select 1 from m_les m where m.id = l.id)
+     and (l.id_esterno is null or l.id_esterno = s.chiave
+          or not exists (select 1 from stg_lessema s2 where s2.chiave = l.id_esterno))
   on conflict do nothing;
   -- la stessa parola registrata in una varietà (lat. mediev. zephirum) o nella lingua madre (lat. zephirum)
   insert into m_les
