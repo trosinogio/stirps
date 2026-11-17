@@ -1696,14 +1696,11 @@ class Importatore:
             if n1 < 2 and not diretti[cima][radice] and sotto[cima] >= CIMA_GRANDE:
                 self.stat['radici_con_un_solo_voto_lontano'] += 1
                 continue
-            # un affisso o un segno non prende una radice per ripiego (*-ónts, «+»): i voti vengono dalle parole che lo
-            # contengono, e dichiarano la radice della loro base
-            lc = self.lessemi[cima]
-            if lc['lemma'].startswith('-') or not re.search(r'[^\W\d_]', lc['lemma']):
-                self.stat['radici_per_un_affisso'] += 1
-                continue
             # nella stessa lingua la cima ha la forma della sua radice: *dwóh₁ «due» non viene da *pel- «piegare»
-            # (twofold), *úp non viene da *men- (i composti con mind); il 17 novembre 2026 23 archi su 1.043, due su tre sbagliati
+            # (twofold), *úp non viene da *men- (i composti con mind). Il 17 novembre 2026 toglie 26 archi su circa 1.100:
+            # una dozzina sbagliati, che trascinavano famiglie intere, e otto giusti ma piccoli (*téḱsneh₂ < *tetḱ-, metatesi).
+            # Gli affissi no: -stasis < *steh₂-, -γένεια < *ǵenh₁- vengono da una parola, e il ripiego è quasi sempre giusto
+            lc = self.lessemi[cima]
             if lc['ricostruito'] and lc['lingua'] == self.lessemi[radice]['lingua'] \
                     and not ha_la_forma_della_radice(lc['lemma'], self.lessemi[radice]['lemma']):
                 self.stat['radici_senza_la_forma_della_cima'] += 1
