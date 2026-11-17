@@ -581,6 +581,10 @@ imp.voce({'w': 'preot', 'p': 'noun', 't': 'Vulgar Latin preb(i)ter, popular vari
     {'n': 'inh', 'a': {'1': 'ro', '2': 'la', '3': 'presbyter'}, 'e': 'Latin presbyter'}]}, lingua_voce='ro')
 archi = {(r['esito'].split(':', 2)[2], r['etimo'].split(':', 2)[2], r['affisso']) for r in imp.relazioni}
 assert archi == {('agăța', '*accaptiare', 'a-'), ('preot', 'presbyter', None)}, archi
+# il Wiktionnaire scrive l'etimo latino all'infinito («Du latin calculare»): va alla voce del dizionario, alla prima persona
+from etimi_wiktionnaire import verbo_latino
+_v = {('la', 'calculo'), ('la', 'loquor'), ('la', 'rosa')}
+assert (verbo_latino('calculāre', _v), verbo_latino('loqui', _v), verbo_latino('rosa', _v), verbo_latino('xyzare', _v)) == ('calculo', 'loquor', 'rosa', 'xyzare')
 # le radici semitiche: la parola araba dichiara la sua radice ({{etymon|ar|:root|…}}, {{ar-root}}, {{ar-rootbox}}) e, se la pagina
 # non dà un altro etimo, ne deriva; una radice di un'altra lingua (ar-root in una voce italiana) non conta
 from filtra import radice_semitica as rs
