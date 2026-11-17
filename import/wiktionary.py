@@ -525,6 +525,9 @@ def forma_ricostruita(l):
     return 'tema' if '-' in l['lemma'].strip('-') else 'radice'
 
 
+LATINO_ESTESO = re.compile("[A-Za-zÀ-ɏḀ-ỿɐ-ʯʰ-˿ᴀ-ᶿⱠ-Ɀ꜠-ꟿ₀-₉⁰-⁹̀-ͯ'’ .·()/⁽⁾~=+*\\-]+")
+
+
 def senza_lettere(t):
     """Un lemma fatto solo di cifre, segni e simboli non è una parola (it:24, sv:+, mul:++, un'emoji); i caratteri che
     Python non conosce (scritture recenti) non contano come segni."""
@@ -686,6 +689,10 @@ class Importatore:
         # un lemma già in alfabeto latino non ha traslitterazione: quella che arriva è un pezzo di glossa o di codice
         # («liquid lard(?)» per tucca, «ablative of <i …>manus</i>» per manu) e finirebbe nell'indirizzo della voce
         if translit and re.fullmatch(r"[\sA-Za-zÀ-ɏḀ-ỿ'’·.\-]+", lemma or ''):
+            translit = None
+        # né una forma ricostruita in alfabeto latino con pedici, lettere modificatrici e diacritici (*bʰōw- «literally»,
+        # *-éh₂ «forms action nouns»: facevano ine-pro/literally), né un pezzo di HTML (l'egiziano pr-ꜥꜣ)
+        if translit and ('<' in translit or (ric and LATINO_ESTESO.fullmatch(lemma or ''))):
             translit = None
         if not ric and base_lingua(lingua) == 'grc' and lemma and all(c in CIPRIOTA for c in lemma):
             lingua = 'grc-arp'          # sillabario cipriota: greco arcadocipriota, con il suo indice
@@ -1158,7 +1165,15 @@ class Importatore:
             return prima
         if l.get('propria') and l['glosse'].get(l['propria']):
             return l['propria']
-        return l['glosse'].most_common(1)[0][0]
+        glosse = l['glosse']
+        if l['ricostruito']:
+            # per una forma ricostruita una glossa che è un affisso è il suo discendente, non il suo senso (*-kos «-y»,
+            # dalle pagine inglesi): senza un'altra candidata nessuna glossa, e nel database resta quella che c'è
+            glosse = Counter({g: n for g, n in glosse.items() if not re.fullmatch(r'-\S+|\S+-', g.strip())})
+            if not glosse:
+                self.stat['glosse_affisso_scartate'] += 1
+                return None
+        return glosse.most_common(1)[0][0]
 
     def nomi_tedeschi(self):
         """In tedesco la maiuscola è dei nomi comuni: una voce con la maiuscola, di una parola, senza voce nel dump e senza

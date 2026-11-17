@@ -597,6 +597,18 @@ from wiktionary import ha_la_forma_della_radice as _hf
 assert _hf('trémti', 'trem-') and _hf('puH-yós', 'pewH-') and _hf('ḱád-e-ti', 'ḱh₂d-') and _hf('teh₂tis', '(s)teh₂-')
 assert _hf('h₁wogʷʰ-eye-ti', 'h₁wegʷʰ-') and _hf('wi-wǵʰ-é-ti', 'weǵʰ-') and _hf('káput', 'kap-')
 assert not _hf('úp', 'men-') and not _hf('dwóh₁', 'pel-') and not _hf('dóru', 'weyd-')
+# una forma ricostruita in alfabeto latino non ha traslitterazione (*bʰōw- «literally»), e nessuna voce ne ha una di HTML;
+# le altre scritture la tengono
+imp = Importatore()
+assert imp.lessemi[imp.lessema('ine-pro', '*bʰōw-', translit='literally')]['translit'] is None
+assert imp.lessemi[imp.lessema('egy', 'pr-ꜥꜣ', translit='<i class="Latn mention">pr-ꜥꜣ</i>')]['translit'] is None
+assert imp.lessemi[imp.lessema('got', '*𐌲𐌰𐌱𐌹𐌻𐌰', translit='*gabila')]['translit'] == '*gabila'
+# per una forma ricostruita una glossa che è un affisso è il suo discendente (*-kos «-y»), non il suo senso
+imp = Importatore()
+_k = imp.lessema('ine-pro', '*-kos', glossa='-y')
+assert imp.scegli_glossa(imp.lessemi[_k]) is None
+imp.lessema('ine-pro', '*-kos', glossa='adjectival suffix')
+assert imp.scegli_glossa(imp.lessemi[_k]) == 'adjectival suffix'
 # un lemma di sole cifre o segni non è una parola
 from wiktionary import senza_lettere
 assert senza_lettere('24') and senza_lettere('+') and senza_lettere('++') and senza_lettere('🎻') and senza_lettere('1-2-3')

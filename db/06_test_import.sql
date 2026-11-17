@@ -242,14 +242,21 @@ select pg_temp.verifica(
 
 \echo '— traslitterazioni finte'
 do $$
-declare v_id bigint := lx('it/carne');
+declare v_id bigint := lx('it/carne'); v_r bigint;
 begin
   -- una traslitterazione che è un pezzo di glossa (tucca, «liquid lard(?)») fa l'indirizzo; il pacchetto non la dà più
   update lessema set translit = 'liquid lard(?)' where id = v_id;
   perform pg_temp.verifica((select slug from lessema where id = v_id) <> 'it/carne', 'una traslitterazione finta cambia l''indirizzo');
+  -- e lo stesso su una forma ricostruita con pedici e lettere modificatrici (*bʰōw-, «literally»: ine-pro/literally)
+  v_r := (select l.id from lessema l join stg_lessema s on s.chiave = l.id_esterno
+           where l.ricostruito and l.provenienza = 'wiktionary' and s.translit is null and l.lemma ~ '[₁₂₃ʰʷ]'
+           order by l.id limit 1);
+  update lessema set translit = 'literally' where id = v_r;
   perform importa_wiktionary();
   perform pg_temp.verifica((select translit is null and slug = 'it/carne' from lessema where id = v_id),
     'il nuovo import toglie la traslitterazione finta da un lemma in alfabeto latino, e l''indirizzo torna quello giusto');
+  perform pg_temp.verifica(v_r is not null and (select translit is null and slug not like '%literally%' from lessema where id = v_r),
+    'e da una forma ricostruita in alfabeto latino con pedici e lettere modificatrici');
   raise exception using errcode = 'P0098', message = 'annulla';
 exception when sqlstate 'P0098' then null;
 end $$;

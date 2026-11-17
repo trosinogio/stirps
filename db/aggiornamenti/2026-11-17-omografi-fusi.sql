@@ -2,6 +2,8 @@
 -- riga che un'altra voce del pacchetto ha già per identificativo: quando i numeri d'omografo cambiavano tra due
 -- pacchetti, due radici omografe diverse (*kap-@head e *kap-@seize) finivano in una riga sola, con le loro famiglie
 -- mescolate (260 voci il 17 novembre 2026). La funzione è rigenerata dal file canonico (db/05_import_wiktionary.sql).
+-- E le traslitterazioni sbagliate delle forme ricostruite in alfabeto latino (*bʰōw-, «literally») e quelle fatte di HTML
+-- si tolgono anche quando il pacchetto non ne dà una nuova.
 create or replace function importa_wiktionary() returns jsonb
 language plpgsql as $$
 declare
@@ -118,8 +120,11 @@ begin
       from lessema l join m_scelta s on s.id = l.id
      where l.provenienza = 'wiktionary' and l.stato_editoriale = 'importato'
        -- una traslitterazione che il pacchetto non dà più si toglie solo da un lemma in alfabeto latino: lì era un pezzo
-       -- di glossa (tucca, «liquid lard(?)») e faceva l'indirizzo; per le altre scritture resta quella che c'è
-       and (s.translit is not null or l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿ''’ .·-]+$')
+       -- di glossa (tucca, «liquid lard(?)») e faceva l'indirizzo; per le altre scritture resta quella che c'è. Anche da
+       -- una forma ricostruita in alfabeto latino con pedici, lettere modificatrici e diacritici (*bʰōw-, «literally»:
+       -- ine-pro/literally) e ovunque sia un pezzo di HTML (egy/i-class=latn-mention…)
+       and (s.translit is not null or l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿ''’ .·-]+$' or l.translit ~ '[<>]'
+            or (l.ricostruito and l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿɐ-ʯʰ-˿ᴀ-ᶿⱠ-Ɀ꜠-ꟿ₀-₉⁰-⁹\u0300-\u036f''’ .·()/⁽⁾~=+*-]+$'))
        and l.translit is distinct from s.translit),
   libere as (
     select distinct on (n.nuovo) n.id, n.translit from nuove n
