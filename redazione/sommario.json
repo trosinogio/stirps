@@ -1,12 +1,12 @@
 {
-  "versione_dati": "b1032c33e16a8b55",
+  "versione_dati": "bd43d6d11328a9c9",
   "record": {
-    "lessemi": 121617,
-    "ipotesi": 53452,
-    "passaggi": 27906,
-    "attestazioni": 106686,
+    "lessemi": 121514,
+    "ipotesi": 83511,
+    "passaggi": 46051,
+    "attestazioni": 106683,
     "glosse": 164,
-    "fonti": 46731,
+    "fonti": 64271,
     "accezioni": 6,
     "connessioni": 1,
     "storico": 0
