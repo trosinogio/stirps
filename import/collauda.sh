@@ -586,6 +586,18 @@ assert archi == {('agăța', '*accaptiare', 'a-'), ('preot', 'presbyter', None)}
 # dal sabino; e il sabino discende dal protoitalico
 from wiktionary import antenato_lingua, nome_pagina
 assert antenato_lingua('sbv') == 'itc-pro'
+# dentro le lingue germaniche l'antenato immediato: l'inglese discende dall'antico inglese, lo svedese dal norreno, l'afrikaans
+# dall'olandese; non il contrario, e lo yiddish non è un antenato del tedesco
+from wiktionary import discende_da
+assert discende_da('en', 'ang') and discende_da('sv', 'non') and discende_da('af', 'nl') and discende_da('en', 'gem-pro')
+assert not discende_da('ang', 'en') and not discende_da('non', 'sv') and not discende_da('de', 'yi') and not discende_da('da', 'nb')
+# e la tabella delle lingue porta quell'antenato anche per le germaniche non curate (svedese < svedese antico)
+import tempfile
+imp = Importatore()
+imp.lessema('sv', 'djur'); imp.lessema('gmq-osw', 'diur')
+_d = tempfile.mkdtemp(); imp.scrivi(_d)
+_l = {r.split('\t')[0]: r.rstrip('\n').split('\t') for r in open(_d + '/lingue.tsv', encoding='utf-8')}
+assert _l['sv'][5:8] == ['indoeuropea', 'germanica', 'gmq-osw'] and _l['gmq-osw'][7] == 'non', (_l['sv'], _l['gmq-osw'])
 imp = Importatore()
 imp.chiusura['ine-pro'] = {'voci': [], 'omografi': {}, 'forme': {}, 'participi': {}, 'flesse': {}, 'file_glosse': None,
                            'lemmi': {nome_pagina('ine-pro', 'h₂nḗr')}}

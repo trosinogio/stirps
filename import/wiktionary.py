@@ -451,6 +451,19 @@ ROMANZE = {'it', 'fr', 'es', 'pt', 'ro', 'ca', 'oc', 'fro', 'frm', 'pro', 'gl', 
            'osp', 'roa-ole', 'wa', 'nrf', 'mfe', 'ht'}
 GERMANICHE = {'en', 'ang', 'enm', 'sco', 'de', 'gmh', 'goh', 'gsw', 'lb', 'yi', 'nl', 'dum', 'odt', 'osx', 'nds', 'gml',
               'fy', 'ofs', 'lng', 'frk', 'got', 'non', 'is', 'fo', 'sv', 'da', 'no', 'nb', 'nn', 'gmw-pro', 'gmq-pro', 'gme-pro'}
+# Dentro le lingue germaniche, l'antenato immediato: con tutte le lingue germaniche al protogermanico un arco rovesciato tra
+# inglese e antico inglese, o tra svedese e norreno, non si vedeva, e un discendente dichiarato (inglese sotto l'antico
+# inglese) non era un'eredità. Le altre germaniche discendono direttamente dal protogermanico.
+ANTENATI_GERMANICI = {
+    'en': 'enm', 'sco': 'enm', 'yol': 'enm', 'enm': 'ang', 'ang': 'gmw-pro',
+    'de': 'gmh', 'gsw': 'gmh', 'bar': 'gmh', 'lb': 'gmh', 'yi': 'gmh', 'cim': 'gmh', 'pdc': 'gmh', 'ksh': 'gmh',
+    'swg': 'gmh', 'wae': 'gmh', 'vmf': 'gmh', 'gmw-cfr': 'gmh', 'gmw-rfr': 'gmh', 'hrx': 'gmh', 'gmh': 'goh', 'goh': 'gmw-pro',
+    'nl': 'dum', 'li': 'dum', 'zea': 'dum', 'vls': 'dum', 'af': 'nl', 'dum': 'odt', 'odt': 'gmw-pro', 'frk': 'gmw-pro',
+    'nds': 'gml', 'nds-de': 'gml', 'nds-nl': 'gml', 'pdt': 'gml', 'gml': 'osx', 'osx': 'gmw-pro',
+    'fy': 'ofs', 'stq': 'ofs', 'frr': 'ofs', 'ofs': 'gmw-pro', 'lng': 'gmw-pro',
+    'sv': 'gmq-osw', 'gmq-osw': 'non', 'da': 'gmq-oda', 'gmq-oda': 'non',
+    'nb': 'non', 'nn': 'non', 'no': 'non', 'is': 'non', 'fo': 'non', 'nrn': 'non', 'ovd': 'non', 'non': 'gmq-pro',
+    'gmq-pro': 'gem-pro', 'gmw-pro': 'gem-pro'}
 CELTICHE = {'ga', 'sga', 'mga', 'gd', 'gv', 'cy', 'wlm', 'owl', 'br', 'xbm', 'obt', 'kw', 'xtg', 'xcg', 'xce', 'cel-bry-pro'}
 SLAVE = {'ru', 'orv', 'uk', 'be', 'pl', 'cs', 'sk', 'sl', 'hr', 'sr', 'sh', 'bg', 'mk', 'cu', 'dsb', 'hsb', 'zlw-pro'}
 INDOIRANICHE = {'sa', 'pi', 'pra', 'hi', 'ur', 'bn', 'inc-pro', 'fa', 'pal', 'peo', 'ae', 'xpr', 'ku', 'ps', 'os', 'ira-pro'}
@@ -470,6 +483,8 @@ def antenato_lingua(c):
         return 'grc'
     if c == 'grc':
         return 'grk-pro'
+    if c in ANTENATI_GERMANICI:
+        return ANTENATI_GERMANICI[c]
     if c in GERMANICHE:
         return 'gem-pro'
     if c in CELTICHE:
@@ -1907,6 +1922,11 @@ class Importatore:
                             var = pref          # en-US, grc-dor, scn-old, fro-nor: varietà della lingua madre
                         if c in ('oc-pro', 'oc-pro-old'):
                             var = 'oc'
+                    # le germaniche non curate con il loro antenato (svedese < svedese antico): senza, nel database
+                    # un'eredità svedese < svedese antico diventava un legame generico (eredita_fuori_genealogia)
+                    if c in ANTENATI_GERMANICI:
+                        ant = ANTENATI_GERMANICI[c]
+                        fam, ramo = fam or 'indoeuropea', ramo or 'germanica'
                 # ricostruita: -pro su un codice di famiglia (oc-pro è il provenzale, non una protolingua)
                 ric = c.endswith('-pro') and len(c.split('-')[0]) >= 3
                 f.write('\t'.join(esc(x) for x in (c, nit, sit, nen, sen, fam, ramo, ant, var, 't' if ric else 'f', lat, lon)) + '\n')
