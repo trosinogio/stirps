@@ -179,6 +179,28 @@ begin
      where not exists (select 1 from lessema y where y.id <> n.id and y.slug = n.nuovo)
      order by n.nuovo, n.id)
   update lessema l set translit = f.translit from libere f where l.id = f.id;
+  -- se l'indirizzo senza la traslitterazione finta è di un'altra voce (*bʰōw- e *bʰow-: ine-pro/bhow), la voce passa al
+  -- primo numero d'omografo libero, come una voce nuova qui sotto: altrimenti teneva ine-pro/literally (10 voci il
+  -- 17 novembre 2026). Il numero resta finché l'indirizzo è occupato (pulisci_wiktionary(), passo 5)
+  for rec in select l.id, l.omografo
+               from lessema l join m_scelta s on s.id = l.id
+              where l.provenienza = 'wiktionary' and l.stato_editoriale = 'importato'
+                and s.translit is null and l.translit is not null
+                and (l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿ''’ .·-]+$' or l.translit ~ '[<>]'
+                     or (l.ricostruito and l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿɐ-ʯʰ-˿ᴀ-ᶿⱠ-Ɀ꜠-ꟿ₀-₉⁰-⁹\u0300-\u036f''’ .·()/⁽⁾~=+*-]+$'))
+              order by l.id loop
+    omo := rec.omografo;
+    loop
+      omo := omo + 1;
+      exit when omo > rec.omografo + 9;
+      begin
+        update lessema set translit = null, omografo = omo where id = rec.id;
+        exit;
+      exception when unique_violation then
+        null;
+      end;
+    end loop;
+  end loop;
 
   with ins as (
     insert into lessema (lingua, lemma, omografo, ricostruito, translit, pos, glossa, glossa_lingua,

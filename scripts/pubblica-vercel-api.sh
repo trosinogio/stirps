@@ -49,18 +49,34 @@ url=https://$(jq -r .url <<< "$dep")
 echo "deploy $did ($destinazione): $url"
 
 stato=""
-# fino a 40 minuti: la build rifà l'import quando cambia il pacchetto dati, e con le lingue romanze (16 novembre 2026)
-# l'import dura circa 13 minuti; con 10 minuti di attesa la pubblicazione si dava per fallita mentre Vercel finiva
-for _ in $(seq 1 600); do
-  stato=$(curl -sS "${riprova[@]}" -H "$aut" "$api/v13/deployments/$did?$squadra" | jq -r '.readyState // .status')
-  case "$stato" in READY|ERROR|CANCELED) break;; esac
-  sleep 4
+visto=""
+# fino a 40 minuti di orologio: la build rifà l'import quando cambia il pacchetto dati (con le lingue germaniche, 17 novembre
+# 2026, circa 17 minuti su Neon). Un guasto di rete mentre si aspetta non ferma l'attesa: il deploy va avanti su Vercel
+# anche se GitHub non lo vede. Il 17 novembre 2026 GitHub ha perso Vercel per qualche minuto, curl ha esaurito i suoi
+# tentativi e lo script, con set -e, si è fermato: il deploy è riuscito, ma la pubblicazione risultava fallita
+fine=$(( $(date +%s) + 2400 ))
+while [ "$(date +%s)" -lt "$fine" ]; do
+  if risposta=$(curl -sS --fail-with-body --connect-timeout 30 --max-time 60 -H "$aut" "$api/v13/deployments/$did?$squadra" 2>&1); then
+    stato=$(jq -r '.readyState // .status // empty' <<< "$risposta" 2>/dev/null || true)
+    visto=$(date +%s)
+    case "$stato" in READY|ERROR|CANCELED) break;; esac
+  else
+    echo "Vercel non risponde, riprovo: $(tail -1 <<< "$risposta")"
+  fi
+  sleep 10
 done
-echo "stato: $stato"
-if [ "$stato" != READY ]; then
-  # le ultime righe della build, per capire che cosa non va
-  curl -sS "${riprova[@]}" -H "$aut" "$api/v3/deployments/$did/events?$squadra&limit=-1" \
-    | jq -r '.[]? | (.text // .payload.text // empty)' | tail -40 || true
+echo "stato: ${stato:-sconosciuto}"
+if [ "$stato" = READY ]; then
+  echo "$url"
+  exit 0
+fi
+# le ultime righe della build, per capire che cosa non va
+curl -sS "${riprova[@]}" -H "$aut" "$api/v3/deployments/$did/events?$squadra&limit=-1" \
+  | jq -r '.[]? | (.text // .payload.text // empty)' | tail -40 || true
+if [ "$stato" = ERROR ] || [ "$stato" = CANCELED ]; then
   exit 1
 fi
-echo "$url"
+# né pronto né fallito: la build è ancora in corso, o Vercel non ha più risposto. Il deploy può riuscire da solo: non si
+# rilancia la pubblicazione (due build farebbero due import sul database) prima di aver guardato il sito
+echo "non so come è finito il deploy $did: ultimo stato ${stato:-sconosciuto}, ultima risposta di Vercel $( [ -n "$visto" ] && date -u -d "@$visto" +%H:%M:%S || echo mai)"
+exit 2

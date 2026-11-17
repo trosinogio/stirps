@@ -242,7 +242,7 @@ select pg_temp.verifica(
 
 \echo '— traslitterazioni finte'
 do $$
-declare v_id bigint := lx('it/carne'); v_r bigint;
+declare v_id bigint := lx('it/carne'); v_r bigint; v_o bigint; v_pulito text;
 begin
   -- una traslitterazione che è un pezzo di glossa (tucca, «liquid lard(?)») fa l'indirizzo; il pacchetto non la dà più
   update lessema set translit = 'liquid lard(?)' where id = v_id;
@@ -252,11 +252,25 @@ begin
            where l.ricostruito and l.provenienza = 'wiktionary' and s.translit is null and l.lemma ~ '[₁₂₃ʰʷ]'
            order by l.id limit 1);
   update lessema set translit = 'literally' where id = v_r;
+  -- e se l'indirizzo pulito è già di un'altra voce (*bʰōw- e *bʰow-: ine-pro/bhow), al primo numero d'omografo libero
+  v_o := (select l.id from lessema l join stg_lessema s on s.chiave = l.id_esterno
+           where l.ricostruito and l.provenienza = 'wiktionary' and s.translit is null and l.lemma ~ '[₁₂₃ʰʷ]'
+             and l.id <> v_r and l.omografo = 1
+           order by l.id limit 1);
+  v_pulito := (select slug_di(lingua, lemma, null, omografo, ricostruito) from lessema where id = v_o);
+  update lessema set translit = 'idem' where id = v_o;
+  insert into lessema (lingua, lemma, omografo, ricostruito, provenienza)
+    select lingua, norm(lemma), 1, true, 'redazione' from lessema where id = v_o;
+  perform pg_temp.verifica((select count(*) from lessema where slug = v_pulito) = 1,
+    'una voce della redazione occupa l''indirizzo pulito');
   perform importa_wiktionary();
   perform pg_temp.verifica((select translit is null and slug = 'it/carne' from lessema where id = v_id),
     'il nuovo import toglie la traslitterazione finta da un lemma in alfabeto latino, e l''indirizzo torna quello giusto');
   perform pg_temp.verifica(v_r is not null and (select translit is null and slug not like '%literally%' from lessema where id = v_r),
     'e da una forma ricostruita in alfabeto latino con pedici e lettere modificatrici');
+  perform pg_temp.verifica((select translit is null and omografo = 2 and slug = slug_di(lingua, lemma, null, 2, ricostruito)
+                              from lessema where id = v_o),
+    'se l''indirizzo pulito è di un''altra voce, la traslitterazione finta va via e la voce passa al primo omografo libero');
   raise exception using errcode = 'P0098', message = 'annulla';
 exception when sqlstate 'P0098' then null;
 end $$;
