@@ -536,6 +536,23 @@ begin
 exception when sqlstate 'P0098' then null;
 end $$;
 
+\echo '— omografi rinumerati tra due pacchetti'
+do $$
+begin
+  -- nel database la riga dell'omografo 2 è di *zzk-@seize; nel pacchetto nuovo *zzk-@head è l'omografo 2 e *zzk-@seize il 3
+  insert into lessema (lingua, lemma, omografo, ricostruito, provenienza, stato_editoriale, id_esterno)
+    values ('ine-pro', 'zzk-', 2, true, 'wiktionary', 'importato', 'prova:*zzk-@seize');
+  insert into stg_lessema (chiave, lingua, lemma, omografo, ricostruito)
+    values ('prova:*zzk-@head', 'ine-pro', 'zzk-', 2, true), ('prova:*zzk-@seize', 'ine-pro', 'zzk-', 3, true);
+  perform importa_wiktionary();
+  perform pg_temp.verifica(
+    (select count(distinct id) from lessema where id_esterno in ('prova:*zzk-@head', 'prova:*zzk-@seize')) = 2
+    and (select omografo from lessema where id_esterno = 'prova:*zzk-@seize') = 2,
+    'due radici omografe restano due voci anche se il pacchetto le rinumera: la riga già presa per identificativo non si riprende per numero d''omografo, e l''indirizzo di quella che c''era non cambia');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
+
 \echo '— etimologie dei dizionari e analisi della forma'
 select pg_temp.verifica(
   (select h.etichetta = 'Lewis & Short' and h.stato = 'accolta' and h.confidenza = 3 and h.provenienza = 'perseus'

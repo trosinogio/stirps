@@ -36,7 +36,7 @@ jobs:
         roa-opt:Old Galician-Portuguese roa-oca:Old Catalan nrf:Norman pcd:Picard'
       INTERE: la,grc
       # la stima dopo ogni giro (stima_import.py), per le lingue romanze
-      STIMA_LINGUE: es,pt,ca,ro,gl,oc,fr,fro,frm,osp,roa-opt,roa-oca,pro,nap,scn,vec,lij,sc,lmo,pms,fur,ast,an,co,lld,rm,wa,frp,dlm,rup,ruq,ruo,lad,egl,rgn,ist,mxi,nrf,pcd
+      STIMA_LINGUE: ro,ar,he,fr,es
       STIMA_ATTUALE: '1053'
       STIMA_FREQUENZE: es=dati/frequenze_es.tsv.gz,pt=dati/frequenze_pt.tsv.gz,ca=dati/frequenze_ca.tsv.gz,ro=dati/frequenze_ro.tsv.gz,gl=dati/frequenze_gl.tsv.gz,fr=dati/frequenze_fr.tsv.gz
       # sotto le voci dei rami antichi e del latino entrano anche i discendenti dichiarati che il dizionario non ha
@@ -62,7 +62,7 @@ jobs:
       # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
       DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq
       # i modelli grezzi di alcune parole, per capire perché la loro etimologia non si legge (le cime greche del 13 novembre)
-      DIAGNOSI_PAROLE: φωνή,σῆμα,ζῷον,ὄνυμα,προτί,ζώς,πρός
+      DIAGNOSI_PAROLE: classer,calculer,sulfure,algie,preot,agăța
       # le glosse con cui le pagine citano le radici ricostruite, per il controllo delle radici omografe
       GLOSSE_RADICI: /tmp/glosse_radici.tsv
     steps:
