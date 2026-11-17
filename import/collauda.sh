@@ -569,6 +569,27 @@ assert imp.ammessa('es', {'w': 'estornino', 'p': 'noun'})
 assert not imp.ammessa('es', {'w': 'del', 'p': 'contraction'}) and not imp.ammessa('es', {'w': 'Madrid', 'p': 'name'})
 assert not imp.ammessa('es', {'w': 'a menudo', 'p': 'adv'})
 assert imp.ammessa('la', {'w': 'Romanus', 'p': 'name'})
+# un prefisso senza base aspetta l'etimo dopo il «+» (agăța = a- + *accaptiāre); senza «+» la catena si ferma come prima;
+# un primo etimo che non è una forma valida (preb(i)ter) lascia il posto al successivo (preot < presbyter)
+imp = Importatore()
+imp.voce({'w': 'agăța', 'p': 'verb', 't': 'From a- + Vulgar Latin *accaptiāre.', 'g': ['x'], 'tpl': [
+    {'n': 'af', 'a': {'1': 'ro', '2': 'a-'}, 'e': 'a-'}, {'n': 'inh', 'a': {'1': 'ro', '2': 'la-vul', '3': '*accaptiāre'}, 'e': 'Vulgar Latin *accaptiāre'}]}, lingua_voce='ro')
+imp.voce({'w': 'zzzu', 'p': 'verb', 't': 'From a- (prefix). Compare Latin xyz.', 'g': ['x'], 'tpl': [
+    {'n': 'af', 'a': {'1': 'ro', '2': 'a-'}, 'e': 'a-'}, {'n': 'der', 'a': {'1': 'ro', '2': 'la', '3': 'xyz'}, 'e': 'Latin xyz'}]}, lingua_voce='ro')
+imp.voce({'w': 'preot', 'p': 'noun', 't': 'Vulgar Latin preb(i)ter, popular variant of Latin presbyter.', 'g': ['x'], 'tpl': [
+    {'n': 'inh+', 'a': {'1': 'ro', '2': 'la-vul', '3': '', '4': 'preb(i)ter'}, 'e': 'Vulgar Latin preb(i)ter'},
+    {'n': 'inh', 'a': {'1': 'ro', '2': 'la', '3': 'presbyter'}, 'e': 'Latin presbyter'}]}, lingua_voce='ro')
+archi = {(r['esito'].split(':', 2)[2], r['etimo'].split(':', 2)[2], r['affisso']) for r in imp.relazioni}
+assert archi == {('agăța', '*accaptiare', 'a-'), ('preot', 'presbyter', None)}, archi
+# le radici semitiche: la parola araba dichiara la sua radice ({{etymon|ar|:root|…}}, {{ar-root}}, {{ar-rootbox}}) e, se la pagina
+# non dà un altro etimo, ne deriva; una radice di un'altra lingua (ar-root in una voce italiana) non conta
+from filtra import radice_semitica as rs
+assert rs([{'name': 'etymon', 'args': {'1': 'ar', 'id': 'book', '2': ':root', '3': 'ك ت ب<id:root>'}}], 'ar')['args']['3'] == 'ك ت ب'
+assert rs([{'name': 'ar-rootbox', 'args': {'1': 'ق ل ب'}}], 'ar')['name'] == 'radice'
+assert rs([{'name': 'ar-root', 'args': {'1': 'خ ل ف'}}], 'it') is None
+imp = Importatore()
+imp.voce({'w': 'كتاب', 'p': 'noun', 't': '', 'g': ['book'], 'tpl': [{'n': 'radice', 'a': {'1': 'ar', '2': 'ar', '3': 'ك ت ب'}, 'e': ''}]}, lingua_voce='ar')
+assert [(r['tipo'], imp.lessemi[r['etimo']]['lemma']) for r in imp.relazioni] == [('derivazione', 'ك ت ب')], imp.relazioni
 # un segno di una scrittura non è una parola: il segno sillabico 𐀆 e il numerale 𐄉 escono, la congiunzione 𐀤 resta
 imp = Importatore()
 for lemma, glossa in (('𐀆', 'The Linear B syllabic letter ⟨de⟩.'), ('𐄉', 'three, 3'), ('𐀤', 'and')):

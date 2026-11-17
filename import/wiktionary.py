@@ -27,7 +27,9 @@ from collections import Counter, defaultdict
 
 CATENA = {'inh': 'eredita', 'inh+': 'eredita', 'bor': 'prestito', 'bor+': 'prestito', 'ubor': 'prestito', 'obor': 'prestito',
           'lbor': 'prestito_dotto', 'slbor': 'semidotto', 'der': 'generico', 'der+': 'generico', 'uder': 'generico',
-          'cal': 'calco', 'calque': 'calco', 'sl': 'calco_semantico', 'psm': 'calco'}
+          'cal': 'calco', 'calque': 'calco', 'sl': 'calco_semantico', 'psm': 'calco',
+          # la parola semitica e la sua radice triconsonantica (filtra.py, radice_semitica): كِتَاب < ك ت ب
+          'radice': 'derivazione'}
 LOCALI = {'bf': 'retroformazione', 'back-form': 'retroformazione', 'clipping': 'accorciamento', 'ellipsis': 'accorciamento',
           'named-after': 'deonimico', 'deverbal': 'derivazione',
           # una voce senza etimologia che è la variante di un'altra (filtra.py, variante_di): ὄνυμα < ὄνομα
@@ -718,6 +720,7 @@ class Importatore:
         catena_attiva = True
         primo = True
         alternative = []                # le altre ipotesi del testo, un etimo ciascuna, con certezza al massimo 2
+        in_attesa = None                # «{{af|ro|a-}} + {{inh|ro|la-vul|*accaptiāre}}»: il prefisso aspetta la base
         for t in tpl:
             n, a, e = t['n'], t['a'], t.get('e') or ''
             pos_t = testo.find(e, cursore) if e else -1
@@ -783,7 +786,9 @@ class Importatore:
                     self.stat['composti_di_elementi'] += 1
                 if not basi:
                     self.stat['solo_affissi'] += 1
-                    catena_attiva = False
+                    # un prefisso senza base (agăța = a- + *accaptiāre): l'etimo dopo il «+» è la base, e la catena
+                    # non si ferma; senza un «+» dopo, si ferma come prima
+                    in_attesa = affissi
                     continue
                 tipo = 'derivazione' if len(basi) == 1 else 'composizione'
                 for i, (b, lb) in enumerate(basi, 1):
@@ -835,6 +840,9 @@ class Importatore:
                 if not lingua or not termine or termine == '-':
                     continue
                 termine = pulisci_parte(termine)[0]
+                if in_attesa is not None and not (primo and '+' in connettore):
+                    catena_attiva = False      # il prefisso non ha trovato la sua base: la catena si ferma
+                    continue
                 if '<' in termine or '>' in termine:
                     self.stat['termini_con_modificatori_annidati'] += 1
                     continue
@@ -863,6 +871,11 @@ class Importatore:
                 if not tr and mostra is None and re.search(r'[^\x00-\u024f]', termine):
                     m = re.search(re.escape(termine) + r' \(([^,“”()]+)', e)
                     tr = m.group(1).strip() if m else None
+                if primo and not lemma_valido(codice_lingua(lingua) or lingua, termine, termine.startswith('*')):
+                    # «{{inh+|ro|la-vul||preb(i)ter}} or … {{inh|ro|la|presbyter}}» (preot): un primo etimo che non è una
+                    # forma valida uscirebbe con tutta l'ipotesi; vale l'etimo successivo
+                    self.stat['primi_etimi_non_validi_saltati'] += 1
+                    continue
                 self.nome_lingua(t, termine, mostra)
                 lingua, termine, omo_t, forma_extra = self.risolvi(lingua, termine, mostra)
                 mostra = mostra or forma_extra
@@ -887,10 +900,14 @@ class Importatore:
                     self.stat['primi_anelli_alternativi'] += 1
                 if primo:
                     if kt != k0:
-                        archi.append({'etimo': kt, 'esito': k0, 'tipo': tipo, 'ordine': 1, 'affisso': None,
+                        archi.append({'etimo': kt, 'esito': k0, 'tipo': tipo, 'ordine': 1,
+                                      'affisso': ' '.join(in_attesa) if in_attesa else None,
                                       'conf': min(conf, conf_voce), 'forma': mostra})
+                        if in_attesa:
+                            self.stat['prefissi_con_la_base_dopo_il_piu'] += 1
                         if glossa_t and termine.startswith('*') and termine.endswith('-'):
                             self.glossa_arco.setdefault((k0, kt), glossa_t)
+                    in_attesa = None
                     primo, prec = False, kt
                     continue
                 # «три (… ultimately from *tréyes) + зуб (… ultimately from *ǵómbʰos)»: dopo un «+», o dentro una
