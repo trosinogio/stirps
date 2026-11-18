@@ -464,6 +464,18 @@ ANTENATI_GERMANICI = {
     'sv': 'gmq-osw', 'gmq-osw': 'non', 'da': 'gmq-oda', 'gmq-oda': 'non',
     'nb': 'non', 'nn': 'non', 'no': 'non', 'is': 'non', 'fo': 'non', 'nrn': 'non', 'ovd': 'non', 'non': 'gmq-pro',
     'gmq-pro': 'gem-pro', 'gmw-pro': 'gem-pro'}
+# Dentro le lingue slave, l'antenato immediato (dai moduli di Wiktionary): russo < russo medio < antico slavo orientale,
+# polacco < polacco medio < polacco antico, bulgaro < bulgaro medio < slavo ecclesiastico antico; il protoslavo discende
+# dal protobaltoslavo. Prima tutte discendevano dal protoslavo, e un arco rovesciato tra russo e antico slavo orientale non
+# si vedeva
+ANTENATI_SLAVI = {
+    'ru': 'zle-mru', 'zle-mru': 'orv', 'uk': 'zle-muk', 'zle-muk': 'zle-ort', 'be': 'zle-mbe', 'zle-mbe': 'zle-ort',
+    'rue': 'zle-ort', 'zle-ort': 'orv', 'orv': 'sla-pro', 'zle-ono': 'sla-pro',
+    'pl': 'zlw-mpl', 'zlw-mpl': 'zlw-opl', 'szl': 'zlw-opl', 'zlw-opl': 'sla-pro', 'csb': 'sla-pro', 'pox': 'sla-pro',
+    'cs': 'zlw-ocs', 'czk': 'zlw-ocs', 'zlw-ocs': 'sla-pro', 'sk': 'zlw-osk', 'rsk': 'zlw-osk', 'zlw-osk': 'sla-pro',
+    'hsb': 'sla-pro', 'dsb': 'sla-pro',
+    'bg': 'cu-bgm', 'cu-bgm': 'cu', 'mk': 'cu', 'zls-chs': 'cu', 'cu': 'sla-pro', 'sh': 'sla-pro', 'svm': 'sh',
+    'sl': 'sla-pro', 'sla-pro': 'ine-bsl-pro'}
 CELTICHE = {'ga', 'sga', 'mga', 'gd', 'gv', 'cy', 'wlm', 'owl', 'br', 'xbm', 'obt', 'kw', 'xtg', 'xcg', 'xce', 'cel-bry-pro'}
 SLAVE = {'ru', 'orv', 'uk', 'be', 'pl', 'cs', 'sk', 'sl', 'hr', 'sr', 'sh', 'bg', 'mk', 'cu', 'dsb', 'hsb', 'zlw-pro'}
 INDOIRANICHE = {'sa', 'pi', 'pra', 'hi', 'ur', 'bn', 'inc-pro', 'fa', 'pal', 'peo', 'ae', 'xpr', 'ku', 'ps', 'os', 'ira-pro'}
@@ -485,6 +497,8 @@ def antenato_lingua(c):
         return 'grk-pro'
     if c in ANTENATI_GERMANICI:
         return ANTENATI_GERMANICI[c]
+    if c in ANTENATI_SLAVI:
+        return ANTENATI_SLAVI[c]
     if c in GERMANICHE:
         return 'gem-pro'
     if c in CELTICHE:

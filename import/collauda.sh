@@ -591,6 +591,9 @@ assert antenato_lingua('sbv') == 'itc-pro'
 from wiktionary import discende_da
 assert discende_da('en', 'ang') and discende_da('sv', 'non') and discende_da('af', 'nl') and discende_da('en', 'gem-pro')
 assert not discende_da('ang', 'en') and not discende_da('non', 'sv') and not discende_da('de', 'yi') and not discende_da('da', 'nb')
+# e dentro le slave: il russo discende dall'antico slavo orientale, il bulgaro dallo slavo ecclesiastico antico
+assert discende_da('ru', 'orv') and discende_da('bg', 'cu') and discende_da('pl', 'zlw-opl') and discende_da('sla-pro', 'ine-bsl-pro')
+assert not discende_da('orv', 'ru') and not discende_da('cu', 'bg') and not discende_da('ru', 'pl')
 # il ripiego sulla radice dichiarata: nella stessa lingua la cima ha la forma della radice (*trémti < *trem-, *puH-yós
 # < *pewH-, *ḱád-e-ti < *ḱh₂d-, *teh₂tis < *(s)teh₂-), non *úp < *men- né *dwóh₁ < *pel-
 from wiktionary import ha_la_forma_della_radice as _hf
