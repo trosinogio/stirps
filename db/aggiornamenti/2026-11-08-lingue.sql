@@ -168,6 +168,27 @@ begin
     join stg_lingua_wikt w on w.nome = y.m[2] and w.tipo <> 'etimologica'
     join lingua x on x.codice = w.codice and x.nome <> w.nome
    where y.codice = l.codice and y.m is not null and l.nome ~ '^(Old|Middle) ';
+  -- i nomi che Wikidata dà a un'altra lingua (zle-mru «antica lingua slava orientale», come orv; zlw-ocs «storia della
+  -- lingua ceca»; quattro lingue «ruteno») o non dà: il nome curato, solo dove la lingua ha ancora il nome inglese,
+  -- quello di Wikidata o il codice (18 novembre 2026)
+  update lingua l set nome = c.it
+    from (values ('orv', 'antico slavo orientale'), ('zle-mru', 'russo medio'), ('zle-muk', 'ucraino medio'),
+                 ('zle-mbe', 'bielorusso medio'), ('zle-ort', 'ruteno antico'), ('rue', 'ruteno dei Carpazi'),
+                 ('rsk', 'ruteno pannonico'), ('zle-ono', 'antico novgorodiano'), ('zle-ops', 'antico pskoviano'),
+                 ('zlw-ocs', 'ceco antico'), ('czk', 'giudeo-ceco'), ('svm', 'slavomolisano'), ('zlw-slv', 'slovinzo'),
+                 ('zls-chs-ru', 'slavo ecclesiastico russo'), ('zls-chs-uk', 'slavo ecclesiastico ucraino'),
+                 ('zls-chs-sr', 'slavo ecclesiastico serbo'), ('zls-chs-hr', 'slavo ecclesiastico croato'),
+                 ('zls-chs-bg', 'slavo ecclesiastico bulgaro'), ('zls-chs-mk', 'slavo ecclesiastico macedone'),
+                 ('zls-chs-cs', 'slavo ecclesiastico ceco'), ('zls-chs-ro', 'slavo ecclesiastico romeno'),
+                 ('fa-cls', 'persiano classico'), ('okz', 'khmer antico'), ('pnb', 'punjabi occidentale'),
+                 ('xlg', 'ligure preromano'), ('es-MX', 'spagnolo del Messico'), ('fr-lou', 'francese della Louisiana'))
+         as c(codice, it)
+    join stg_lingua_wikt w on w.codice = c.codice
+   where l.codice = c.codice and l.nome <> c.it
+     and (l.nome = w.nome or l.nome = coalesce(w.nome_it, '') or l.nome = l.codice
+          or l.nome ~* '^(borrowed from|calque of|learned borrowing) ');
+  get diagnostics n = row_count;
+  r := r || jsonb_build_object('nomi_curati', n);
   -- un codice di famiglia usato come lingua (roa, gmw: «una lingua romanza») prende il nome della famiglia
   update lingua l set nome = case when n.it is null then f.nome else 'lingua ' || n.it || ' (non precisata)' end
     from stg_famiglia_wikt f left join lw_nomi n on n.codice = f.codice

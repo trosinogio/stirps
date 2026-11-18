@@ -713,6 +713,28 @@ exception when sqlstate 'P0098' then null;
 end $$;
 truncate stg_lingua_wikt, stg_famiglia_wikt;
 
+\echo '— lingue: i nomi che Wikidata dà a un''altra lingua'
+do $$
+begin
+  insert into lingua (codice, nome, sigla) values ('zle-mru', 'Middle Russian', 'zle-mru'), ('zlw-ocs', 'Old Czech', 'zlw-ocs'),
+    ('rsk', 'borrowed from Pannonian Rusyn', 'rsk'), ('rue', 'rusino', 'rue')
+  on conflict (codice) do update set nome = excluded.nome;
+  truncate stg_lingua_wikt, stg_famiglia_wikt;
+  insert into stg_lingua_wikt values ('zle-mru', 'Middle Russian', '', '', '', '', 'Q35228', 'antica lingua slava orientale'),
+    ('zlw-ocs', 'Old Czech', 'zlw', '', '', '', 'Q593096', 'storia della lingua ceca'),
+    ('rsk', 'Pannonian Rusyn', 'zlw', '', '', '', 'Q35660', ''), ('rue', 'Carpathian Rusyn', 'zle', '', '', '', 'Q26245', 'ruteno');
+  perform importa_lingue_wiktionary();
+  perform pg_temp.verifica(
+    (select nome = 'russo medio' from lingua where codice = 'zle-mru')
+    and (select nome = 'ceco antico' from lingua where codice = 'zlw-ocs')
+    and (select nome = 'ruteno pannonico' from lingua where codice = 'rsk')
+    and (select nome = 'rusino' from lingua where codice = 'rue'),
+    'il russo medio non si chiama come l''antico slavo orientale, né il ceco antico «storia della lingua ceca»; un nome scritto a mano non cambia');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
+truncate stg_lingua_wikt, stg_famiglia_wikt;
+
 \echo '— aree di significato delle radici'
 do $$
 declare v_l bigint := (select id from lessema where ricostruito and id_esterno is not null order by id limit 1);
