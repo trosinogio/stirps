@@ -267,6 +267,10 @@ MAIUSCOLA_DEI_NOMI = {'de', 'gsw', 'lb', 'bar', 'pdc', 'ksh'}
 SEGNI_DELLA_PAGINA = {'ang': '\u0304\u0306\u0307',             # macron, breve, punto: sæterdæġ → sæterdæg, iċ → ic
                       'enm': '\u0304\u0306',                     # fōtmāl → fotmal
                       'ru': '\u0301\u0300', 'uk': '\u0301\u0300', 'be': '\u0301\u0300', 'rue': '\u0301\u0300',   # accento tonico
+                      # e nelle lingue che lo scrivono solo nelle citazioni (слу́жа → служа, ора́ти → орати, jézik → jezik);
+                      # non in ceco, slovacco, polacco, serbocroato e macedone, dove l'acuto fa parte delle lettere (á, ó, ć, ќ)
+                      'bg': '\u0301', 'orv': '\u0301\u0300', 'zle-ort': '\u0301\u0300', 'zle-mru': '\u0301\u0300',
+                      'sl': '\u0300\u0301\u0302\u030f\u0311',
                       # protoslavo: gli accenti (acuto, grave, doppio grave, breve rovesciata, circonflesso, tilde) non
                       # stanno nel titolo, che tiene invece pipa e ogonek: *šȅstь → *šestь, *pę̑tь → *pętь
                       'sla-pro': '\u0301\u0300\u030f\u0311\u0302\u0303'}

@@ -609,6 +609,10 @@ _k = imp.lessema('ine-pro', '*-kos', glossa='-y')
 assert imp.scegli_glossa(imp.lessemi[_k]) is None
 imp.lessema('ine-pro', '*-kos', glossa='adjectival suffix')
 assert imp.scegli_glossa(imp.lessemi[_k]) == 'adjectival suffix'
+# l'accento delle citazioni non sta nel titolo della pagina: bulgaro, antico slavo orientale, ruteno antico, sloveno; il
+# ceco, il polacco e il serbocroato tengono l'acuto delle loro lettere
+assert nome_pagina('bg', 'слу́жа') == 'служа' and nome_pagina('zle-ort', 'ора́ти') == 'орати' and nome_pagina('sl', 'jézik') == 'jezik'
+assert nome_pagina('cs', 'dál') == 'dál' and nome_pagina('pl', 'ósmy') == 'ósmy' and nome_pagina('sh', 'ćuprija') == 'ćuprija'
 # un lemma di sole cifre o segni non è una parola
 from wiktionary import senza_lettere
 assert senza_lettere('24') and senza_lettere('+') and senza_lettere('++') and senza_lettere('🎻') and senza_lettere('1-2-3')
