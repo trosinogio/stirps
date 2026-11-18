@@ -280,7 +280,7 @@ SEGNI_DELLA_PAGINA = {'ang': '\u0304\u0306\u0307',             # macron, breve, 
 # ć, ќ e ѓ hanno l'acuto nella lettera stessa: rȍđen → rođen, аспира́нт → аспирант, а̀виомотор → авиомотор, ma ćuprija
 # resta ćuprija; 2.323 voci serbocroate avevano il loro doppione senza segni (18 novembre 2026)
 SEGNI_SU_VOCALE = {'sh': '\u0300\u0301\u030f\u0311\u0304\u0303\u0302', 'mk': '\u0300\u0301', 'bg': '\u0300\u0301'}
-VOCALI_SLAVE = set('aeiouAEIOUrRаеиоуАЕИОУрРъЪ')
+VOCALI_SLAVE = set('aeiouAEIOUrRаеиоуяюАЕИОУЯЮрРъЪѣѢ')   # я e ю: in bulgaro следя́, ря́зък
 
 
 def nome_pagina(lingua, termine):

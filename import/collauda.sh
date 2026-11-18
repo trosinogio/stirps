@@ -615,7 +615,7 @@ assert nome_pagina('bg', 'слу́жа') == 'служа' and nome_pagina('zle-or
 assert nome_pagina('cs', 'dál') == 'dál' and nome_pagina('pl', 'ósmy') == 'ósmy' and nome_pagina('sh', 'ćuprija') == 'ćuprija'
 assert nome_pagina('sh', 'rȍđen') == 'rođen' and nome_pagina('sh', 'ра̀чӯн') == 'рачун' and nome_pagina('sh', 'krèpati') == 'krepati'
 assert nome_pagina('mk', 'аспира́нт') == 'аспирант' and nome_pagina('mk', 'ќе') == 'ќе' and nome_pagina('mk', 'ѓубре') == 'ѓубре'
-assert nome_pagina('bg', 'а̀виомотор') == 'авиомотор' and nome_pagina('bg', 'ѝ') == 'ѝ' and nome_pagina('sl', 'nosīti') == 'nositi'
+assert nome_pagina('bg', 'а̀виомотор') == 'авиомотор' and nome_pagina('bg', 'ѝ') == 'ѝ' and nome_pagina('bg', 'следя́') == 'следя' and nome_pagina('bg', 'ю́ноша') == 'юноша' and nome_pagina('sl', 'nosīti') == 'nositi'
 # un lemma di sole cifre o segni non è una parola
 from wiktionary import senza_lettere
 assert senza_lettere('24') and senza_lettere('+') and senza_lettere('++') and senza_lettere('🎻') and senza_lettere('1-2-3')
