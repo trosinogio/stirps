@@ -512,7 +512,14 @@ ANTENATI_ALTRI = {
     'txb': 'ine-toc-pro', 'xto': 'ine-toc-pro', 'ine-toc-pro': 'ine-pro',
     'hi': 'pra-sau', 'ur': 'pra-sau', 'pra-sau': 'pra', 'pra': 'sa',
     'tr': 'ota', 'ota': 'trk-oat', 'trk-oat': 'trk-pro', 'ja': 'ojp', 'ojp': 'jpx-pro'}
-ANTENATI_IMMEDIATI = {**ANTENATI_ROMANZI, **ANTENATI_ALTRI, **ANTENATI_SLAVI, **ANTENATI_GERMANICI}
+# le lingue semitiche (18 novembre 2026): per Wiktionary l'ebraico biblico è una varietà dell'ebraico (etimologica),
+# e le protolingue intermedie (cananaico, semitico nordoccidentale) non hanno voci; il primo antenato con voci è il
+# protosemitico occidentale. Senza, he < sem-pro (inh) era un legame generico
+ANTENATI_SEMITICI = {
+    'he': 'he-med', 'he-med': 'he-mis', 'he-mis': 'hbo', 'hbo': 'sem-wes-pro', 'phn': 'sem-wes-pro', 'uga': 'sem-wes-pro',
+    'arc': 'sem-wes-pro', 'syc': 'arc', 'jpa': 'arc', 'tmr': 'arc', 'ar': 'sem-wes-pro', 'sem-wes-pro': 'sem-pro',
+    'akk': 'sem-pro'}
+ANTENATI_IMMEDIATI = {**ANTENATI_ROMANZI, **ANTENATI_ALTRI, **ANTENATI_SLAVI, **ANTENATI_GERMANICI, **ANTENATI_SEMITICI}
 CELTICHE = {'ga', 'sga', 'mga', 'gd', 'gv', 'cy', 'wlm', 'owl', 'br', 'xbm', 'obt', 'kw', 'xtg', 'xcg', 'xce', 'cel-bry-pro'}
 SLAVE = {'ru', 'orv', 'uk', 'be', 'pl', 'cs', 'sk', 'sl', 'hr', 'sr', 'sh', 'bg', 'mk', 'cu', 'dsb', 'hsb', 'zlw-pro'}
 INDOIRANICHE = {'sa', 'pi', 'pra', 'hi', 'ur', 'bn', 'inc-pro', 'fa', 'pal', 'peo', 'ae', 'xpr', 'ku', 'ps', 'os', 'ira-pro'}
@@ -722,6 +729,7 @@ class Importatore:
         self.risalita = set()        # lingue antiche (--risali hit,xcl): entra il lemma con un etimo già nel dizionario
         self.id_proprio = {}         # voce → l'identificativo che la sua pagina si dà ({{etymon|gem-pro|id=three}})
         self.con_ident = defaultdict(set)   # chiave senza identificativo → le chiavi con (*þrīz → *þrīz@three)
+        self.senza_nomi = set()      # lingue intere senza nomi propri né locuzioni (--senza-nomi he)
         self.con_etimologia = set()  # lingue di chiusura di cui entrano tutte le voci con un'etimologia, ma non i lemmi
                                      # senza (--con-etimologia en): l'inglese ha centinaia di migliaia di lemmi vuoti
         self.stat = Counter()
@@ -1250,7 +1258,7 @@ class Importatore:
         nell'elenco (le forme più frequenti) o, con --esterni, ha l'etimo in un'altra lingua; e, fuori dalle lingue
         intere, mai un nome proprio, una locuzione o una contrazione (*del* = *de* + *el*, *j'y*: non sono lemmi)."""
         elenco = self.elenco.get(lingua)
-        if elenco is None and lingua in self.intere:
+        if elenco is None and lingua in self.intere and lingua not in self.senza_nomi:
             return True
         if v.get('p') in ('name', 'contraction') or ' ' in v['w'].strip():
             return False
@@ -1368,6 +1376,8 @@ class Importatore:
             c = riga.rstrip('\n').split('\t') + ['', '', '', '', '', '', '', '']
             parola, etimn, pos, glossa, ricostruita = c[0], c[1], c[2], c[3], c[5]
             if not parola or ricostruita == '1' or parola.startswith('*') or (ammesso and not ammesso(parola)):
+                continue
+            if lingua in self.senza_nomi and (pos in ('name', 'phrase', 'proverb', 'contraction') or ' ' in parola.strip()):
                 continue
             omo = int(etimn) if etimn.isdigit() else 1
             pagina = nome_pagina(lingua, parola)
@@ -2170,9 +2180,10 @@ if __name__ == '__main__':
     #               [--forme-base it=forme.tsv]
     #               [--discendenti la=discendenti.tsv]…
     #               [--semina-discendenti ine-pro,grk-pro,grc,gem-pro,sla-pro] [--risali hit,xcl,ae]
-    #               [--intere la,grc] [--con-etimologia en] [--elenco en=../dati/frequenze_en.tsv.gz] [--esterni en]
+    #               [--intere la,grc] [--con-etimologia en] [--senza-nomi he] [--elenco en=../dati/frequenze_en.tsv.gz] [--esterni en]
     #               [--glosse-precedenti ../dati/lessemi.tsv.gz]
     args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti, comuni = [], [], 1, set(), set(), {}, set(), {}, {}
+    senza_nomi = set()
     risali = set()      # --risali hit,xcl: lingue antiche di cui entrano i lemmi con un etimo già nel dizionario
     semina = set()      # --semina-discendenti ine-pro,grc: sotto le voci di queste lingue entrano anche le parole nuove
     discendenti = []    # --discendenti la=discendenti.tsv: gli alberi dei discendenti dichiarati (filtra.py con DISCENDENTI)
@@ -2210,6 +2221,8 @@ if __name__ == '__main__':
             discendenti.append(tuple(next(it_).split('=', 1)))
         elif x == '--forme-base':
             forme_base = next(it_)
+        elif x == '--senza-nomi':
+            senza_nomi = {c for c in next(it_).split(',') if c}
         elif x == '--con-etimologia':
             con_etimologia = {c for c in next(it_).split(',') if c}
         else:
@@ -2218,6 +2231,7 @@ if __name__ == '__main__':
     imp.intere = intere
     imp.risalita = risali
     imp.con_etimologia = con_etimologia
+    imp.senza_nomi = senza_nomi
     imp.elenco = elenchi
     imp.comuni = comuni
     imp.esterni = esterni

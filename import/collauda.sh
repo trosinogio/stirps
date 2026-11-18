@@ -633,6 +633,15 @@ assert _l['sv'][5:8] == ['indoeuropea', 'germanica', 'gmq-osw'] and _l['gmq-osw'
 assert discende_da('ru', 'orv') and discende_da('bg', 'cu') and discende_da('pl', 'zlw-opl') and discende_da('sla-pro', 'ine-bsl-pro')
 assert not discende_da('orv', 'ru') and not discende_da('cu', 'bg') and not discende_da('ru', 'pl')
 assert discende_da('es', 'osp') and discende_da('fr', 'fro') and discende_da('pt', 'roa-opt') and not discende_da('fro', 'fr')
+# le lingue semitiche: l'ebraico risale all'ebraico biblico e al protosemitico, il siriaco all'aramaico
+assert discende_da('he', 'hbo') and discende_da('he', 'sem-pro') and discende_da('syc', 'arc') and discende_da('akk', 'sem-pro')
+assert not discende_da('hbo', 'he') and not discende_da('arc', 'syc') and not discende_da('he', 'arc')
+from wiktionary import primo_antenato
+assert primo_antenato('he', {'hbo', 'sem-pro'}) == 'hbo' and primo_antenato('hbo', {'sem-pro'}) == 'sem-pro'
+# --senza-nomi: una lingua intera senza nomi propri né locuzioni (l'ebraico)
+imp_sn = Importatore(); imp_sn.intere = {'he', 'arc'}; imp_sn.senza_nomi = {'he'}
+assert not imp_sn.ammessa('he', {'w': 'דוד', 'p': 'name'}) and not imp_sn.ammessa('he', {'w': 'בית ספר', 'p': 'noun'})
+assert imp_sn.ammessa('he', {'w': 'בית', 'p': 'noun'}) and imp_sn.ammessa('arc', {'w': 'אלהא', 'p': 'name'})
 imp = Importatore()
 for _c, _w in [('en', 'tree'), ('enm', 'tre'), ('roa-opt', 'arvor'), ('uk', 'дерево'), ('zle-ort', 'дерево')]:
     imp.lessema(_c, _w)

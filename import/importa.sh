@@ -85,7 +85,7 @@ fi
 echo "2/4  leggo le etimologie"
 python3 wiktionary.py "$DATI/lemmi.jsonl" "$DATI/tsv" "$DATI/glosse.tsv" ${ARGOMENTI[@]+"${ARGOMENTI[@]}"} --passi "$PASSI" \
   --forme-base "$LINGUA=$DATI/forme.tsv" --discendenti "$LINGUA=$DATI/discendenti.tsv" \
-  ${INTERE:+--intere "$INTERE"} ${SEMINA_DISCENDENTI:+--semina-discendenti "$SEMINA_DISCENDENTI"} ${RISALI:+--risali "$RISALI"} ${CON_ETIMOLOGIA:+--con-etimologia "$CON_ETIMOLOGIA"} ${COMUNI:+--comuni "$COMUNI"} \
+  ${INTERE:+--intere "$INTERE"} ${SEMINA_DISCENDENTI:+--semina-discendenti "$SEMINA_DISCENDENTI"} ${RISALI:+--risali "$RISALI"} ${CON_ETIMOLOGIA:+--con-etimologia "$CON_ETIMOLOGIA"} ${SENZA_NOMI:+--senza-nomi "$SENZA_NOMI"} ${COMUNI:+--comuni "$COMUNI"} \
   $(for e in $ELENCHI; do printf -- "--elenco %s " "$e"; done) ${ESTERNI:+--esterni "$ESTERNI"} \
   ${PRECEDENTI:+--glosse-precedenti "$PRECEDENTI"} > "$DATI/rapporto_parser.json"
 if [ "$DIZIONARI" = 1 ]; then

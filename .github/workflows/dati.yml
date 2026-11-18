@@ -40,12 +40,17 @@ jobs:
         frr:North Frisian ovd:Elfdalian nrn:Norn cim:Cimbrian yol:Yola pdt:Plautdietsch gmq-pro:Proto-Norse lng:Lombardic vls:West Flemish zea:Zealandic
         uk:Ukrainian be:Belarusian cs:Czech sk:Slovak sl:Slovene sh:Serbo-Croatian bg:Bulgarian mk:Macedonian hsb:Upper Sorbian
         dsb:Lower Sorbian csb:Kashubian szl:Silesian rue:Rusyn zlw-opl:Old Polish zlw-mpl:Middle Polish zlw-ocs:Old Czech
-        zlw-osk:Old Slovak zle-ort:Old Ruthenian zle-mru:Middle Russian zle-ono:Old Novgorodian zls-chs:Church Slavonic pox:Polabian rsk:Pannonian Rusyn'
-      INTERE: la,grc
+        zlw-osk:Old Slovak zle-ort:Old Ruthenian zle-mru:Middle Russian zle-ono:Old Novgorodian zls-chs:Church Slavonic pox:Polabian rsk:Pannonian Rusyn
+        hbo:Ancient Hebrew arc:Aramaic syc:Classical Syriac phn:Phoenician uga:Ugaritic akk:Akkadian sem-pro:Proto-Semitic
+        sem-wes-pro:Proto-West Semitic jpa:Jewish Palestinian Aramaic tmr:Jewish Babylonian Aramaic'
+      # l'ebraico intero, senza nomi propri né locuzioni, e le lingue semitiche antiche intere (via libera di Giovanni del
+      # 18 novembre 2026 alla proposta della stima, ramo dati-stima-ebraico da non unire)
+      INTERE: la,grc,he,hbo,arc,syc,phn,uga,akk,jpa,tmr
+      SENZA_NOMI: he
       # la stima dopo ogni giro (stima_import.py), per le lingue slave
-      STIMA_LINGUE: ru,uk,be,pl,cs,sk,sl,sh,bg,mk,hsb,dsb,csb,szl,rue,orv,cu,zlw-opl,zlw-mpl,zlw-ocs,zlw-osk,zle-ort,zle-mru,zle-ono,zls-chs,pox,rsk
-      STIMA_ATTUALE: '2297'
-      STIMA_FREQUENZE: ru=dati/frequenze_ru.tsv.gz,uk=dati/frequenze_uk.tsv.gz,pl=dati/frequenze_pl.tsv.gz,cs=dati/frequenze_cs.tsv.gz,sk=dati/frequenze_sk.tsv.gz,sl=dati/frequenze_sl.tsv.gz,sh=dati/frequenze_sh.tsv.gz,bg=dati/frequenze_bg.tsv.gz,mk=dati/frequenze_mk.tsv.gz
+      STIMA_LINGUE: he,hbo,arc,syc,phn,uga,akk,sem-pro,sem-wes-pro,jpa,tmr
+      STIMA_ATTUALE: '2864'
+      STIMA_FREQUENZE: he=dati/frequenze_he.tsv.gz
       # sotto le voci dei rami antichi e del latino entrano anche i discendenti dichiarati che il dizionario non ha
       # (import/wiktionary.py; il latino dal 15 novembre 2026, decisione di Giovanni: le lingue romanze)
       # e sotto il protobaltoslavo e il protoceltico (16 novembre 2026: lituano e irlandese antico, con l'ittita, per il
