@@ -74,10 +74,25 @@ begin
    where not exists (select 1 from lingua l where l.codice = s.codice);
   get diagnostics n = row_count;
   r := r || jsonb_build_object('lingue_nuove', n);
+  -- l'antenato è quello del pacchetto (la genealogia del parser), anche dove la lingua ne ha già uno: un antenato che
+  -- saltava una fase (inglese < antico inglese, tedesco < protogermanico, russo < protoslavo, scritti a mano nel seme)
+  -- faceva di un'eredità un legame generico, 70.845 eredità su 186.392 il 17 novembre 2026 (eredita_fuori_genealogia)
   update lingua l set antenato = s.antenato
     from stg_lingua s
-   where l.codice = s.codice and l.antenato is null and s.antenato is not null and s.antenato <> l.codice
+   where l.codice = s.codice and s.antenato is not null and s.antenato <> l.codice
+     and l.antenato is distinct from s.antenato
      and exists (select 1 from lingua x where x.codice = s.antenato);
+  get diagnostics n = row_count;
+  r := r || jsonb_build_object('antenati_dal_pacchetto', n);
+  -- una famiglia non è una lingua madre: il galego-portoghese antico e lo svedese antico erano varietà di «lingua
+  -- romanza (non precisata)» e delle germaniche settentrionali (il parser prendeva il prefisso del codice), e
+  -- lingue_ascendenti(), che parte dalla madre, non arrivava al latino né al norreno
+  update lingua l set varieta_di = null
+    from stg_lingua s, lingua p
+   where s.codice = l.codice and s.varieta_di is null and p.codice = l.varieta_di
+     and p.nome like 'lingua % (non precisata)';
+  get diagnostics n = row_count;
+  r := r || jsonb_build_object('varieta_di_una_famiglia_tolte', n);
   update lingua l set varieta_di = s.varieta_di
     from stg_lingua s
    where l.codice = s.codice and l.varieta_di is null and l.antenato is null and s.varieta_di is not null

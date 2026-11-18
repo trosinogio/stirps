@@ -240,6 +240,28 @@ select pg_temp.verifica(
   and (select count(*) from glossa) = (select count(*) from glosse_xmin),
   'e non riscrive nessuna glossa');
 
+\echo '— genealogia delle lingue'
+do $$
+declare v_l text; v_a text; v_v text;
+begin
+  -- un antenato sbagliato nel database (scritto a mano, che salta una fase) cede a quello del pacchetto, e una lingua
+  -- che il database fa varietà di una famiglia («lingua … (non precisata)») smette di esserlo
+  select s.codice, s.antenato into v_l, v_a from stg_lingua s join lingua l on l.codice = s.codice
+   where s.antenato is not null and s.antenato <> 'ine-pro' order by s.codice limit 1;
+  update lingua set antenato = 'ine-pro' where codice = v_l;
+  insert into lingua (codice, nome, sigla) values ('zzf', 'lingua di prova (non precisata)', 'zzf') on conflict do nothing;
+  select s.codice into v_v from stg_lingua s join lingua l on l.codice = s.codice
+   where s.varieta_di is null and s.codice <> v_l and l.antenato is null order by s.codice limit 1;
+  update lingua set varieta_di = 'zzf' where codice = v_v;
+  perform importa_wiktionary();
+  perform pg_temp.verifica(v_l is not null and (select antenato from lingua where codice = v_l) = v_a,
+    'l''antenato di una lingua è quello del pacchetto, anche dove il database ne aveva un altro');
+  perform pg_temp.verifica(v_v is not null and (select varieta_di is null from lingua where codice = v_v),
+    'una lingua non è una varietà di una famiglia');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
+
 \echo '— traslitterazioni finte'
 do $$
 declare v_id bigint := lx('it/carne'); v_r bigint; v_o bigint; v_pulito text;
