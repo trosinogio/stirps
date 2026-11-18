@@ -572,7 +572,8 @@ def forma_ricostruita(l):
     return 'tema' if '-' in l['lemma'].strip('-') else 'radice'
 
 
-LATINO_ESTESO = re.compile("[A-Za-zÀ-ɏḀ-ỿɐ-ʯʰ-˿ᴀ-ᶿⱠ-Ɀ꜠-ꟿ₀-₉⁰-⁹̀-ͯ'’ .·()/⁽⁾~=+*\\-]+")
+# con ъ e ь, che il protoslavo scrive in alfabeto latino (*mьrzěti prendeva «ě/i-conjugation» per traslitterazione)
+LATINO_ESTESO = re.compile("[A-Za-zÀ-ɏḀ-ỿɐ-ʯʰ-˿ᴀ-ᶿⱠ-Ɀ꜠-ꟿ₀-₉⁰-⁹ъьЪЬ̀-ͯ'’ .·()/⁽⁾~=+*\\-]+")
 
 
 def senza_lettere(t):

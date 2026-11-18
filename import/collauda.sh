@@ -601,6 +601,7 @@ assert not _hf('úp', 'men-') and not _hf('dwóh₁', 'pel-') and not _hf('dóru
 # le altre scritture la tengono
 imp = Importatore()
 assert imp.lessemi[imp.lessema('ine-pro', '*bʰōw-', translit='literally')]['translit'] is None
+assert imp.lessemi[imp.lessema('sla-pro', '*mьrzěti', translit='ě/i-conjugation')]['translit'] is None
 assert imp.lessemi[imp.lessema('egy', 'pr-ꜥꜣ', translit='<i class="Latn mention">pr-ꜥꜣ</i>')]['translit'] is None
 assert imp.lessemi[imp.lessema('got', '*𐌲𐌰𐌱𐌹𐌻𐌰', translit='*gabila')]['translit'] == '*gabila'
 # per una forma ricostruita una glossa che è un affisso è il suo discendente (*-kos «-y»), non il suo senso

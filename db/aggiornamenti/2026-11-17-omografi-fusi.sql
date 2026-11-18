@@ -141,7 +141,7 @@ begin
        -- una forma ricostruita in alfabeto latino con pedici, lettere modificatrici e diacritici (*bʰōw-, «literally»:
        -- ine-pro/literally) e ovunque sia un pezzo di HTML (egy/i-class=latn-mention…)
        and (s.translit is not null or l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿ''’ .·-]+$' or l.translit ~ '[<>]'
-            or (l.ricostruito and l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿɐ-ʯʰ-˿ᴀ-ᶿⱠ-Ɀ꜠-ꟿ₀-₉⁰-⁹\u0300-\u036f''’ .·()/⁽⁾~=+*-]+$'))
+            or (l.ricostruito and l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿɐ-ʯʰ-˿ᴀ-ᶿⱠ-Ɀ꜠-ꟿ₀-₉⁰-⁹ъьЪЬ\u0300-\u036f''’ .·()/⁽⁾~=+*-]+$'))
        and l.translit is distinct from s.translit),
   libere as (
     select distinct on (n.nuovo) n.id, n.translit from nuove n
@@ -156,7 +156,7 @@ begin
               where l.provenienza = 'wiktionary' and l.stato_editoriale = 'importato'
                 and s.translit is null and l.translit is not null
                 and (l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿ''’ .·-]+$' or l.translit ~ '[<>]'
-                     or (l.ricostruito and l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿɐ-ʯʰ-˿ᴀ-ᶿⱠ-Ɀ꜠-ꟿ₀-₉⁰-⁹\u0300-\u036f''’ .·()/⁽⁾~=+*-]+$'))
+                     or (l.ricostruito and l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿɐ-ʯʰ-˿ᴀ-ᶿⱠ-Ɀ꜠-ꟿ₀-₉⁰-⁹ъьЪЬ\u0300-\u036f''’ .·()/⁽⁾~=+*-]+$'))
               order by l.id loop
     omo := rec.omografo;
     loop
