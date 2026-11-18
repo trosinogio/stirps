@@ -74,10 +74,25 @@ begin
    where not exists (select 1 from lingua l where l.codice = s.codice);
   get diagnostics n = row_count;
   r := r || jsonb_build_object('lingue_nuove', n);
+  -- l'antenato è quello del pacchetto (la genealogia del parser), anche dove la lingua ne ha già uno: un antenato che
+  -- saltava una fase (inglese < antico inglese, tedesco < protogermanico, russo < protoslavo, scritti a mano nel seme)
+  -- faceva di un'eredità un legame generico, 70.845 eredità su 186.392 il 17 novembre 2026 (eredita_fuori_genealogia)
   update lingua l set antenato = s.antenato
     from stg_lingua s
-   where l.codice = s.codice and l.antenato is null and s.antenato is not null and s.antenato <> l.codice
+   where l.codice = s.codice and s.antenato is not null and s.antenato <> l.codice
+     and l.antenato is distinct from s.antenato
      and exists (select 1 from lingua x where x.codice = s.antenato);
+  get diagnostics n = row_count;
+  r := r || jsonb_build_object('antenati_dal_pacchetto', n);
+  -- una famiglia non è una lingua madre: il galego-portoghese antico e lo svedese antico erano varietà di «lingua
+  -- romanza (non precisata)» e delle germaniche settentrionali (il parser prendeva il prefisso del codice), e
+  -- lingue_ascendenti(), che parte dalla madre, non arrivava al latino né al norreno
+  update lingua l set varieta_di = null
+    from stg_lingua s, lingua p
+   where s.codice = l.codice and s.varieta_di is null and p.codice = l.varieta_di
+     and p.nome like 'lingua % (non precisata)';
+  get diagnostics n = row_count;
+  r := r || jsonb_build_object('varieta_di_una_famiglia_tolte', n);
   update lingua l set varieta_di = s.varieta_di
     from stg_lingua s
    where l.codice = s.codice and l.varieta_di is null and l.antenato is null and s.varieta_di is not null
@@ -179,6 +194,28 @@ begin
      where not exists (select 1 from lessema y where y.id <> n.id and y.slug = n.nuovo)
      order by n.nuovo, n.id)
   update lessema l set translit = f.translit from libere f where l.id = f.id;
+  -- se l'indirizzo senza la traslitterazione finta è di un'altra voce (*bʰōw- e *bʰow-: ine-pro/bhow), la voce passa al
+  -- primo numero d'omografo libero, come una voce nuova qui sotto: altrimenti teneva ine-pro/literally (10 voci il
+  -- 17 novembre 2026). Il numero resta finché l'indirizzo è occupato (pulisci_wiktionary(), passo 5)
+  for rec in select l.id, l.omografo
+               from lessema l join m_scelta s on s.id = l.id
+              where l.provenienza = 'wiktionary' and l.stato_editoriale = 'importato'
+                and s.translit is null and l.translit is not null
+                and (l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿ''’ .·-]+$' or l.translit ~ '[<>]'
+                     or (l.ricostruito and l.lemma ~ '^[A-Za-zÀ-ɏḀ-ỿɐ-ʯʰ-˿ᴀ-ᶿⱠ-Ɀ꜠-ꟿ₀-₉⁰-⁹\u0300-\u036f''’ .·()/⁽⁾~=+*-]+$'))
+              order by l.id loop
+    omo := rec.omografo;
+    loop
+      omo := omo + 1;
+      exit when omo > rec.omografo + 9;
+      begin
+        update lessema set translit = null, omografo = omo where id = rec.id;
+        exit;
+      exception when unique_violation then
+        null;
+      end;
+    end loop;
+  end loop;
 
   with ins as (
     insert into lessema (lingua, lemma, omografo, ricostruito, translit, pos, glossa, glossa_lingua,

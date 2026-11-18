@@ -240,9 +240,31 @@ select pg_temp.verifica(
   and (select count(*) from glossa) = (select count(*) from glosse_xmin),
   'e non riscrive nessuna glossa');
 
+\echo '— genealogia delle lingue'
+do $$
+declare v_l text; v_a text; v_v text;
+begin
+  -- un antenato sbagliato nel database (scritto a mano, che salta una fase) cede a quello del pacchetto, e una lingua
+  -- che il database fa varietà di una famiglia («lingua … (non precisata)») smette di esserlo
+  select s.codice, s.antenato into v_l, v_a from stg_lingua s join lingua l on l.codice = s.codice
+   where s.antenato is not null and s.antenato <> 'ine-pro' order by s.codice limit 1;
+  update lingua set antenato = 'ine-pro' where codice = v_l;
+  insert into lingua (codice, nome, sigla) values ('zzf', 'lingua di prova (non precisata)', 'zzf') on conflict do nothing;
+  select s.codice into v_v from stg_lingua s join lingua l on l.codice = s.codice
+   where s.varieta_di is null and s.codice <> v_l and l.antenato is null order by s.codice limit 1;
+  update lingua set varieta_di = 'zzf' where codice = v_v;
+  perform importa_wiktionary();
+  perform pg_temp.verifica(v_l is not null and (select antenato from lingua where codice = v_l) = v_a,
+    'l''antenato di una lingua è quello del pacchetto, anche dove il database ne aveva un altro');
+  perform pg_temp.verifica(v_v is not null and (select varieta_di is null from lingua where codice = v_v),
+    'una lingua non è una varietà di una famiglia');
+  raise exception using errcode = 'P0098', message = 'annulla';
+exception when sqlstate 'P0098' then null;
+end $$;
+
 \echo '— traslitterazioni finte'
 do $$
-declare v_id bigint := lx('it/carne'); v_r bigint;
+declare v_id bigint := lx('it/carne'); v_r bigint; v_o bigint; v_pulito text;
 begin
   -- una traslitterazione che è un pezzo di glossa (tucca, «liquid lard(?)») fa l'indirizzo; il pacchetto non la dà più
   update lessema set translit = 'liquid lard(?)' where id = v_id;
@@ -252,11 +274,25 @@ begin
            where l.ricostruito and l.provenienza = 'wiktionary' and s.translit is null and l.lemma ~ '[₁₂₃ʰʷ]'
            order by l.id limit 1);
   update lessema set translit = 'literally' where id = v_r;
+  -- e se l'indirizzo pulito è già di un'altra voce (*bʰōw- e *bʰow-: ine-pro/bhow), al primo numero d'omografo libero
+  v_o := (select l.id from lessema l join stg_lessema s on s.chiave = l.id_esterno
+           where l.ricostruito and l.provenienza = 'wiktionary' and s.translit is null and l.lemma ~ '[₁₂₃ʰʷ]'
+             and l.id <> v_r and l.omografo = 1
+           order by l.id limit 1);
+  v_pulito := (select slug_di(lingua, lemma, null, omografo, ricostruito) from lessema where id = v_o);
+  update lessema set translit = 'idem' where id = v_o;
+  insert into lessema (lingua, lemma, omografo, ricostruito, provenienza)
+    select lingua, norm(lemma), 1, true, 'redazione' from lessema where id = v_o;
+  perform pg_temp.verifica((select count(*) from lessema where slug = v_pulito) = 1,
+    'una voce della redazione occupa l''indirizzo pulito');
   perform importa_wiktionary();
   perform pg_temp.verifica((select translit is null and slug = 'it/carne' from lessema where id = v_id),
     'il nuovo import toglie la traslitterazione finta da un lemma in alfabeto latino, e l''indirizzo torna quello giusto');
   perform pg_temp.verifica(v_r is not null and (select translit is null and slug not like '%literally%' from lessema where id = v_r),
     'e da una forma ricostruita in alfabeto latino con pedici e lettere modificatrici');
+  perform pg_temp.verifica((select translit is null and omografo = 2 and slug = slug_di(lingua, lemma, null, 2, ricostruito)
+                              from lessema where id = v_o),
+    'se l''indirizzo pulito è di un''altra voce, la traslitterazione finta va via e la voce passa al primo omografo libero');
   raise exception using errcode = 'P0098', message = 'annulla';
 exception when sqlstate 'P0098' then null;
 end $$;

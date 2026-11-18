@@ -455,15 +455,46 @@ GERMANICHE = {'en', 'ang', 'enm', 'sco', 'de', 'gmh', 'goh', 'gsw', 'lb', 'yi', 
 # inglese e antico inglese, o tra svedese e norreno, non si vedeva, e un discendente dichiarato (inglese sotto l'antico
 # inglese) non era un'eredità. Le altre germaniche discendono direttamente dal protogermanico.
 ANTENATI_GERMANICI = {
-    'en': 'enm', 'sco': 'enm', 'yol': 'enm', 'enm': 'ang', 'ang': 'gmw-pro',
+    'en': 'enm', 'sco': 'gmw-msc', 'gmw-msc': 'enm', 'yol': 'enm', 'enm': 'ang', 'ang': 'gmw-pro',
     'de': 'gmh', 'gsw': 'gmh', 'bar': 'gmh', 'lb': 'gmh', 'yi': 'gmh', 'cim': 'gmh', 'pdc': 'gmh', 'ksh': 'gmh',
     'swg': 'gmh', 'wae': 'gmh', 'vmf': 'gmh', 'gmw-cfr': 'gmh', 'gmw-rfr': 'gmh', 'hrx': 'gmh', 'gmh': 'goh', 'goh': 'gmw-pro',
-    'nl': 'dum', 'li': 'dum', 'zea': 'dum', 'vls': 'dum', 'af': 'nl', 'dum': 'odt', 'odt': 'gmw-pro', 'frk': 'gmw-pro',
+    'nl': 'dum', 'li': 'dum', 'zea': 'dum', 'vls': 'dum', 'af': 'nl', 'dum': 'odt', 'odt': 'frk', 'frk': 'gmw-pro',
     'nds': 'gml', 'nds-de': 'gml', 'nds-nl': 'gml', 'pdt': 'gml', 'gml': 'osx', 'osx': 'gmw-pro',
     'fy': 'ofs', 'stq': 'ofs', 'frr': 'ofs', 'ofs': 'gmw-pro', 'lng': 'gmw-pro',
     'sv': 'gmq-osw', 'gmq-osw': 'non', 'da': 'gmq-oda', 'gmq-oda': 'non',
-    'nb': 'non', 'nn': 'non', 'no': 'non', 'is': 'non', 'fo': 'non', 'nrn': 'non', 'ovd': 'non', 'non': 'gmq-pro',
+    'nb': 'da', 'nn': 'gmq-mno', 'no': 'gmq-mno', 'gmq-mno': 'non', 'is': 'non', 'fo': 'non', 'nrn': 'non', 'ovd': 'non', 'non': 'gmq-pro',
     'gmq-pro': 'gem-pro', 'gmw-pro': 'gem-pro'}
+# Dentro le lingue slave, l'antenato immediato (dai moduli di Wiktionary): russo < russo medio < antico slavo orientale,
+# polacco < polacco medio < polacco antico, bulgaro < bulgaro medio < slavo ecclesiastico antico; il protoslavo discende
+# dal protobaltoslavo
+ANTENATI_SLAVI = {
+    'ru': 'zle-mru', 'zle-mru': 'orv', 'uk': 'zle-muk', 'zle-muk': 'zle-ort', 'be': 'zle-mbe', 'zle-mbe': 'zle-ort',
+    'rue': 'zle-ort', 'zle-ort': 'orv', 'orv': 'sla-pro', 'zle-ono': 'sla-pro',
+    'pl': 'zlw-mpl', 'zlw-mpl': 'zlw-opl', 'szl': 'zlw-opl', 'zlw-opl': 'sla-pro', 'csb': 'sla-pro', 'pox': 'sla-pro',
+    'cs': 'zlw-ocs', 'czk': 'zlw-ocs', 'zlw-ocs': 'sla-pro', 'sk': 'zlw-osk', 'rsk': 'zlw-osk', 'zlw-osk': 'sla-pro',
+    'hsb': 'sla-pro', 'dsb': 'sla-pro',
+    'bg': 'cu-bgm', 'cu-bgm': 'cu', 'mk': 'cu', 'zls-chs': 'cu', 'cu': 'sla-pro', 'sh': 'sla-pro', 'svm': 'sh',
+    'sl': 'sla-pro', 'sla-pro': 'ine-bsl-pro'}
+# Dentro le romanze le fasi antiche (francese < francese medio < francese antico, spagnolo < spagnolo antico, portoghese e
+# galiziano < galego-portoghese antico, catalano < catalano antico, occitano < occitano antico); le altre dal latino
+ANTENATI_ROMANZI = {
+    'fr': 'frm', 'frm': 'fro', 'fro': 'la', 'nrf': 'fro', 'pcd': 'fro', 'wa': 'fro',
+    'es': 'osp', 'lad': 'osp', 'osp': 'la', 'pt': 'roa-opt', 'gl': 'roa-opt', 'roa-opt': 'la',
+    'ca': 'roa-oca', 'roa-oca': 'la', 'oc': 'pro', 'pro': 'la', 'ast': 'roa-ole', 'roa-ole': 'la',
+    'rup': 'la', 'ruq': 'la', 'ruo': 'la', 'mxi': 'la', 'dlm': 'la', 'ist': 'la', 'frp': 'la', 'an': 'la'}
+# Le altre fasi dichiarate dai moduli di Wiktionary: greco, gaelico e britonico, indoario e iranico, baltico, armeno
+ANTENATI_ALTRI = {
+    'el': 'gkm', 'gkm': 'grc',
+    'ga': 'mga', 'gd': 'mga', 'gv': 'mga', 'mga': 'sga', 'sga': 'cel-pro',
+    'cy': 'wlm', 'wlm': 'owl', 'br': 'xbm', 'xbm': 'obt', 'kw': 'cnx', 'cnx': 'oco',
+    'owl': 'cel-bry-pro', 'obt': 'cel-bry-pro', 'oco': 'cel-bry-pro', 'cel-bry-pro': 'cel-pro',
+    'sa': 'inc-pro', 'pi': 'sa', 'inc-pro': 'iir-pro', 'fa': 'pal', 'pal': 'peo', 'peo': 'ira-pro', 'ae': 'ira-pro',
+    'ira-pro': 'iir-pro', 'lt': 'olt', 'olt': 'ine-bsl-pro', 'lv': 'ine-bsl-pro', 'prg': 'ine-bsl-pro',
+    'bat-pro': 'ine-bsl-pro', 'hy': 'axm', 'axm': 'xcl', 'gmy': 'grk-pro',
+    'txb': 'ine-toc-pro', 'xto': 'ine-toc-pro', 'ine-toc-pro': 'ine-pro',
+    'hi': 'pra-sau', 'ur': 'pra-sau', 'pra-sau': 'pra', 'pra': 'sa',
+    'tr': 'ota', 'ota': 'trk-oat', 'trk-oat': 'trk-pro', 'ja': 'ojp', 'ojp': 'jpx-pro'}
+ANTENATI_IMMEDIATI = {**ANTENATI_ROMANZI, **ANTENATI_ALTRI, **ANTENATI_SLAVI, **ANTENATI_GERMANICI}
 CELTICHE = {'ga', 'sga', 'mga', 'gd', 'gv', 'cy', 'wlm', 'owl', 'br', 'xbm', 'obt', 'kw', 'xtg', 'xcg', 'xce', 'cel-bry-pro'}
 SLAVE = {'ru', 'orv', 'uk', 'be', 'pl', 'cs', 'sk', 'sl', 'hr', 'sr', 'sh', 'bg', 'mk', 'cu', 'dsb', 'hsb', 'zlw-pro'}
 INDOIRANICHE = {'sa', 'pi', 'pra', 'hi', 'ur', 'bn', 'inc-pro', 'fa', 'pal', 'peo', 'ae', 'xpr', 'ku', 'ps', 'os', 'ira-pro'}
@@ -473,18 +504,16 @@ FIGLIE_PIE = {'itc-pro', 'gem-pro', 'grk-pro', 'cel-pro', 'sla-pro', 'bsl-pro', 
 
 def antenato_lingua(c):
     c = base_lingua(c)
+    if c in ANTENATI_IMMEDIATI:
+        return ANTENATI_IMMEDIATI[c]
     if c in ROMANZE:
         return 'la'
     # con le lingue sabelliche minori (sabino, piceno meridionale, volsco, equo, marso, vestino): senza, *h₂nḗr «uomo»
     # risultava preso in prestito dal sabino nerō (dalla pagina di Nero), e la famiglia indoeuropea finiva sotto una parola sabina
     if c in ('la', 'osc', 'xum', 'xfa', 'itc-ola', 'sbv', 'spx', 'xvo', 'xae', 'xmr', 'xvs'):
         return 'itc-pro'
-    if c in ('el', 'gkm'):
-        return 'grc'
     if c == 'grc':
         return 'grk-pro'
-    if c in ANTENATI_GERMANICI:
-        return ANTENATI_GERMANICI[c]
     if c in GERMANICHE:
         return 'gem-pro'
     if c in CELTICHE:
@@ -561,6 +590,18 @@ def ha_la_forma_della_radice(parola, radice):
         if i < len(r) and c == r[i]:
             i += 1
     return i == len(r)
+
+
+def primo_antenato(c, presenti):
+    """Il primo antenato di c che è una lingua del dizionario: le fasi che il dizionario non ha si saltano (l'ucraino,
+    senza l'ucraino medio, discende dal ruteno antico)."""
+    x, visti = antenato_lingua(c), {c}
+    while x and x not in visti:
+        if x in presenti:
+            return x
+        visti.add(x)
+        x = antenato_lingua(x)
+    return None
 
 
 def discende_da(a, b):
@@ -1961,9 +2002,11 @@ class Importatore:
         os.makedirs(cartella, exist_ok=True)
         usate = Counter(l['lingua'] for l in self.lessemi.values())
         with open(os.path.join(cartella, 'lingue.tsv'), 'w', encoding='utf-8') as f:
-            for c in sorted(usate):
-                if c in NOTE:
-                    continue
+            # anche le lingue del seme: nel database l'antenato viene dal pacchetto, e con quello scritto a mano nel seme
+            # (inglese < antico inglese, tedesco < protogermanico, russo < protoslavo) un'eredità inglese < medio inglese
+            # diventava un legame generico: 70.845 su 186.392 il 17 novembre 2026 (eredita_fuori_genealogia)
+            presenti = set(usate) | NOTE
+            for c in sorted(presenti):
                 nome_en = self.nomi_lingua[c].most_common(1)[0][0] if self.nomi_lingua[c] else c
                 cur = CURATE.get(c)
                 if cur:
@@ -1977,15 +2020,24 @@ class Importatore:
                         pref = c.split('-')[0]
                         if pref in PREFISSO_FAMIGLIA:
                             fam, ramo = PREFISSO_FAMIGLIA[pref]
-                        if '-' in c and not c.endswith('-pro') and (pref in usate or pref in NOTE or pref in CURATE):
-                            var = pref          # en-US, grc-dor, scn-old, fro-nor: varietà della lingua madre
+                        # en-US, grc-dor, scn-old, fro-nor: varietà della lingua madre; mai di una famiglia (roa-opt non è
+                        # una varietà di «lingua romanza (non precisata)», gmq-osw non lo è delle germaniche settentrionali)
+                        if '-' in c and not c.endswith('-pro') and (pref in usate or pref in NOTE or pref in CURATE) \
+                                and pref not in PREFISSO_FAMIGLIA:
+                            var = pref
                         if c in ('oc-pro', 'oc-pro-old'):
                             var = 'oc'
-                    # le germaniche non curate con il loro antenato (svedese < svedese antico): senza, nel database
-                    # un'eredità svedese < svedese antico diventava un legame generico (eredita_fuori_genealogia)
                     if c in ANTENATI_GERMANICI:
-                        ant = ANTENATI_GERMANICI[c]
                         fam, ramo = fam or 'indoeuropea', ramo or 'germanica'
+                    elif c in ANTENATI_SLAVI:
+                        fam, ramo = fam or 'indoeuropea', ramo or 'slava'
+                # l'antenato immediato che il dizionario ha (gli intermedi che mancano si saltano); senza, quello curato
+                if base_lingua(c) == c:
+                    ant = primo_antenato(c, presenti) or (ant if ant in presenti else None)
+                else:
+                    ant = None          # latino volgare, greco della koinè: varietà della loro lingua, non lingue figlie
+                if var and ant:
+                    var = None          # una lingua con un antenato non è una varietà (lingue_ascendenti parte dalla madre)
                 # ricostruita: -pro su un codice di famiglia (oc-pro è il provenzale, non una protolingua)
                 ric = c.endswith('-pro') and len(c.split('-')[0]) >= 3
                 f.write('\t'.join(esc(x) for x in (c, nit, sit, nen, sen, fam, ramo, ant, var, 't' if ric else 'f', lat, lon)) + '\n')

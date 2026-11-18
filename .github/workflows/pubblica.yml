@@ -86,7 +86,15 @@ jobs:
         run: |
           # con l'API REST, non con la CLI: il token è un token di progetto (vcp_…), che non vede l'utente,
           # e la CLI con lui si ferma («User not found»)
-          if ! out=$(bash scripts/pubblica-vercel-api.sh production 2>&1); then
+          esito=0
+          out=$(bash scripts/pubblica-vercel-api.sh production 2>&1) || esito=$?
+          if [ "$esito" = 2 ]; then
+            # Vercel non ha più risposto, o la build non è finita in 40 minuti: il deploy può riuscire da solo, e un
+            # secondo deploy farebbe un secondo import sul database
+            echo "$out" | tail -45
+            echo "::error title=Deploy::esito sconosciuto: Vercel non risponde o la build non è finita; guardare il sito prima di rilanciare (le ultime righe sono nel registro)"
+            exit 1
+          elif [ "$esito" != 0 ]; then
             echo "$out" | tail -45
             echo "::error title=Deploy::la pubblicazione su Vercel non è riuscita (le ultime righe sono nel registro)"
             exit 1

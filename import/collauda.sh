@@ -616,10 +616,24 @@ assert not senza_lettere('ἄλφα') and not senza_lettere('18-enne') and not s
 # e la tabella delle lingue porta quell'antenato anche per le germaniche non curate (svedese < svedese antico)
 import tempfile
 imp = Importatore()
-imp.lessema('sv', 'djur'); imp.lessema('gmq-osw', 'diur')
+imp.lessema('sv', 'djur'); imp.lessema('gmq-osw', 'diur'); imp.lessema('non', 'dýr')
 _d = tempfile.mkdtemp(); imp.scrivi(_d)
 _l = {r.split('\t')[0]: r.rstrip('\n').split('\t') for r in open(_d + '/lingue.tsv', encoding='utf-8')}
 assert _l['sv'][5:8] == ['indoeuropea', 'germanica', 'gmq-osw'] and _l['gmq-osw'][7] == 'non', (_l['sv'], _l['gmq-osw'])
+# le slave e le romanze con le loro fasi; anche le lingue del seme prendono l'antenato immediato che il dizionario ha
+# (inglese < medio inglese, non antico inglese), e una lingua non è una varietà della sua famiglia (roa-opt non è di roa)
+assert discende_da('ru', 'orv') and discende_da('bg', 'cu') and discende_da('pl', 'zlw-opl') and discende_da('sla-pro', 'ine-bsl-pro')
+assert not discende_da('orv', 'ru') and not discende_da('cu', 'bg') and not discende_da('ru', 'pl')
+assert discende_da('es', 'osp') and discende_da('fr', 'fro') and discende_da('pt', 'roa-opt') and not discende_da('fro', 'fr')
+imp = Importatore()
+for _c, _w in [('en', 'tree'), ('enm', 'tre'), ('roa-opt', 'arvor'), ('uk', 'дерево'), ('zle-ort', 'дерево')]:
+    imp.lessema(_c, _w)
+_d = tempfile.mkdtemp(); imp.scrivi(_d)
+_l = {r.split('\t')[0]: r.rstrip('\n').split('\t') for r in open(_d + '/lingue.tsv', encoding='utf-8')}
+assert _l['en'][7] == 'enm' and _l['enm'][7] == 'ang', (_l['en'], _l['enm'])
+assert _l['roa-opt'][7] == 'la' and _l['roa-opt'][8] == '\\N', _l['roa-opt']
+assert _l['uk'][7] == 'zle-ort', _l['uk']          # l'ucraino medio non c'è: si salta
+assert _l['la-vul'][7] == '\\N', _l['la-vul']      # il latino volgare resta una varietà, non una lingua figlia
 imp = Importatore()
 imp.chiusura['ine-pro'] = {'voci': [], 'omografi': {}, 'forme': {}, 'participi': {}, 'flesse': {}, 'file_glosse': None,
                            'lemmi': {nome_pagina('ine-pro', 'h₂nḗr')}}
