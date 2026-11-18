@@ -12,10 +12,9 @@ jobs:
         run: |
           S=https://dizionario-etimologico.vercel.app
           prova() { curl -s -o /tmp/p.html -w "%{http_code} %{size_download}B" "$S$1"; printf ' %s | ' "$1"; grep -o "$2" /tmp/p.html | head -${3:-2} | tr '\n' ' '; echo; }
-          prova /it/w/sv/djurskydd 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
-          prova /it/w/nl/dorpsschool 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
-          prova /it/w/is/sjukdomur 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
-          prova /it/w/af/wilg 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
-          prova /it/w/ine-pro/dwoh1-2 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
-          prova /it/w/ine-pro/kwo-2 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
-          prova /it/w/ine-pro/h2ner 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/w/en/mother 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/w/gl/leite 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/w/ine-pro/bhow 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/w/en/wright 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/w/sv/hus 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/lingue 'ruteno[^<]*\|svedese antico[^<]*\|galego-portoghese[^<]*' 6
