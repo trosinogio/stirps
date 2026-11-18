@@ -41,6 +41,8 @@ assert ff(s('second-person plural present passive indicative/imperative of conte
 assert ff({'senses': [{'glosses': ['genitive singular of nox'], 'form_of': [{'word': 'nox'}]}, {'tags': ['no-gloss']}]}), 'un senso vuoto non salva una forma'
 assert not ff(s('perfect passive participle of amō', 'beloved, dear')), 'un senso lessicale e la voce resta'
 assert not ff(s('alternative form of riappressare')) and not ff(s('comparative studies')), 'varianti e falsi amici restano'
+assert ff(s('to-infinitive of הִכְעִיס (hikh\'ís)')) and ff(s('bare infinitive (infinitive construct or gerund) of יָשַׁב')), 'gli infiniti ebraici sono forme'
+assert ff(s('construct state of שָׂכָר')) and not ff(s('defective spelling of קיבוץ')), 'lo stato costrutto è una forma, la grafia difettiva una variante'
 # {{ety}}/{{etymon}}, il sistema nuovo di Wiktionary, diventa il modello classico equivalente
 from filtra import da_ety
 assert da_ety({'args': {'1': 'la', '2': ':af', '3': 'audiēns', '4': '-ia'}}, 'la')['args'] == {'1': 'la', '2': 'audiēns', '3': '-ia'}

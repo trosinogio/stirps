@@ -276,6 +276,7 @@ FORMA = re.compile(r'^(?:\([^)]*\)\s*)*(?:'
                    r'|(?:plural|singular|dual|inflection|gerund|supine)\s+of\b'
                    r'|(?:(?:present|perfect|future|past|aorist|imperfect)\s+)?(?:(?:active|passive|middle|mediopassive)\s+)?'
                    r'(?:infinitive|participle)\s+of\b'
+                   r'|(?:to-|bare\s+)infinitive\b|construct\s+(?:state|form)\s+of\b'   # ebraico: «to-infinitive of הִכְעִיס»
                    r'|(?:comparative|superlative)(?:\s+degree)?\s+of\b'
                    r'|(?:simple\s+)?past\s+tense\b|simple\s+past\b'                # inglese: «simple past tense and past participle of»
                    r'|compound\s+of\b)', re.I)       # italiano, forme con pronomi attaccati: «compound of the infinitive dire with ve and la»
