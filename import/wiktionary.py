@@ -269,11 +269,18 @@ SEGNI_DELLA_PAGINA = {'ang': '\u0304\u0306\u0307',             # macron, breve, 
                       'ru': '\u0301\u0300', 'uk': '\u0301\u0300', 'be': '\u0301\u0300', 'rue': '\u0301\u0300',   # accento tonico
                       # e nelle lingue che lo scrivono solo nelle citazioni (слу́жа → служа, ора́ти → орати, jézik → jezik);
                       # non in ceco, slovacco, polacco, serbocroato e macedone, dove l'acuto fa parte delle lettere (á, ó, ć, ќ)
-                      'bg': '\u0301', 'orv': '\u0301\u0300', 'zle-ort': '\u0301\u0300', 'zle-mru': '\u0301\u0300',
-                      'sl': '\u0300\u0301\u0302\u030f\u0311',
+                      'orv': '\u0301\u0300', 'zle-ort': '\u0301\u0300', 'zle-mru': '\u0301\u0300',
+                      'sl': '\u0300\u0301\u0302\u030f\u0311\u0304',
                       # protoslavo: gli accenti (acuto, grave, doppio grave, breve rovesciata, circonflesso, tilde) non
                       # stanno nel titolo, che tiene invece pipa e ogonek: *šȅstь → *šestь, *pę̑tь → *pętь
                       'sla-pro': '\u0301\u0300\u030f\u0311\u0302\u0303'}
+
+
+# serbocroato, macedone e bulgaro: i segni tonali e l'accento si tolgono solo sopra le vocali (e la r sillabica), perché
+# ć, ќ e ѓ hanno l'acuto nella lettera stessa: rȍđen → rođen, аспира́нт → аспирант, а̀виомотор → авиомотор, ma ćuprija
+# resta ćuprija; 2.323 voci serbocroate avevano il loro doppione senza segni (18 novembre 2026)
+SEGNI_SU_VOCALE = {'sh': '\u0300\u0301\u030f\u0311\u0304\u0303\u0302', 'mk': '\u0300\u0301', 'bg': '\u0300\u0301'}
+VOCALI_SLAVE = set('aeiouAEIOUrRаеиоуАЕИОУрРъЪ')
 
 
 def nome_pagina(lingua, termine):
@@ -284,6 +291,13 @@ def nome_pagina(lingua, termine):
         termine = unicodedata.normalize('NFC', ''.join(ch for ch in unicodedata.normalize('NFD', termine) if ch not in '\u0304\u0306'))
     elif (lingua or '').split('-')[0] in SENZA_VOCALI or lingua in SENZA_VOCALI:
         termine = SEGNI_VOCALICI.sub('', unicodedata.normalize('NFC', termine))
+    elif lingua in SEGNI_SU_VOCALE and len(termine) > 1:      # ѝ (bulgaro, «le») è una parola con il suo accento
+        segni, out = SEGNI_SU_VOCALE[lingua], []
+        for ch in unicodedata.normalize('NFD', termine):
+            if ch in segni and out and out[-1] in VOCALI_SLAVE:
+                continue
+            out.append(ch)
+        termine = unicodedata.normalize('NFC', ''.join(out))
     elif lingua in SEGNI_DELLA_PAGINA:
         segni = SEGNI_DELLA_PAGINA[lingua]
         termine = unicodedata.normalize('NFC', ''.join(ch for ch in unicodedata.normalize('NFD', termine) if ch not in segni))
