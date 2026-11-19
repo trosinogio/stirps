@@ -37,12 +37,20 @@ jobs:
         sv:Swedish da:Danish nb:Norwegian Bokmål nn:Norwegian Nynorsk no:Norwegian is:Icelandic fo:Faroese fy:West Frisian ofs:Old Frisian
         af:Afrikaans lb:Luxembourgish nds:Low German nds-de:German Low German nds-nl:Dutch Low Saxon sco:Scots odt:Old Dutch
         gmq-osw:Old Swedish gmq-oda:Old Danish li:Limburgish gsw:Alemannic German bar:Bavarian pdc:Pennsylvania German stq:Saterland Frisian
-        frr:North Frisian ovd:Elfdalian nrn:Norn cim:Cimbrian yol:Yola pdt:Plautdietsch gmq-pro:Proto-Norse lng:Lombardic vls:West Flemish zea:Zealandic'
-      INTERE: la,grc
-      # la stima dopo ogni giro (stima_import.py), per le lingue germaniche
-      STIMA_LINGUE: de,nl,sv,da,nb,nn,no,is,fo,fy,af,lb,yi,sco,nds,nds-de,nds-nl,li,gsw,bar,pdc,stq,frr,ovd,nrn,cim,yol,pdt,vls,zea,ang,enm,non,gmh,goh,dum,gml,osx,odt,ofs,gmq-osw,gmq-oda,got,frk,lng
-      STIMA_ATTUALE: '1492'
-      STIMA_FREQUENZE: de=dati/frequenze_de.tsv.gz,nl=dati/frequenze_nl.tsv.gz,sv=dati/frequenze_sv.tsv.gz,da=dati/frequenze_da.tsv.gz,nb=dati/frequenze_no.tsv.gz,no=dati/frequenze_no.tsv.gz,nn=dati/frequenze_no.tsv.gz,is=dati/frequenze_is.tsv.gz
+        frr:North Frisian ovd:Elfdalian nrn:Norn cim:Cimbrian yol:Yola pdt:Plautdietsch gmq-pro:Proto-Norse lng:Lombardic vls:West Flemish zea:Zealandic
+        uk:Ukrainian be:Belarusian cs:Czech sk:Slovak sl:Slovene sh:Serbo-Croatian bg:Bulgarian mk:Macedonian hsb:Upper Sorbian
+        dsb:Lower Sorbian csb:Kashubian szl:Silesian rue:Rusyn zlw-opl:Old Polish zlw-mpl:Middle Polish zlw-ocs:Old Czech
+        zlw-osk:Old Slovak zle-ort:Old Ruthenian zle-mru:Middle Russian zle-ono:Old Novgorodian zls-chs:Church Slavonic pox:Polabian rsk:Pannonian Rusyn
+        hbo:Ancient Hebrew arc:Aramaic syc:Classical Syriac phn:Phoenician uga:Ugaritic akk:Akkadian sem-pro:Proto-Semitic
+        sem-wes-pro:Proto-West Semitic jpa:Jewish Palestinian Aramaic tmr:Jewish Babylonian Aramaic'
+      # l'ebraico intero, senza nomi propri né locuzioni, e le lingue semitiche antiche intere (via libera di Giovanni del
+      # 18 novembre 2026 alla proposta della stima, ramo dati-stima-ebraico da non unire)
+      INTERE: la,grc,he,hbo,arc,syc,phn,uga,akk,jpa,tmr
+      SENZA_NOMI: he
+      # la stima dopo ogni giro (stima_import.py), per le lingue slave
+      STIMA_LINGUE: he,hbo,arc,syc,phn,uga,akk,sem-pro,sem-wes-pro,jpa,tmr
+      STIMA_ATTUALE: '2864'
+      STIMA_FREQUENZE: he=dati/frequenze_he.tsv.gz
       # sotto le voci dei rami antichi e del latino entrano anche i discendenti dichiarati che il dizionario non ha
       # (import/wiktionary.py; il latino dal 15 novembre 2026, decisione di Giovanni: le lingue romanze)
       # e sotto il protobaltoslavo e il protoceltico (16 novembre 2026: lituano e irlandese antico, con l'ittita, per il
@@ -56,14 +64,16 @@ jobs:
       # di Giovanni, 16 novembre 2026, «ambito B» della stima: 209 mila voci); il francese non ha più l'elenco del lessico comune
       # e le lingue germaniche, tranne l'inglese, allo stesso modo (via libera di Giovanni del 17 novembre 2026 all'«ambito B» della
       # stima: 269 mila voci); il tedesco non ha più l'elenco del lessico comune
-      CON_ETIMOLOGIA: en,ru,es,pt,ca,ro,gl,oc,fr,fro,frm,osp,roa-opt,roa-oca,pro,nap,scn,vec,lij,sc,lmo,pms,fur,ast,an,co,lld,rm,wa,frp,dlm,rup,ruq,ruo,lad,egl,rgn,ist,mxi,nrf,pcd,de,nl,sv,da,nb,nn,no,is,fo,fy,af,lb,yi,sco,nds,nds-de,nds-nl,li,gsw,bar,pdc,stq,frr,ovd,nrn,cim,yol,pdt,vls,zea,ang,enm,non,gmh,goh,dum,gml,osx,odt,ofs,gmq-osw,gmq-oda,got,frk,lng
+      # e le lingue slave, russo compreso, allo stesso modo (via libera di Giovanni del 18 novembre 2026 all'«ambito B»
+      # della stima, ramo dati-stima-slave: 200 mila voci); il russo non ha più l'elenco del lessico comune
+      CON_ETIMOLOGIA: en,ru,es,pt,ca,ro,gl,oc,fr,fro,frm,osp,roa-opt,roa-oca,pro,nap,scn,vec,lij,sc,lmo,pms,fur,ast,an,co,lld,rm,wa,frp,dlm,rup,ruq,ruo,lad,egl,rgn,ist,mxi,nrf,pcd,de,nl,sv,da,nb,nn,no,is,fo,fy,af,lb,yi,sco,nds,nds-de,nds-nl,li,gsw,bar,pdc,stq,frr,ovd,nrn,cim,yol,pdt,vls,zea,ang,enm,non,gmh,goh,dum,gml,osx,odt,ofs,gmq-osw,gmq-oda,got,frk,lng,uk,be,pl,cs,sk,sl,sh,bg,mk,hsb,dsb,csb,szl,rue,orv,cu,zlw-opl,zlw-mpl,zlw-ocs,zlw-osk,zle-ort,zle-mru,zle-ono,zls-chs,pox,rsk
       # dell'inglese, il lessico comune (i lemmi tra le 50 mila forme più frequenti) e le parole con l'etimo fuori
       # dall'inglese (ESTERNI), senza nomi propri né locuzioni
       # la stessa regola per francese, tedesco e russo (stima del 6 novembre 2026: 114 MB invece di 239 per le lingue intere)
       # l'italiano anche con i lemmi senza etimologia del lessico comune (referto), per l'analisi di un testo
       COMUNI: it=../dati/frequenze_it.tsv.gz
-      ELENCHI: en=../dati/frequenze_en.tsv.gz ru=../dati/frequenze_ru.tsv.gz
-      ESTERNI: en,ru
+      ELENCHI: en=../dati/frequenze_en.tsv.gz
+      ESTERNI: en
       GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
       # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
       DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq

@@ -41,6 +41,8 @@ assert ff(s('second-person plural present passive indicative/imperative of conte
 assert ff({'senses': [{'glosses': ['genitive singular of nox'], 'form_of': [{'word': 'nox'}]}, {'tags': ['no-gloss']}]}), 'un senso vuoto non salva una forma'
 assert not ff(s('perfect passive participle of amō', 'beloved, dear')), 'un senso lessicale e la voce resta'
 assert not ff(s('alternative form of riappressare')) and not ff(s('comparative studies')), 'varianti e falsi amici restano'
+assert ff(s('to-infinitive of הִכְעִיס (hikh\'ís)')) and ff(s('bare infinitive (infinitive construct or gerund) of יָשַׁב')), 'gli infiniti ebraici sono forme'
+assert ff(s('construct state of שָׂכָר')) and not ff(s('defective spelling of קיבוץ')), 'lo stato costrutto è una forma, la grafia difettiva una variante'
 # {{ety}}/{{etymon}}, il sistema nuovo di Wiktionary, diventa il modello classico equivalente
 from filtra import da_ety
 assert da_ety({'args': {'1': 'la', '2': ':af', '3': 'audiēns', '4': '-ia'}}, 'la')['args'] == {'1': 'la', '2': 'audiēns', '3': '-ia'}
@@ -601,6 +603,7 @@ assert not _hf('úp', 'men-') and not _hf('dwóh₁', 'pel-') and not _hf('dóru
 # le altre scritture la tengono
 imp = Importatore()
 assert imp.lessemi[imp.lessema('ine-pro', '*bʰōw-', translit='literally')]['translit'] is None
+assert imp.lessemi[imp.lessema('sla-pro', '*mьrzěti', translit='ě/i-conjugation')]['translit'] is None
 assert imp.lessemi[imp.lessema('egy', 'pr-ꜥꜣ', translit='<i class="Latn mention">pr-ꜥꜣ</i>')]['translit'] is None
 assert imp.lessemi[imp.lessema('got', '*𐌲𐌰𐌱𐌹𐌻𐌰', translit='*gabila')]['translit'] == '*gabila'
 # per una forma ricostruita una glossa che è un affisso è il suo discendente (*-kos «-y»), non il suo senso
@@ -609,6 +612,13 @@ _k = imp.lessema('ine-pro', '*-kos', glossa='-y')
 assert imp.scegli_glossa(imp.lessemi[_k]) is None
 imp.lessema('ine-pro', '*-kos', glossa='adjectival suffix')
 assert imp.scegli_glossa(imp.lessemi[_k]) == 'adjectival suffix'
+# l'accento delle citazioni non sta nel titolo della pagina: bulgaro, antico slavo orientale, ruteno antico, sloveno; il
+# ceco, il polacco e il serbocroato tengono l'acuto delle loro lettere
+assert nome_pagina('bg', 'слу́жа') == 'служа' and nome_pagina('zle-ort', 'ора́ти') == 'орати' and nome_pagina('sl', 'jézik') == 'jezik'
+assert nome_pagina('cs', 'dál') == 'dál' and nome_pagina('pl', 'ósmy') == 'ósmy' and nome_pagina('sh', 'ćuprija') == 'ćuprija'
+assert nome_pagina('sh', 'rȍđen') == 'rođen' and nome_pagina('sh', 'ра̀чӯн') == 'рачун' and nome_pagina('sh', 'krèpati') == 'krepati'
+assert nome_pagina('mk', 'аспира́нт') == 'аспирант' and nome_pagina('mk', 'ќе') == 'ќе' and nome_pagina('mk', 'ѓубре') == 'ѓубре'
+assert nome_pagina('bg', 'а̀виомотор') == 'авиомотор' and nome_pagina('bg', 'ѝ') == 'ѝ' and nome_pagina('bg', 'следя́') == 'следя' and nome_pagina('bg', 'ю́ноша') == 'юноша' and nome_pagina('sl', 'nosīti') == 'nositi'
 # un lemma di sole cifre o segni non è una parola
 from wiktionary import senza_lettere
 assert senza_lettere('24') and senza_lettere('+') and senza_lettere('++') and senza_lettere('🎻') and senza_lettere('1-2-3')
@@ -625,6 +635,15 @@ assert _l['sv'][5:8] == ['indoeuropea', 'germanica', 'gmq-osw'] and _l['gmq-osw'
 assert discende_da('ru', 'orv') and discende_da('bg', 'cu') and discende_da('pl', 'zlw-opl') and discende_da('sla-pro', 'ine-bsl-pro')
 assert not discende_da('orv', 'ru') and not discende_da('cu', 'bg') and not discende_da('ru', 'pl')
 assert discende_da('es', 'osp') and discende_da('fr', 'fro') and discende_da('pt', 'roa-opt') and not discende_da('fro', 'fr')
+# le lingue semitiche: l'ebraico risale all'ebraico biblico e al protosemitico, il siriaco all'aramaico
+assert discende_da('he', 'hbo') and discende_da('he', 'sem-pro') and discende_da('syc', 'arc') and discende_da('akk', 'sem-pro')
+assert not discende_da('hbo', 'he') and not discende_da('arc', 'syc') and not discende_da('he', 'arc')
+from wiktionary import primo_antenato
+assert primo_antenato('he', {'hbo', 'sem-pro'}) == 'hbo' and primo_antenato('hbo', {'sem-pro'}) == 'sem-pro'
+# --senza-nomi: una lingua intera senza nomi propri né locuzioni (l'ebraico)
+imp_sn = Importatore(); imp_sn.intere = {'he', 'arc'}; imp_sn.senza_nomi = {'he'}
+assert not imp_sn.ammessa('he', {'w': 'דוד', 'p': 'name'}) and not imp_sn.ammessa('he', {'w': 'בית ספר', 'p': 'noun'})
+assert imp_sn.ammessa('he', {'w': 'בית', 'p': 'noun'}) and imp_sn.ammessa('arc', {'w': 'אלהא', 'p': 'name'})
 imp = Importatore()
 for _c, _w in [('en', 'tree'), ('enm', 'tre'), ('roa-opt', 'arvor'), ('uk', 'дерево'), ('zle-ort', 'дерево')]:
     imp.lessema(_c, _w)
