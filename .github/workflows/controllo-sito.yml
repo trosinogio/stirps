@@ -12,9 +12,11 @@ jobs:
         run: |
           S=https://dizionario-etimologico.vercel.app
           prova() { curl -s -o /tmp/p.html -w "%{http_code} %{size_download}B" "$S$1"; printf ' %s | ' "$1"; grep -o "$2" /tmp/p.html | head -${3:-2} | tr '\n' ' '; echo; }
-          prova /it/w/en/mother 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
-          prova /it/w/gl/leite 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
-          prova /it/w/ine-pro/bhow 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
-          prova /it/w/en/wright 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
-          prova /it/w/sv/hus 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
-          prova /it/lingue 'ruteno[^<]*\|svedese antico[^<]*\|galego-portoghese[^<]*' 6
+          prova /it/w/pl/dom 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/w/cs/voda 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/w/sh/krepati 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/w/bg/sledja 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/w/he/misgad 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/w/he/yeda 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/w/akk/napistum 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
+          prova /it/w/syc/%DC%9D%DC%98%DC%AA%DC%A9%DC%90 'glossa-g[^<]*<[^<]*<[^<]*<[^<]*\|href="/it/[wr]/[a-z-]*/[^"]*"' 6
