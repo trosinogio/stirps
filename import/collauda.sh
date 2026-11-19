@@ -42,6 +42,8 @@ assert ff({'senses': [{'glosses': ['genitive singular of nox'], 'form_of': [{'wo
 assert not ff(s('perfect passive participle of amō', 'beloved, dear')), 'un senso lessicale e la voce resta'
 assert not ff(s('alternative form of riappressare')) and not ff(s('comparative studies')), 'varianti e falsi amici restano'
 assert ff(s('to-infinitive of הִכְעִיס (hikh\'ís)')) and ff(s('bare infinitive (infinitive construct or gerund) of יָשַׁב')), 'gli infiniti ebraici sono forme'
+assert ff({'senses': [{'tags': ['form-i', 'no-gloss']}], 'head_templates': [{'expansion': 'أُنَّا • (ʔunnā) (form I)\n# first-person'}]}), 'una forma verbale araba senza glossa'
+assert not ff({'senses': [{'tags': ['no-gloss']}], 'head_templates': [{'expansion': 'كَتَبَ • (kataba) I'}]}), 'senza glossa ma senza segni di forma: resta'
 assert ff(s('construct state of שָׂכָר')) and not ff(s('defective spelling of קיבוץ')), 'lo stato costrutto è una forma, la grafia difettiva una variante'
 # {{ety}}/{{etymon}}, il sistema nuovo di Wiktionary, diventa il modello classico equivalente
 from filtra import da_ety
@@ -281,6 +283,25 @@ imp = Importatore()
 radius, mens, frustum = imp.lessema('la', 'radius', pos='s.'), imp.lessema('la', 'mens', pos='s.f.'), imp.lessema('la', 'frustum', pos='s.')
 radio_, mente_, ulentus_ = imp.lessema('it', 'radio-'), imp.lessema('it', '-mente'), imp.lessema('la', '-ulentus')
 arco(imp, radio_, radius); arco(imp, mente_, mens); arco(imp, ulentus_, frustum)
+# una radice ebraica con l'etimo in due grafie («*q-d-m//*qdm»): vale la prima, non è un link interno di Wiktionary
+imp_q = Importatore()
+imp_q.voce({'w': 'ק־ד־ם', 'l': 'he', 'tpl': [{'n': 'inh', 'a': {'1': 'he', '2': 'sem-pro', '3': '*q-d-m//*qdm'}, 'e': ''}]}, 'he')
+assert any(r['etimo'] == imp_q.chiave_di('sem-pro', '*q-d-m') for r in imp_q.relazioni), imp_q.relazioni
+# il protosemitico ha due notazioni: *ʾil- e *ʔil- sono la stessa voce
+from wiktionary import nome_pagina as np_
+assert np_('sem-pro', '*ʾil-') == '*ʔil-' and np_('sem-pro', '*ʿayn-') == '*ʕayn-' and np_('ar', 'ʿayn') == 'ʿayn'
+# le radici corrispondenti dichiarate: ש־ל־ם < *š-l-m e «Cognate with Arabic root س ل م» → س ل م < *š-l-m
+import tempfile, os as _os
+_d = tempfile.mkdtemp(); _os.makedirs(_d + '/he')
+open(_d + '/he/radici_corrispondenti.tsv', 'w', encoding='utf-8').write('ש־ל־ם\tar\tس ل م\nז־כ־ר\tar\tذ ك ر\n')
+imp_r = Importatore()
+shlm, slm, zkr, dkr = imp_r.lessema('he', 'ש־ל־ם'), imp_r.lessema('ar', 'س ل م'), imp_r.lessema('he', 'ז־כ־ר'), imp_r.lessema('ar', 'ذ ك ر')
+arco(imp_r, shlm, imp_r.lessema('sem-pro', '*š-l-m'))
+imp_r.collega_radici_corrispondenti([('he', _d + '/he/discendenti.tsv')])
+assert ha(imp_r, slm) and not ha(imp_r, dkr), 'la radice araba prende l\'etimo della radice ebraica cognata, solo se quella ne ha uno protosemitico'
+import sys as _sys; _sys.path.insert(0, '.')
+from controlla_semitico import ha_le_consonanti as hc
+assert hc('ar', 'ب ي ت', '*bayt-') and hc('ar', 'س ل م', '*š-l-m') and hc('he', 'צ־ר־ר', '*ṯ̣urr-') and not hc('ar', 'ب ي ت', '*kalb-')
 imp.voce({'w': 'radioattivo', 'tpl': [{'n': 'af', 'a': {'1': 'it', '2': 'radio-', '3': 'attivo'}, 'e': ''}]})
 imp.voce({'w': 'velocemente', 'tpl': [{'n': 'af', 'a': {'1': 'it', '2': 'veloce', '3': '-mente'}, 'e': ''}]})
 imp.voce({'w': 'vinolentus', 'tpl': [{'n': 'af', 'a': {'1': 'la', '2': 'vinum', '3': '-ulentus'}, 'e': ''}]}, lingua_voce='la', parola='vinolentus')

@@ -283,10 +283,17 @@ SEGNI_SU_VOCALE = {'sh': '\u0300\u0301\u030f\u0311\u0304\u0303\u0302', 'mk': '\u
 VOCALI_SLAVE = set('aeiouAEIOUrRаеиоуяюАЕИОУЯЮрРъЪѣѢ')   # я e ю: in bulgaro следя́, ря́зък
 
 
+NOTAZIONE_SEMITICA = {'sem-pro', 'sem-wes-pro', 'afa-pro'}
+
+
 def nome_pagina(lingua, termine):
     """Il titolo della pagina: per latino e greco senza macron e brevi (carō → caro);
     per ebraico, aramaico, arabo e siriaco senza segni vocalici (אַבָּא → אבא); per inglese antico e medio e per il
     russo senza i segni che Wiktionary toglie dal titolo (SEGNI_DELLA_PAGINA)."""
+    if lingua in NOTAZIONE_SEMITICA:
+        # il protosemitico ha due notazioni per l'occlusiva glottidale e la faringale: *ʔil- e *ʾil-, *ʕayn- e *ʿayn-
+        # erano voci diverse, e l'albero dei discendenti non riconosceva la parola delle catene (19 novembre 2026)
+        termine = termine.replace('\u02be', '\u0294').replace('\u02bf', '\u0295')
     if SENZA_QUANTITA.match(lingua or ''):
         termine = unicodedata.normalize('NFC', ''.join(ch for ch in unicodedata.normalize('NFD', termine) if ch not in '\u0304\u0306'))
     elif (lingua or '').split('-')[0] in SENZA_VOCALI or lingua in SENZA_VOCALI:
@@ -985,6 +992,10 @@ class Importatore:
                     self.stat['termini_multipli'] += 1
                     if not termine:
                         continue
+                # due grafie della stessa forma («*q-d-m//*qdm», nella radice ebraica ק־ד־ם): vale la prima, come in lessema()
+                if '//' in termine:
+                    termine = termine.split('//')[0].strip()
+                    self.stat['termini_con_due_grafie'] += 1
                 if '/' in termine or re.match(r'^[A-Z][a-z]+:', termine):
                     self.stat['termini_spuri'] += 1       # «i/languages A to L»: link interni di Wiktionary
                     continue
@@ -1973,6 +1984,38 @@ class Importatore:
             self.stat['discendenti_collegati'] += 1
             self.stat[f"discendenti_collegati_{self.lessemi[figlio]['lingua']}"] += 1
 
+    def collega_radici_corrispondenti(self, percorsi):
+        """Le pagine delle radici ebraiche dichiarano la radice araba corrispondente («ש־ל־ם: From Proto-Semitic
+        *š-l-m. Cognate with Arabic root س ل م»; RADICI_CORRISPONDENTI di filtra.py). Se la radice che dichiara ha un etimo
+        protosemitico e quella corrispondente non ne ha nessuno, la corrispondente prende lo stesso etimo: due radici
+        cognate continuano la stessa forma. Certezza 2, con la sua etichetta; mai da una radice senza etimo protosemitico."""
+        accolte = {h['chiave'] for h in self.ipotesi.values() if h['stato'] == 'accolta'}
+        con_ipotesi = {h['esito'] for h in self.ipotesi.values()}
+        etimo_di = defaultdict(list)
+        for r in self.relazioni:
+            if r['ipotesi'] in accolte:
+                etimo_di[r['esito']].append(r)
+        for lingua, percorso in percorsi:
+            file = os.path.join(os.path.dirname(percorso), 'radici_corrispondenti.tsv')
+            if not os.path.exists(file):
+                continue
+            for riga in open(file, encoding='utf-8'):
+                c = riga.rstrip('\n').split('\t')
+                if len(c) < 3:
+                    continue
+                ka, kb = self.chiave_di(lingua, c[0]), self.chiave_di(c[1], c[2])
+                self.stat['radici_corrispondenti_dichiarate'] += 1
+                proto = [r for r in etimo_di.get(ka, []) if self.lessemi.get(r['etimo'], {}).get('lingua') in NOTAZIONE_SEMITICA]
+                if len(proto) != 1 or kb not in self.lessemi or kb in con_ipotesi:
+                    continue
+                kh = kb + '#wikt-corrispondente'
+                self.ipotesi[kh] = {'chiave': kh, 'esito': kb, 'etichetta': 'Wiktionary (radice corrispondente dichiarata)',
+                                    'stato': 'accolta', 'confidenza': 2, 'origine': 'etimo', 'nota': None}
+                self.relazioni.append({'chiave': kh + '#0', 'ipotesi': kh, 'etimo': proto[0]['etimo'], 'esito': kb,
+                                       'tipo': proto[0]['tipo'], 'ordine': 1, 'affisso': None, 'conf': 2, 'forma': None})
+                con_ipotesi.add(kb)
+                self.stat['radici_corrispondenti_collegate'] += 1
+
     # ---- niente cicli: si toglie l'arco che chiude il ciclo (tipicamente un prestito di ritorno) ----
     def togli_cicli(self):
         figli = defaultdict(list)
@@ -2279,6 +2322,7 @@ if __name__ == '__main__':
     passo('unisci_varianti', imp.unisci_varianti)
     if discendenti:
         passo('collega_discendenti', imp.collega_discendenti, discendenti)
+        passo('collega_radici_corrispondenti', imp.collega_radici_corrispondenti, discendenti)
     passo('chiudi_su_radici', imp.chiudi_su_radici)
     passo('togli_cicli', imp.togli_cicli)
     # prima dei lemmi interi: un lemma latino o greco seminato e rimasto senza legami rientra come ogni lemma (Dionysia)

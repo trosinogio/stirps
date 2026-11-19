@@ -42,20 +42,22 @@ jobs:
         dsb:Lower Sorbian csb:Kashubian szl:Silesian rue:Rusyn zlw-opl:Old Polish zlw-mpl:Middle Polish zlw-ocs:Old Czech
         zlw-osk:Old Slovak zle-ort:Old Ruthenian zle-mru:Middle Russian zle-ono:Old Novgorodian zls-chs:Church Slavonic pox:Polabian rsk:Pannonian Rusyn
         hbo:Ancient Hebrew arc:Aramaic syc:Classical Syriac phn:Phoenician uga:Ugaritic akk:Akkadian sem-pro:Proto-Semitic
-        sem-wes-pro:Proto-West Semitic jpa:Jewish Palestinian Aramaic tmr:Jewish Babylonian Aramaic'
+        sem-wes-pro:Proto-West Semitic jpa:Jewish Palestinian Aramaic tmr:Jewish Babylonian Aramaic
+        mt:Maltese am:Amharic gez:Geez'
       # l'ebraico intero, senza nomi propri né locuzioni, e le lingue semitiche antiche intere (via libera di Giovanni del
       # 18 novembre 2026 alla proposta della stima, ramo dati-stima-ebraico da non unire)
-      INTERE: la,grc,he,hbo,arc,syc,phn,uga,akk,jpa,tmr
-      SENZA_NOMI: he
+      INTERE: la,grc,he,hbo,arc,syc,phn,uga,akk,jpa,tmr,ar
+      # l'arabo intero come l'ebraico, senza nomi propri né locuzioni (19 novembre 2026, «completare l'arabo»)
+      SENZA_NOMI: he,ar
       # la stima dopo ogni giro (stima_import.py), per le lingue slave
-      STIMA_LINGUE: he,hbo,arc,syc,phn,uga,akk,sem-pro,sem-wes-pro,jpa,tmr
-      STIMA_ATTUALE: '2864'
-      STIMA_FREQUENZE: he=dati/frequenze_he.tsv.gz
+      STIMA_LINGUE: ar,mt,am,gez
+      STIMA_ATTUALE: '2580'
+      STIMA_FREQUENZE: ar=dati/frequenze_ar.tsv.gz
       # sotto le voci dei rami antichi e del latino entrano anche i discendenti dichiarati che il dizionario non ha
       # (import/wiktionary.py; il latino dal 15 novembre 2026, decisione di Giovanni: le lingue romanze)
       # e sotto il protobaltoslavo e il protoceltico (16 novembre 2026: lituano e irlandese antico, con l'ittita, per il
       # confronto indoeuropeo, solo con le parole che stanno in una famiglia)
-      SEMINA_DISCENDENTI: ine-pro,grk-pro,grc,gem-pro,sla-pro,la,ine-bsl-pro,cel-pro
+      SEMINA_DISCENDENTI: ine-pro,grk-pro,grc,gem-pro,sla-pro,la,ine-bsl-pro,cel-pro,sem-pro,sem-wes-pro
       # le lingue antiche del confronto entrano anche dal basso (16 novembre 2026): un lemma che nessuna catena raggiunge
       # entra se un etimo della sua pagina è già nel dizionario (l'ittita: gli alberi citano 386 parole, quasi tutte
       # temi o forme senza pagina, e ne entravano 25; delle 515 pagine ittite 337 hanno un'etimologia)
@@ -298,6 +300,14 @@ jobs:
           gzip -9 discendenti_archi.tsv
           git add -A && git -c user.name=dati -c user.email=dati@users.noreply.github.com commit -qm "Discendenti dichiarati: l'albero e la misura"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:refs/heads/misure-discendenti
+
+      - name: Radici semitiche
+        continue-on-error: true
+        run: |
+          # le parole semitiche arrivano al protosemitico? E che cosa potrebbe portarcele (misura, prima di usarlo)
+          cd import
+          python3 controlla_semitico.py dati/it/tsv 'dati/*/discendenti.tsv' 'dati/*/radici_corrispondenti.tsv' 'dati/*/membri_radice.tsv' | tee /tmp/semitico.txt
+          echo "::notice title=Radici semitiche::$(grep -E '^(discendenti|radici)' /tmp/semitico.txt | tr '\n' ' ' | cut -c1-1500)"
 
       - name: Discendenti (artefatto)
         continue-on-error: true

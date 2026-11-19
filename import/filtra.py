@@ -281,6 +281,8 @@ FORMA = re.compile(r'^(?:\([^)]*\)\s*)*(?:'
                    r'|(?:simple\s+)?past\s+tense\b|simple\s+past\b'                # inglese: «simple past tense and past participle of»
                    r'|compound\s+of\b)', re.I)       # italiano, forme con pronomi attaccati: «compound of the infinitive dire with ve and la»
 
+TESTA_FORMA = re.compile(r'\b(?:first|second|third)-person\b|\binflection of\b', re.I)
+
 # Le voci che non sono parole: sigle e abbreviazioni (NASA, BBC, SPQR), simboli, caratteri, segni d'interpunzione.
 # Le sigle diventate parole minuscole (laser, radar) restano.
 NON_PAROLE = {'abbrev', 'symbol', 'character', 'punct'}
@@ -413,6 +415,12 @@ def forma_flessa(v):
         return True
     sensi = v.get('senses') or []
     con_glossa = [s for s in sensi if s.get('glosses')]
+    # le pagine arabe delle forme verbali non hanno glossa: il senso è vuoto (no-gloss) e la testa dice la forma
+    # («أُنَّا (form I) … # first-person …»); erano 200 mila «verbi» arabi
+    if not con_glossa and sensi and all('no-gloss' in (s.get('tags') or []) for s in sensi):
+        testa = ' '.join((h.get('expansion') or '') for h in v.get('head_templates') or [])
+        if TESTA_FORMA.search(testa):
+            return True
     return bool(con_glossa) and all(s.get('form_of') or 'form-of' in (s.get('tags') or []) or FORMA.match(s['glosses'][0])
                                     for s in con_glossa)
 
@@ -665,12 +673,21 @@ if __name__ == '__main__':
     # DISCENDENTI: l'albero dei discendenti dichiarati da ogni pagina, una riga per nodo: parola, numero
     # dell'etimologia, se è ricostruita, profondità, lingua e parola del discendente, segni (bor, der, unc…)
     discendenti_f = open(os.environ['DISCENDENTI'], 'w', encoding='utf-8') if os.environ.get('DISCENDENTI') else None
+    # RADICI_CORRISPONDENTI: le radici di un'altra lingua che la pagina di una radice dichiara («ש־ל־ם: … Cognate with
+    # Arabic root س ل م», {{ar-root}} nell'etimologia di una radice ebraica): lingua, radice, altra lingua, sua radice
+    corrispondenti_f = open(os.environ['RADICI_CORRISPONDENTI'], 'w', encoding='utf-8') if os.environ.get('RADICI_CORRISPONDENTI') else None
+    corrispondenti = 0
+    # MEMBRI_RADICE: parola e radice che la pagina dichiara, anche quando ha un etimo storico (كَلْب: *kalb- e ك ل ب)
+    membri_f = open(os.environ['MEMBRI_RADICE'], 'w', encoding='utf-8') if os.environ.get('MEMBRI_RADICE') else None
     righe_discendenti = pagine_discendenti = 0
     # DIAGNOSI_MODELLI=ety,etymon: alcuni esempi grezzi di quei modelli nel registro, per imparare a leggerli
     diagnosi = set(filter(None, os.environ.get('DIAGNOSI_MODELLI', '').split(',')))
     esempi_diagnosi = Counter()
     # DIAGNOSI_PAROLE=audientia,acquiesco: i modelli grezzi di quelle parole, per capire perché non si leggono
     parole_diagnosi = set(filter(None, os.environ.get('DIAGNOSI_PAROLE', '').split(',')))
+    # DIAGNOSI_POS=ar:root,ar:verb: quante voci di quella parte del discorso, e le prime 10, grezze
+    pos_diagnosi = {x.split(':', 1)[1] for x in os.environ.get('DIAGNOSI_POS', '').split(',') if x.startswith(LINGUA + ':')}
+    conti_pos, esempi_pos = Counter(), Counter()
     for riga in sys.stdin:
         n += 1
         try: v = json.loads(riga)
@@ -678,10 +695,20 @@ if __name__ == '__main__':
         if v.get('lang_code') != LINGUA: continue
         tpl = v.get('etymology_templates') or []
         sensi = v.get('senses') or []
+        if v.get('pos') in pos_diagnosi:
+            conti_pos[v['pos']] += 1
+            if esempi_pos[v['pos']] < 10:
+                esempi_pos[v['pos']] += 1
+                print('  pos ' + json.dumps({'parola': v.get('word'), 'pos': v.get('pos'), 'titolo': v.get('original_title'),
+                                             'testa': ((v.get('head_templates') or [{}])[0].get('expansion') or '')[:80],
+                                             'modelli': [t.get('name') for t in tpl], 'testo': (v.get('etymology_text') or '')[:200],
+                                             'sensi': [((s.get('glosses') or [''])[0][:80], s.get('tags'), bool(s.get('form_of'))) for s in sensi][:3]},
+                                            ensure_ascii=False)[:1500], file=sys.stderr)
         if v.get('word') in parole_diagnosi:
             print('  parola ' + json.dumps({'parola': v.get('word'), 'pos': v.get('pos'), 'modelli': tpl,
                                              'testo': (v.get('etymology_text') or '')[:300],
-                                             'sensi': [(s.get('glosses') or [''])[0][:60] for s in sensi][:3]}, ensure_ascii=False)[:1500],
+                                             'sensi': [(s.get('glosses') or [''])[0][:60] for s in sensi][:3],
+                                             'discendenti': list(discendenti(v))[:12]}, ensure_ascii=False)[:2500],
                   file=sys.stderr)
         for t in tpl:
             if t.get('name') in diagnosi and esempi_diagnosi[t['name']] < 10:
@@ -691,6 +718,17 @@ if __name__ == '__main__':
         if non_parola(v):
             non_parole += 1
             continue
+        if membri_f and v.get('pos') != 'root' and not forma_flessa(v):
+            rs = radice_semitica(tpl, LINGUA)
+            if rs:
+                membri_f.write(f"{v['word']}\t{v.get('etymology_number') or 1}\t{rs['args']['3']}\n")
+        if corrispondenti_f and v.get('pos') == 'root':
+            for t in tpl:
+                altra = MODELLI_RADICE.get(t.get('name'))
+                r = ((t.get('args') or {}).get('1') or '').strip()
+                if altra and altra != LINGUA and r:
+                    corrispondenti_f.write(f"{v['word']}\t{altra}\t{r}\n")
+                    corrispondenti += 1
         if discendenti_f and v.get('descendants'):
             ric = '1' if (v.get('original_title') or '').startswith('Reconstruction:') else ''
             scritte = 0
@@ -801,6 +839,10 @@ if __name__ == '__main__':
                               'se': dati_scheda(v),
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
+    if pos_diagnosi:
+        print(f'  pos, conti in {LINGUA}: {dict(conti_pos)}', file=sys.stderr)
+    if corrispondenti:
+        print(f'  radici corrispondenti dichiarate dalle radici: {corrispondenti}', file=sys.stderr)
     print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}; con una radice dichiarata da {{{{ety}}}} {radici_dalla_ety}; varianti senza etimologia legate al lemma {varianti_legate}; basi lette dalla menzione prima del suffisso {basi_dalla_menzione}; dalla radice semitica {dalle_radici}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}, sigle e simboli esclusi {non_parole}', file=sys.stderr)
