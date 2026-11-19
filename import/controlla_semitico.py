@@ -46,7 +46,7 @@ def main():
     def cima(k):
         visti = {k}
         while True:
-            su = sorted(etimi.get(k, ()) - visti)
+            su = sorted(etimi.get(k, set()) - visti)
             if not su:
                 return k
             k = su[0]
