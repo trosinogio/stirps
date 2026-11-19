@@ -301,6 +301,14 @@ jobs:
           git add -A && git -c user.name=dati -c user.email=dati@users.noreply.github.com commit -qm "Discendenti dichiarati: l'albero e la misura"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:refs/heads/misure-discendenti
 
+      - name: Radici semitiche
+        continue-on-error: true
+        run: |
+          # le parole semitiche arrivano al protosemitico? E che cosa potrebbe portarcele (misura, prima di usarlo)
+          cd import
+          python3 controlla_semitico.py dati/it/tsv 'dati/*/discendenti.tsv' 'dati/*/radici_corrispondenti.tsv' | tee /tmp/semitico.txt
+          echo "::notice title=Radici semitiche::$(grep -E '^(discendenti|radici)' /tmp/semitico.txt | tr '\n' ' ' | cut -c1-1500)"
+
       - name: Discendenti (artefatto)
         continue-on-error: true
         uses: actions/upload-artifact@v4

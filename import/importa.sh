@@ -45,7 +45,7 @@ for voce in $(printf '%s' "$CHIUSURA" | sed 's/ \([a-z][a-z-]*:\)/\n\1/g' | tr '
   echo "     chiusura delle catene: $nome"
   mkdir -p "dati/$codice"
   # un dump che Kaikki non ha per lingua (protoellenico, francone…) si cerca dopo nel dump grezzo di tutte le lingue
-  if ! scarica "$nome" | LINGUA=$codice FORME="dati/$codice/forme.tsv" VARIANTI="dati/$codice/varianti.tsv" DISCENDENTI="dati/$codice/discendenti.tsv" python3 filtra.py "dati/$codice/lemmi.jsonl" "dati/$codice/glosse.tsv"; then
+  if ! scarica "$nome" | LINGUA=$codice FORME="dati/$codice/forme.tsv" VARIANTI="dati/$codice/varianti.tsv" DISCENDENTI="dati/$codice/discendenti.tsv" RADICI_CORRISPONDENTI="dati/$codice/radici_corrispondenti.tsv" python3 filtra.py "dati/$codice/lemmi.jsonl" "dati/$codice/glosse.tsv"; then
     MANCANTI+=("$codice")
     continue
   fi
@@ -61,7 +61,7 @@ if [ ${#MANCANTI[@]} -gt 0 ]; then
        | grep -E "\"lang_code\": ?\"($codici)\"" > dati/grezzi.jsonl; then
     for codice in "${MANCANTI[@]}"; do
       grep -E "\"lang_code\": ?\"$codice\"" dati/grezzi.jsonl \
-        | LINGUA=$codice FORME="dati/$codice/forme.tsv" VARIANTI="dati/$codice/varianti.tsv" DISCENDENTI="dati/$codice/discendenti.tsv" python3 filtra.py "dati/$codice/lemmi.jsonl" "dati/$codice/glosse.tsv" || true
+        | LINGUA=$codice FORME="dati/$codice/forme.tsv" VARIANTI="dati/$codice/varianti.tsv" DISCENDENTI="dati/$codice/discendenti.tsv" RADICI_CORRISPONDENTI="dati/$codice/radici_corrispondenti.tsv" python3 filtra.py "dati/$codice/lemmi.jsonl" "dati/$codice/glosse.tsv" || true
       if [ -s "dati/$codice/lemmi.jsonl" ]; then
         echo "     $codice: $(wc -l < "dati/$codice/lemmi.jsonl") voci dal dump grezzo"
         ARGOMENTI+=(--chiudi "$codice=dati/$codice/lemmi.jsonl,dati/$codice/glosse.tsv,dati/$codice/forme.tsv,dati/$codice/varianti.tsv")
