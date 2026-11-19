@@ -682,7 +682,7 @@ if __name__ == '__main__':
             print('  parola ' + json.dumps({'parola': v.get('word'), 'pos': v.get('pos'), 'modelli': tpl,
                                              'testo': (v.get('etymology_text') or '')[:300],
                                              'sensi': [(s.get('glosses') or [''])[0][:60] for s in sensi][:3],
-                                             'discendenti': discendenti(v)[:12]}, ensure_ascii=False)[:2500],
+                                             'discendenti': list(discendenti(v))[:12]}, ensure_ascii=False)[:2500],
                   file=sys.stderr)
         for t in tpl:
             if t.get('name') in diagnosi and esempi_diagnosi[t['name']] < 10:
