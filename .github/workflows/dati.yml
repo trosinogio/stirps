@@ -80,6 +80,7 @@ jobs:
       DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq
       # i modelli grezzi di alcune parole, per capire perché la loro etimologia non si legge (le cime greche del 13 novembre)
       DIAGNOSI_PAROLE: ك ت ب,ع ل م,س ل م,ك ل ب,כ־ת־ב,ש־ל־ם,ק־ד־ם,כ־ל־ב,q-d-m,w-r-d-,k-t-b,ś-l-m,kalb-,bayt-,malk-,كتاب,كلب,בית,ملك
+      DIAGNOSI_POS: ar:root,ar:verb,he:root,arc:root,syc:root,sem-pro:root
       # le glosse con cui le pagine citano le radici ricostruite, per il controllo delle radici omografe
       GLOSSE_RADICI: /tmp/glosse_radici.tsv
     steps:

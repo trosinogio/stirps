@@ -985,6 +985,10 @@ class Importatore:
                     self.stat['termini_multipli'] += 1
                     if not termine:
                         continue
+                # due grafie della stessa forma («*q-d-m//*qdm», nella radice ebraica ק־ד־ם): vale la prima, come in lessema()
+                if '//' in termine:
+                    termine = termine.split('//')[0].strip()
+                    self.stat['termini_con_due_grafie'] += 1
                 if '/' in termine or re.match(r'^[A-Z][a-z]+:', termine):
                     self.stat['termini_spuri'] += 1       # «i/languages A to L»: link interni di Wiktionary
                     continue

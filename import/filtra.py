@@ -671,6 +671,9 @@ if __name__ == '__main__':
     esempi_diagnosi = Counter()
     # DIAGNOSI_PAROLE=audientia,acquiesco: i modelli grezzi di quelle parole, per capire perché non si leggono
     parole_diagnosi = set(filter(None, os.environ.get('DIAGNOSI_PAROLE', '').split(',')))
+    # DIAGNOSI_POS=ar:root,ar:verb: quante voci di quella parte del discorso, e le prime 10, grezze
+    pos_diagnosi = {x.split(':', 1)[1] for x in os.environ.get('DIAGNOSI_POS', '').split(',') if x.startswith(LINGUA + ':')}
+    conti_pos, esempi_pos = Counter(), Counter()
     for riga in sys.stdin:
         n += 1
         try: v = json.loads(riga)
@@ -678,6 +681,15 @@ if __name__ == '__main__':
         if v.get('lang_code') != LINGUA: continue
         tpl = v.get('etymology_templates') or []
         sensi = v.get('senses') or []
+        if v.get('pos') in pos_diagnosi:
+            conti_pos[v['pos']] += 1
+            if esempi_pos[v['pos']] < 10:
+                esempi_pos[v['pos']] += 1
+                print('  pos ' + json.dumps({'parola': v.get('word'), 'pos': v.get('pos'), 'titolo': v.get('original_title'),
+                                             'testa': ((v.get('head_templates') or [{}])[0].get('expansion') or '')[:80],
+                                             'modelli': [t.get('name') for t in tpl], 'testo': (v.get('etymology_text') or '')[:200],
+                                             'sensi': [((s.get('glosses') or [''])[0][:80], s.get('tags'), bool(s.get('form_of'))) for s in sensi][:3]},
+                                            ensure_ascii=False)[:1500], file=sys.stderr)
         if v.get('word') in parole_diagnosi:
             print('  parola ' + json.dumps({'parola': v.get('word'), 'pos': v.get('pos'), 'modelli': tpl,
                                              'testo': (v.get('etymology_text') or '')[:300],
@@ -802,6 +814,8 @@ if __name__ == '__main__':
                               'se': dati_scheda(v),
                               'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
         tenuti += 1
+    if pos_diagnosi:
+        print(f'  pos, conti in {LINGUA}: {dict(conti_pos)}', file=sys.stderr)
     print(f'righe {n}, lemmi con etimologia {tenuti} (dal solo testo {promosse}, dal testo senza modelli o da surf, it-verb-obj, from, contraction {dal_testo}, da {{{{ety}}}} {dalla_ety}; con una radice dichiarata da {{{{ety}}}} {radici_dalla_ety}; varianti senza etimologia legate al lemma {varianti_legate}; basi lette dalla menzione prima del suffisso {basi_dalla_menzione}; dalla radice semitica {dalle_radici}), forme flesse {flesse} '
           f'(riconosciute dalla sola glossa: {flesse_dalla_glossa}), '
           f'lemmi senza etimologia utile {senza}, sigle e simboli esclusi {non_parole}', file=sys.stderr)

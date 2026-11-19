@@ -281,6 +281,10 @@ imp = Importatore()
 radius, mens, frustum = imp.lessema('la', 'radius', pos='s.'), imp.lessema('la', 'mens', pos='s.f.'), imp.lessema('la', 'frustum', pos='s.')
 radio_, mente_, ulentus_ = imp.lessema('it', 'radio-'), imp.lessema('it', '-mente'), imp.lessema('la', '-ulentus')
 arco(imp, radio_, radius); arco(imp, mente_, mens); arco(imp, ulentus_, frustum)
+# una radice ebraica con l'etimo in due grafie («*q-d-m//*qdm»): vale la prima, non è un link interno di Wiktionary
+imp_q = Importatore()
+imp_q.voce({'w': 'ק־ד־ם', 'l': 'he', 'tpl': [{'n': 'inh', 'a': {'1': 'he', '2': 'sem-pro', '3': '*q-d-m//*qdm'}, 'e': ''}]}, 'he')
+assert any(r['etimo'] == imp_q.chiave_di('sem-pro', '*q-d-m') for r in imp_q.relazioni), imp_q.relazioni
 imp.voce({'w': 'radioattivo', 'tpl': [{'n': 'af', 'a': {'1': 'it', '2': 'radio-', '3': 'attivo'}, 'e': ''}]})
 imp.voce({'w': 'velocemente', 'tpl': [{'n': 'af', 'a': {'1': 'it', '2': 'veloce', '3': '-mente'}, 'e': ''}]})
 imp.voce({'w': 'vinolentus', 'tpl': [{'n': 'af', 'a': {'1': 'la', '2': 'vinum', '3': '-ulentus'}, 'e': ''}]}, lingua_voce='la', parola='vinolentus')
