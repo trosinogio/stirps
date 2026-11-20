@@ -170,6 +170,27 @@ assert (imp.stat['omografe_glossa_concorde'], imp.stat['omografe_glossa_in_attes
 imp, etimo, (gen, cut, turn, curtus, corona, crux) = omografe_per_glossa((1, 0.9))
 assert etimo[corona] == turn and etimo[crux] == gen, 'misurata, la glossa «to bend; to turn» porta a *(s)ker- «girare»; «to turn; to cut» non decide'
 wiktionary.OMOGRAFE_PER_GLOSSA = (50, 0.9)
+# il campo di senso delle omografe: senza la glossa della citazione vale la glossa della parola che cita la radice
+# (*kaput «head» < *kap-: *kap-@head «head, cap, hat»), misurata come la regola delle glosse e mai contro le dichiarazioni
+from wiktionary import parole as _parole
+def omografe_per_campo(soglia):
+    wiktionary.OMOGRAFE_PER_CAMPO = soglia
+    imp = Importatore()
+    gen, testa, prendo = imp.lessema('ine-pro', '*kap-'), imp.lessema('ine-pro', '*kap-', ident='head'), imp.lessema('ine-pro', '*kap-', ident='seize')
+    imp.campi = {testa: _parole('head, cap, hat, cloak, cover'), prendo: _parole('seize, grasp, take, catch, hold')}
+    kaput, kapio, haft = imp.lessema('itc-pro', '*kaput', glossa='head'), imp.lessema('itc-pro', '*kapiō', glossa='to take'), imp.lessema('gem-pro', '*haftaz', glossa='captive, seized')
+    neutro = imp.lessema('gem-pro', '*hōbą', glossa='hoof')
+    for k in (kaput, kapio, haft, neutro):
+        arco(imp, k, gen)
+    imp.radici = {(haft, prendo)}
+    imp.precisa_omografe()
+    return imp, {r['esito']: r['etimo'] for r in imp.relazioni}, (gen, testa, prendo, kaput, kapio, haft, neutro)
+imp, etimo, (gen, testa, prendo, kaput, kapio, haft, neutro) = omografe_per_campo((50, 0.9))
+assert etimo[haft] == prendo and etimo[kaput] == gen, 'senza misura il campo non sposta archi'
+assert imp.stat['omografe_campo_concorde'] == 0 and imp.stat['omografe_campo_in_attesa'] == 2, dict(imp.stat)
+imp, etimo, (gen, testa, prendo, kaput, kapio, haft, neutro) = omografe_per_campo((0, 0.9))
+assert etimo[kaput] == testa and etimo[kapio] == prendo and etimo[neutro] == gen, ('il campo sceglie; «hoof» non decide', etimo)
+wiktionary.OMOGRAFE_PER_CAMPO = (50, 0.9)
 # audientia: il ripiego sulla radice dichiarata non sceglie a caso tra due radici
 imp = Importatore()
 aud, audience = imp.lessema('la', 'audientia'), imp.lessema('it', 'audience')

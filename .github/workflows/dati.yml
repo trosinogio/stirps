@@ -277,6 +277,15 @@ jobs:
           cat /tmp/sensi.txt
           echo "::notice title=Linea del senso::$(head -1 /tmp/sensi.txt) $(grep 'stessa lingua' /tmp/sensi.txt)"
 
+      - name: Campi di senso delle radici
+        continue-on-error: true
+        run: |
+          # le parole a uno e due passaggi da una radice stanno nel suo campo di senso (dati/campi_radici.tsv.gz)?
+          # Contro il campo di una radice a caso; e le parole a un passaggio fuori dal campo, da guardare
+          python3 import/controlla_campi.py dati/lessemi.tsv.gz dati/ipotesi.tsv.gz dati/relazioni.tsv.gz dati/campi_radici.tsv.gz 2> /tmp/campi.txt
+          cat /tmp/campi.txt
+          echo "::notice title=Campi di senso::$(sed -n 2p /tmp/campi.txt) $(grep 'fuori dal campo' /tmp/campi.txt)"
+
       - name: Radici omografe
         continue-on-error: true
         run: |

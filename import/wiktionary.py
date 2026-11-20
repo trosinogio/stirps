@@ -23,9 +23,28 @@ LINGUA = os.environ.get('LINGUA', 'it')
 OMOGRAFE_PER_GLOSSA = (50, 0.9)
 # Le parole omografe (ὄψ «voce» e ὄψ² «occhio»): la stessa misura, sugli archi che citano già l'omografo preciso
 OMOGRAFI_PER_GLOSSA = (50, 0.9)
+# Le radici omografe precisate dal campo di senso della radice (dati/campi_radici.tsv.gz): la stessa misura
+OMOGRAFE_PER_CAMPO = (50, 0.9)
 from controlla_sensi import legate, parole
 from array import array
 from collections import Counter, defaultdict
+
+def campi_radici(percorso=None):
+    """Il campo di senso di ogni radice (*kap-@head «head, cap, hat, cloak, cover», *kap-@seize «seize, grasp, take»):
+    le parole chiave che Claude ha proposto dalle glosse e dai discendenti (lotto «campi» di definisci.py), come insiemi
+    di parole piene. Vuoto se il registro non c'è."""
+    percorso = percorso or os.environ.get('CAMPI_RADICI') or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), '..', 'dati', 'campi_radici.tsv.gz')
+    campi = {}
+    if not os.path.exists(percorso):
+        return campi
+    with gzip.open(percorso, 'rt', encoding='utf-8') as f:
+        for riga in f:
+            c = riga.rstrip('\n').split('\t')
+            if len(c) > 2 and c[2].strip() and parole(c[2]):
+                campi[c[0]] = parole(c[2])
+    return campi
+
 
 CATENA = {'inh': 'eredita', 'inh+': 'eredita', 'bor': 'prestito', 'bor+': 'prestito', 'ubor': 'prestito', 'obor': 'prestito',
           'lbor': 'prestito_dotto', 'slbor': 'semidotto', 'der': 'generico', 'der+': 'generico', 'uder': 'generico',
@@ -1637,15 +1656,48 @@ class Importatore:
                 self.stat['omografe_precisate'] += 1
             else:
                 self.stat['omografe_ambigue'] += 1
-        for rid, (r, k) in per_glossa.items():
+        # Il campo di senso delle omografe (*kap-@head «head, cap, hat…», *kap-@seize «seize, grasp, take…»): se la
+        # pagina non dà una glossa della citazione, vale la glossa della parola che cita la radice (*kaput «head»). Una
+        # sola omografa con una parola in comune, e tutte le omografe con il loro campo; la regola si misura come quella
+        # delle glosse, sugli archi che le dichiarazioni decidono da sole (OMOGRAFE_PER_CAMPO), e mai contro di loro.
+        campi = getattr(self, 'campi', None)
+        if campi is None:
+            campi = self.campi = campi_radici()
+        per_campo = {}
+        for r in self.relazioni:
+            if r['etimo'] not in varianti or accolte.get(r['esito']) != r['ipotesi'] or id(r) in per_glossa:
+                continue
+            if not all(k in campi for k in varianti[r['etimo']]):
+                continue
+            le = self.lessemi.get(r['esito']) or {}
+            g = self.glossa_arco.get((r['esito'], r['etimo'])) or le.get('propria') or \
+                next((x for x, _ in (le.get('glosse') or Counter()).most_common(1)), '')
+            pg = parole(g)
+            if not pg:
+                continue
+            legati = [k for k in sorted(varianti[r['etimo']]) if legate(pg, campi[k])]
+            if len(legati) == 1:
+                per_campo[id(r)] = (r, legati[0])
+            else:
+                self.stat['omografe_campo_non_decide'] += 1
+        for rid, (r, k) in per_campo.items():
             if rid in voti and len(voti[rid]) == 1:
-                continue                        # l'ha già decisa la dichiarazione
-            if rid in voti and k not in voti[rid]:
-                self.stat['omografe_glossa_contro_le_dichiarazioni'] += 1
-                continue                        # le parole sotto dichiarano altre omografe: resta com'è
-            self.stat['omografe_glossa_' + ('precisate' if vale else 'in_attesa')] += 1
-            if vale:
-                r['etimo'] = k
+                self.stat['omografe_campo_concorde' if next(iter(voti[rid])) == k else 'omografe_campo_discorde'] += 1
+        prove_c = self.stat['omografe_campo_concorde'] + self.stat['omografe_campo_discorde']
+        vale_c = prove_c >= OMOGRAFE_PER_CAMPO[0] and self.stat['omografe_campo_concorde'] >= OMOGRAFE_PER_CAMPO[1] * prove_c
+        for regola, scelte, ok in (('glossa', per_glossa, vale), ('campo', per_campo, vale_c)):
+            for rid, (r, k) in scelte.items():
+                if rid in voti and len(voti[rid]) == 1:
+                    continue                        # l'ha già decisa la dichiarazione
+                if rid in voti and k not in voti[rid]:
+                    self.stat[f'omografe_{regola}_contro_le_dichiarazioni'] += 1
+                    continue                        # le parole sotto dichiarano altre omografe: resta com'è
+                self.stat[f'omografe_{regola}_' + ('precisate' if ok else 'in_attesa')] += 1
+                if ok:
+                    if regola == 'campo' and self.stat['omografe_campo_esempi'] < 30:
+                        self.stat['omografe_campo_esempi'] += 1
+                        print(f"  omografa per campo: {r['esito']} < {r['etimo']} → {k}", file=sys.stderr)
+                    r['etimo'] = k
 
     def precisa_omografi_parole(self):
         """ὄψις «From ὄψ (óps, “eye”) + -σῐς»: Wiktionary cita la parola senza dire quale degli omografi (ὄψ «voce»,
