@@ -21,6 +21,8 @@ import gzip, json, re, sys, os, unicodedata
 LINGUA = os.environ.get('LINGUA', 'it')
 # radici omografe precisate dalla glossa citata: almeno quante prove, e quale accordo con le dichiarazioni {{root}}
 OMOGRAFE_PER_GLOSSA = (50, 0.9)
+# Le parole omografe (ὄψ «voce» e ὄψ² «occhio»): la stessa misura, sugli archi che citano già l'omografo preciso
+OMOGRAFI_PER_GLOSSA = (50, 0.9)
 from controlla_sensi import legate, parole
 from array import array
 from collections import Counter, defaultdict
@@ -1048,8 +1050,9 @@ class Importatore:
                                       'conf': min(conf, conf_voce), 'forma': mostra})
                         if in_attesa:
                             self.stat['prefissi_con_la_base_dopo_il_piu'] += 1
-                        if glossa_t and termine.startswith('*') and termine.endswith('-'):
-                            self.glossa_arco.setdefault((k0, kt), glossa_t)
+                        if glossa_t:
+                            # (le radici omografe, precisa_omografe; le parole omografe, precisa_omografi_parole)
+                            self.glossa_arco.setdefault((k0, kt), glossa_t[:80])
                     in_attesa = None
                     primo, prec = False, kt
                     continue
@@ -1077,8 +1080,8 @@ class Importatore:
                 if kt != prec:
                     self.intermedi[prec][(kt, tipo, conf, mostra)] += 1
                     self.stat['anelli_intermedi'] += 1
-                    if glossa_t and termine.startswith('*') and termine.endswith('-'):
-                        self.glossa_arco.setdefault((prec, kt), glossa_t)
+                    if glossa_t:
+                        self.glossa_arco.setdefault((prec, kt), glossa_t[:80])
                 prec = kt
         if k0 not in self.attestazioni:
             d = data_prosa(testo)
@@ -1618,6 +1621,55 @@ class Importatore:
             self.stat['omografe_glossa_' + ('precisate' if vale else 'in_attesa')] += 1
             if vale:
                 r['etimo'] = k
+
+    def precisa_omografi_parole(self):
+        """ὄψις «From ὄψ (óps, “eye”) + -σῐς»: Wiktionary cita la parola senza dire quale degli omografi (ὄψ «voce»,
+        ὄψ² «occhio»), e il parser prendeva il primo: ὄψις, -οψία, *autopsia*, ὀπτικός finivano sotto *wekʷ- «parlare».
+        Se la glossa della citazione ha una linea di senso con uno solo degli omografi, e non con quello scelto, l'arco
+        passa a quello. Prima di usarla la regola si misura sugli archi che citano già l'omografo preciso (con il
+        numero dell'etimologia o l'identificativo): vale solo se concorda nove volte su dieci, su almeno 50 archi
+        (OMOGRAFI_PER_GLOSSA)."""
+        gruppi = defaultdict(list)
+        for k, l in self.lessemi.items():
+            if not l.get('ricostruito'):
+                gruppi[(l['lingua'], l['lemma'])].append(k)
+        gruppo_di = {k: ks for ks in gruppi.values() if len(ks) > 1 for k in ks}
+        if not gruppo_di:
+            return
+        sensi = {k: [p for p in (parole(x) for x in self.lessemi[k]['glosse']) if p] for k in gruppo_di}
+
+        def scelta(r):
+            pg = parole(self.glossa_arco.get((r['esito'], r['etimo'])) or '')
+            if not pg:
+                return None
+            legati = [k for k in sorted(gruppo_di[r['etimo']]) if any(legate(pg, s) for s in sensi[k])]
+            return legati[0] if len(legati) == 1 else None
+
+        def generica(k):
+            return k == chiave(self.lessemi[k]['lingua'], self.lessemi[k]['lemma'], 1)
+
+        cambi = []
+        for r in self.relazioni:
+            if r['etimo'] not in gruppo_di:
+                continue
+            s = scelta(r)
+            if s is None:
+                continue
+            if not generica(r['etimo']):
+                self.stat['omografi_glossa_concorde' if s == r['etimo'] else 'omografi_glossa_discorde'] += 1
+            elif s != r['etimo']:
+                cambi.append((r, s))
+        prove = self.stat['omografi_glossa_concorde'] + self.stat['omografi_glossa_discorde']
+        vale = prove >= OMOGRAFI_PER_GLOSSA[0] and self.stat['omografi_glossa_concorde'] >= OMOGRAFI_PER_GLOSSA[1] * prove
+        for r, s in cambi:
+            if self.stat['omografi_glossa_esempi'] < 40:
+                self.stat['omografi_glossa_esempi'] += 1
+                print(f"  omografo per glossa: {r['esito']} < {r['etimo']} → {s} "
+                      f"(«{self.glossa_arco.get((r['esito'], r['etimo']))}»)", file=sys.stderr)
+            self.stat['omografi_glossa_' + ('precisati' if vale else 'in_attesa')] += 1
+            if vale:
+                self.glossa_arco[(r['esito'], s)] = self.glossa_arco.get((r['esito'], r['etimo']))
+                r['etimo'] = s
 
     def togli_archi_impossibili(self):
         """Ultimo controllo su tutti gli archi (arco_impossibile): quelli che non possono stare escono, e con loro le
@@ -2318,6 +2370,7 @@ if __name__ == '__main__':
     passo('unisci_identificativi', imp.unisci_identificativi)
     passo('risolvi_intermedi', imp.risolvi_intermedi)
     passo('precisa_omografe', imp.precisa_omografe)
+    passo('precisa_omografi_parole', imp.precisa_omografi_parole)
     passo('elementi_di_composizione', imp.elementi_di_composizione)
     passo('unisci_varianti', imp.unisci_varianti)
     if discendenti:

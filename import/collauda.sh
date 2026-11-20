@@ -287,6 +287,18 @@ arco(imp, radio_, radius); arco(imp, mente_, mens); arco(imp, ulentus_, frustum)
 imp_q = Importatore()
 imp_q.voce({'w': 'ק־ד־ם', 'l': 'he', 'tpl': [{'n': 'inh', 'a': {'1': 'he', '2': 'sem-pro', '3': '*q-d-m//*qdm'}, 'e': ''}]}, 'he')
 assert any(r['etimo'] == imp_q.chiave_di('sem-pro', '*q-d-m') for r in imp_q.relazioni), imp_q.relazioni
+# ὄψις «From ὄψ (óps, “eye”)»: tra ὄψ «voice» e ὄψ² «eye» vale l'omografo della glossa della citazione
+import wiktionary as _w
+_w.OMOGRAFI_PER_GLOSSA = (0, 0.9)
+imp_o = Importatore()
+voce1, occhio = imp_o.lessema('grc', 'ὄψ', glossa='voice'), imp_o.lessema('grc', 'ὄψ', glossa='eye', omografo=2)
+opsis, qui = imp_o.lessema('grc', 'ὄψις'), imp_o.lessema('grc', 'αἶθοψ')
+arco(imp_o, opsis, voce1); imp_o.glossa_arco[(opsis, voce1)] = 'eye'
+arco(imp_o, qui, voce1)
+imp_o.precisa_omografi_parole()
+assert [r['etimo'] for r in imp_o.relazioni if r['esito'] == opsis] == [occhio], imp_o.relazioni
+assert [r['etimo'] for r in imp_o.relazioni if r['esito'] == qui] == [voce1], 'senza glossa resta com\'è'
+_w.OMOGRAFI_PER_GLOSSA = (50, 0.9)
 # il protosemitico ha due notazioni: *ʾil- e *ʔil- sono la stessa voce
 from wiktionary import nome_pagina as np_
 assert np_('sem-pro', '*ʾil-') == '*ʔil-' and np_('sem-pro', '*ʿayn-') == '*ʕayn-' and np_('ar', 'ʿayn') == 'ʿayn'
