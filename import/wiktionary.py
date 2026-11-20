@@ -932,6 +932,13 @@ class Importatore:
                     in_attesa = affissi
                     continue
                 tipo = 'derivazione' if len(basi) == 1 else 'composizione'
+                # le glosse degli elementi ({{af|grc|ὄψ|-σις|t1=eye}}): tN o glossN, per la posizione del termine
+                glosse_el = {}
+                for j in range(1, 12):
+                    termine_j = (a.get(str(j + 1)) or '').strip()
+                    g_j = (a.get(f't{j}') or a.get(f'gloss{j}') or '').strip()
+                    if termine_j and g_j:
+                        glosse_el[pulisci_parte(termine_j)[0]] = g_j[:80]
                 for i, (b, lb) in enumerate(basi, 1):
                     lingua_b, forma_b = lb or codice_lingua(a.get('1')) or lingua_voce, None
                     fx = None
@@ -946,6 +953,8 @@ class Importatore:
                     if kb != k0:
                         archi.append({'etimo': kb, 'esito': k0, 'tipo': tipo, 'ordine': i,
                                       'affisso': ' '.join(affissi) or None, 'conf': 3, 'forma': forma_b})
+                        if glosse_el.get(b):
+                            self.glossa_arco.setdefault((k0, kb), glosse_el[b])
                 primo = False
                 prec = None             # la catena non prosegue oltre l'analisi in affissi
                 continue

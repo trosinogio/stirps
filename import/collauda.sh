@@ -298,6 +298,10 @@ arco(imp_o, qui, voce1)
 imp_o.precisa_omografi_parole()
 assert [r['etimo'] for r in imp_o.relazioni if r['esito'] == opsis] == [occhio], imp_o.relazioni
 assert [r['etimo'] for r in imp_o.relazioni if r['esito'] == qui] == [voce1], 'senza glossa resta com\'è'
+# la glossa di un elemento di {{af}} (t1=eye) si conserva per l'arco
+imp_a = Importatore()
+imp_a.voce({'w': 'ὄψις', 'l': 'grc', 'tpl': [{'n': 'af', 'a': {'1': 'grc', '2': 'ὄψ', '3': '-σις', 't1': 'eye'}, 'e': ''}]}, 'grc')
+assert 'eye' in imp_a.glossa_arco.values(), imp_a.glossa_arco
 _w.OMOGRAFI_PER_GLOSSA = (50, 0.9)
 # il protosemitico ha due notazioni: *ʾil- e *ʔil- sono la stessa voce
 from wiktionary import nome_pagina as np_
