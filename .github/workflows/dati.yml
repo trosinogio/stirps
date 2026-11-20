@@ -99,6 +99,7 @@ jobs:
           echo "::notice title=Parser::$(jq -c '{lessemi, ipotesi, relazioni, voci, intere_la, intere_grc, intere_en, intere_fr, intere_de, intere_ru, lemmi_interi_la, lemmi_interi_grc}' dati/it/rapporto_parser.json)"
           echo "::notice title=Perseus::$(tail -1 dati/it/rapporto_perseus.txt)"
           echo "::notice title=Greco, regole apprese::$(head -2 dati/it/rapporto_greco.txt | tr '\n' ' ')"
+          echo "::notice title=Derivati trasparenti::$(head -1 dati/it/rapporto_derivati.txt)"
 
       - name: Etimologie del Wikizionario e diagnosi delle mancanti
         run: |

@@ -353,6 +353,10 @@ imp_i.voce({'w': 'ὄψις', 'l': 'grc', 'tpl': [{'n': 'af', 'a': {'1': 'grc', 
 imp_i.precisa_omografi_parole()
 _ops = [r['etimo'] for r in imp_i.relazioni if r['esito'] == imp_i.chiave_di('grc', 'ὄψις')]
 assert _ops == [imp_i.chiave_di('grc', 'ὄψ') + ':2'], ('l\'omografo dell\'identificativo', _ops, list(imp_i.lessemi))
+# i derivati trasparenti: le regole di una coppia (abolition < abolish, reaeration < aeration)
+from apprendi_derivati import regole_della_coppia as rdc
+assert ('S', 'ition', 'ish') in rdc('abolition', 'abolish') and ('P', 're') in rdc('reaeration', 'aeration'), rdc('abolition', 'abolish')
+assert not rdc('cane', 'gatto'), 'senza una parte comune nessuna regola'
 # il protosemitico ha due notazioni: *ʾil- e *ʔil- sono la stessa voce
 from wiktionary import nome_pagina as np_
 assert np_('sem-pro', '*ʾil-') == '*ʔil-' and np_('sem-pro', '*ʿayn-') == '*ʕayn-' and np_('ar', 'ʿayn') == 'ʿayn'

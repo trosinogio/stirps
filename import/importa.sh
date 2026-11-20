@@ -118,6 +118,13 @@ if [ "$DIZIONARI" = 1 ]; then
     cat "$DATI/rapporto_greco.txt" >&2; exit 1
   fi
   cat "$DATI/rapporto_greco.txt"
+  # i derivati trasparenti senza etimologia nelle altre lingue (aerazione < aerare): regole imparate e misurate per
+  # lingua, solo dove mettono la parola nella famiglia giusta almeno l'85% delle volte (apprendi_derivati.py)
+  if ! python3 apprendi_derivati.py "$DATI/tsv/etimi_dizionari.tsv" "$DATI/tsv/lessemi.tsv" "$DATI/tsv/ipotesi.tsv" \
+       "$DATI/tsv/relazioni.tsv" 2> "$DATI/rapporto_derivati.txt"; then
+    cat "$DATI/rapporto_derivati.txt" >&2; exit 1
+  fi
+  cat "$DATI/rapporto_derivati.txt"
   # stime della prima attestazione: l'autore datato più antico citato nella voce (DATAZIONI.md, passo 1)
   python3 datatore_dizionari.py autori "$DATI/tsv/autori.tsv"
   python3 datatore_dizionari.py stime "$DATI/tsv/autori.tsv" "$DATI/tsv/stime.tsv" "${locali[@]}"
