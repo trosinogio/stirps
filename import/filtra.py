@@ -224,6 +224,47 @@ def da_ety(t, lingua):
                 args[dove] = mod[k]
         return {'name': nome, 'args': args, 'expansion': ''}
     return None
+def porta_identificativi(classici, tpl, lingua):
+    """ὄψις: «{{etymon|grc|:af|grc:ὄψ<id:eye>|grc:-σῐς}}» accanto a «{{af|grc|ὄψ|-σῐς|t1=eye}}». Il modello classico dà
+    l'etimo, ma solo {{etymon}} dice quale degli omografi (ὄψ «voce» o ὄψ² «occhio», che si dà id=eye): l'identificativo
+    passa al termine uguale del modello classico, che non ne ha uno (idN per gli affissi, id per gli altri)."""
+    ident = {}
+    for t in tpl:
+        if t.get('name') not in ('ety', 'etymon'):
+            continue
+        for k, x in (t.get('args') or {}).items():
+            if not k.isdigit() or int(k) < 2 or not x or x.strip().startswith(':'):
+                continue
+            lt, termine, mod = termine_ety(x.strip(), (t['args'].get('1') or lingua).strip())
+            if mod.get('id') and '<' not in mod['id'] and termine.strip('*- '):
+                ident.setdefault((lt, termine.strip()), mod['id'].strip())
+    if not ident:
+        return 0
+    portati = 0
+    for t in classici:
+        n, a = t.get('name'), t.get('args')
+        if not a or n not in CON_ETIMO:
+            continue
+        lv = (a.get('1') or lingua).strip()
+        if n in ('af', 'affix', 'prefix', 'suffix', 'confix', 'compound', 'blend'):
+            for j in range(1, 12):
+                x = (a.get(str(j + 1)) or '').strip()
+                if not x or a.get(f'id{j}') or '<id:' in x:
+                    continue
+                testo = scomponi(x)[0]
+                m = re.match(r'^([a-z]{2,3}(?:-[a-z]{2,4})*):(.*)$', testo)
+                lt, termine = (m.group(1), m.group(2).strip()) if m else (lv, testo.strip())
+                if ident.get((lt, termine)):
+                    a[f'id{j}'] = ident[(lt, termine)]
+                    portati += 1
+        elif not a.get('id'):
+            lt, termine = (a.get('2') or '').strip(), scomponi(a.get('3') or '')[0].strip()
+            if ident.get((lt, termine)):
+                a['id'] = ident[(lt, termine)]
+                portati += 1
+    return portati
+
+
 # Le radici semitiche: la parola araba, ebraica o maltese dichiara la sua radice triconsonantica ({{etymon|ar|:root|ك ت ب}},
 # {{ar-root|ك ت ب}}, il riquadro {{ar-rootbox}}, {{he-root}}, {{mt-root}}). Quando la pagina non dà un altro etimo, la parola
 # viene dalla sua radice, che è la cima della famiglia (كِتَاب, مَكْتَب, كَتَبَ sotto ك ت ب): senza, il 16 novembre 2026,
@@ -796,6 +837,8 @@ if __name__ == '__main__':
                     basi_dalla_menzione += 1
                     if basi_dalla_menzione <= 12:
                         print(f"  base dalla menzione: {v.get('word')} = {conv['args']['2']} + {conv['args']['3']}", file=sys.stderr)
+        else:
+            porta_identificativi(classici, tpl, LINGUA)
         if not any(t.get('name') == 'root' for t in classici):
             dichiarate = [r for t in tpl if t.get('name') in ('ety', 'etymon') for r in radici_ety(t, LINGUA)]
             for lr, radice, ident in dict.fromkeys(dichiarate):

@@ -738,6 +738,7 @@ class Importatore:
         self.risalita = set()        # lingue antiche (--risali hit,xcl): entra il lemma con un etimo già nel dizionario
         self.id_proprio = {}         # voce → l'identificativo che la sua pagina si dà ({{etymon|gem-pro|id=three}})
         self.con_ident = defaultdict(set)   # chiave senza identificativo → le chiavi con (*þrīz → *þrīz@three)
+        self.ident_citato = {}       # (esito, etimo attestato) → l'identificativo della citazione (ὄψις < ὄψ<id:eye>)
         self.senza_nomi = set()      # lingue intere senza nomi propri né locuzioni (--senza-nomi he)
         self.con_etimologia = set()  # lingue di chiusura di cui entrano tutte le voci con un'etimologia, ma non i lemmi
                                      # senza (--con-etimologia en): l'inglese ha centinaia di migliaia di lemmi vuoti
@@ -933,9 +934,14 @@ class Importatore:
                     continue
                 tipo = 'derivazione' if len(basi) == 1 else 'composizione'
                 # le glosse degli elementi ({{af|grc|ὄψ|-σις|t1=eye}}): tN o glossN, per la posizione del termine
-                glosse_el = {}
+                glosse_el, ident_el = {}, {}
                 for j in range(1, 12):
                     termine_j = (a.get(str(j + 1)) or '').strip()
+                    # l'omografo che l'elemento cita: id1 o «ὄψ<id:eye>» (ὄψ², che si dà id=eye, non ὄψ «voce»)
+                    m_id = re.search(r'<id:([^<>]+)>', termine_j)
+                    id_j = (a.get(f'id{j}') or (m_id.group(1) if m_id else '')).strip()
+                    if termine_j and id_j:
+                        ident_el[pulisci_parte(termine_j)[0]] = id_j
                     g_j = (a.get(f't{j}') or a.get(f'gloss{j}') or '').strip()
                     if not g_j:
                         # la sintassi di {{ety}} porta la glossa nel termine: «ὄψ<t:eye>» (ὄψις, ὀφθαλμός)
@@ -953,7 +959,9 @@ class Importatore:
                     if fx:
                         kb, forma_b = self.lessema(lr, pr, omografo=omo_r), fx
                     else:
-                        kb = self.lessema(lingua_b, b)
+                        kb = self.lessema(lingua_b, b, ident=ident_el.get(b))
+                        if ident_el.get(b) and not b.startswith('*'):
+                            self.ident_citato.setdefault((k0, kb), ident_el[b])
                     if kb != k0:
                         archi.append({'etimo': kb, 'esito': k0, 'tipo': tipo, 'ordine': i,
                                       'affisso': ' '.join(affissi) or None, 'conf': 3, 'forma': forma_b})
@@ -1038,6 +1046,8 @@ class Importatore:
                 lingua, termine, omo_t, forma_extra = self.risolvi(lingua, termine, mostra)
                 mostra = mostra or forma_extra
                 kt = self.lessema(lingua, termine, glossa=glossa_t, translit=tr, omografo=omo_t, ident=(a.get('id') or '').strip() or None)
+                if (a.get('id') or '').strip() and not termine.startswith('*'):
+                    self.ident_citato.setdefault((k0, kt), a['id'].strip())
                 if glossa_t and termine.startswith('*') and termine.endswith('-'):
                     # per il controllo delle radici omografe (GLOSSE_RADICI): chi cita la radice, e con quale senso
                     citanti = self.lessemi[kt].setdefault('citanti', {}).setdefault(glossa_t, [])
@@ -1135,6 +1145,8 @@ class Importatore:
         kt = self.lessema(lingua, termine, glossa=glossa_t, omografo=omo_t, ident=(a.get('id') or '').strip() or None)
         if kt == k0 or any(x['etimo'] == kt for x in archi + alternative):
             return None
+        if (a.get('id') or '').strip() and not termine.startswith('*'):
+            self.ident_citato.setdefault((k0, kt), a['id'].strip())
         return kt
 
     # ---- chiusura delle catene: le voci delle lingue intermedie ----
@@ -1663,6 +1675,26 @@ class Importatore:
 
         def generica(k):
             return k == chiave(self.lessemi[k]['lingua'], self.lessemi[k]['lemma'], 1)
+
+        # l'omografo che la citazione dichiara con il suo identificativo (ὄψις: «ὄψ<id:eye>», e ὄψ² si dà id=eye) è
+        # quello: è Wiktionary che lo dice, non una somiglianza di glosse
+        per_ident = {}
+        for k in gruppo_di:
+            if self.id_proprio.get(k):
+                per_ident.setdefault((tuple(sorted(gruppo_di[k])), self.id_proprio[k]), k)
+        for r in self.relazioni:
+            ident = self.ident_citato.get((r['esito'], r['etimo']))
+            if not ident or r['etimo'] not in gruppo_di:
+                continue
+            s = per_ident.get((tuple(sorted(gruppo_di[r['etimo']])), ident))
+            if s and s != r['etimo']:
+                self.glossa_arco[(r['esito'], s)] = self.glossa_arco.get((r['esito'], r['etimo']))
+                r['etimo'] = s
+                self.stat['omografi_per_identificativo'] += 1
+            elif s:
+                self.stat['omografi_identificativo_gia_giusto'] += 1
+            else:
+                self.stat['omografi_identificativo_senza_pagina'] += 1
 
         cambi = []
         for r in self.relazioni:

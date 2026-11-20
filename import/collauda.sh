@@ -308,6 +308,18 @@ imp_b = Importatore()
 imp_b.voce({'w': 'ὄψις', 'l': 'grc', 'tpl': [{'n': 'af', 'a': {'1': 'grc', '2': 'ὄψ<t:eye>', '3': '-σις'}, 'e': ''}]}, 'grc')
 assert 'eye' in imp_b.glossa_arco.values(), ('la glossa come modificatore di {{ety}}', imp_b.glossa_arco)
 _w.OMOGRAFI_PER_GLOSSA = (50, 0.9)
+# ὄψις: «{{etymon|grc|:af|grc:ὄψ<id:eye>|…}}» dichiara l'omografo, e il filtro porta l'identificativo nel {{af}}
+from filtra import porta_identificativi
+_cl = [{'name': 'af', 'args': {'1': 'grc', '2': 'ὄψ', '3': '-σῐς', 't1': 'eye'}}]
+porta_identificativi(_cl, [{'name': 'etymon', 'args': {'1': 'grc', 'id': 'sight', '2': ':af', '3': 'grc:ὄψ<id:eye>', '4': 'grc:-σῐς<id:abstract nouns>'}}], 'grc')
+assert _cl[0]['args'].get('id1') == 'eye' and _cl[0]['args'].get('id2') == 'abstract nouns', _cl
+imp_i = Importatore()
+imp_i.voce({'w': 'ὄψ', 'l': 'grc', 'en': 1, 'tpl': [{'n': 'etymon', 'a': {'1': 'grc', 'id': 'voice'}, 'e': ''}]}, 'grc')
+imp_i.voce({'w': 'ὄψ', 'l': 'grc', 'en': 2, 'tpl': [{'n': 'etymon', 'a': {'1': 'grc', 'id': 'eye'}, 'e': ''}]}, 'grc')
+imp_i.voce({'w': 'ὄψις', 'l': 'grc', 'tpl': [{'n': 'af', 'a': {'1': 'grc', '2': 'ὄψ', '3': '-σις', 'id1': 'eye'}, 'e': ''}]}, 'grc')
+imp_i.precisa_omografi_parole()
+_ops = [r['etimo'] for r in imp_i.relazioni if r['esito'] == imp_i.chiave_di('grc', 'ὄψις')]
+assert _ops == [imp_i.chiave_di('grc', 'ὄψ') + ':2'], ('l\'omografo dell\'identificativo', _ops, list(imp_i.lessemi))
 # il protosemitico ha due notazioni: *ʾil- e *ʔil- sono la stessa voce
 from wiktionary import nome_pagina as np_
 assert np_('sem-pro', '*ʾil-') == '*ʔil-' and np_('sem-pro', '*ʿayn-') == '*ʕayn-' and np_('ar', 'ʿayn') == 'ʿayn'
