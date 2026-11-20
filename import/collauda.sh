@@ -329,6 +329,18 @@ imp_b = Importatore()
 imp_b.voce({'w': 'ὄψις', 'l': 'grc', 'tpl': [{'n': 'af', 'a': {'1': 'grc', '2': 'ὄψ<t:eye>', '3': '-σις'}, 'e': ''}]}, 'grc')
 assert 'eye' in imp_b.glossa_arco.values(), ('la glossa come modificatore di {{ety}}', imp_b.glossa_arco)
 _w.OMOGRAFI_PER_GLOSSA = (50, 0.9)
+# αἶθοψ «face, appearance»: il campo della radice di ogni omografo (ὄψ² < *h₃ekʷ- «eye, face, look») decide
+_w.OMOGRAFI_PER_CAMPO = (0, 0.9)
+imp_c = Importatore()
+v1, v2 = imp_c.lessema('grc', 'ὄψ', glossa='voice'), imp_c.lessema('grc', 'ὄψ', glossa='eye', omografo=2)
+r1, r2 = imp_c.lessema('ine-pro', '*wekʷ-'), imp_c.lessema('ine-pro', '*h₃ekʷ-')
+imp_c.lessemi[v1]['propria'], imp_c.lessemi[v2]['propria'] = 'voice', 'eye'
+imp_c.campi = {r1: _parole('speak, say, voice, word'), r2: _parole('eye, face, look, sight')}
+aith = imp_c.lessema('grc', 'αἶθοψ')
+arco(imp_c, v1, r1); arco(imp_c, v2, r2); arco(imp_c, aith, v1); imp_c.glossa_arco[(aith, v1)] = 'face, appearance'
+imp_c.precisa_omografi_parole()
+assert [r['etimo'] for r in imp_c.relazioni if r['esito'] == aith] == [v2], imp_c.relazioni
+_w.OMOGRAFI_PER_CAMPO = (50, 0.9)
 # ὄψις: «{{etymon|grc|:af|grc:ὄψ<id:eye>|…}}» dichiara l'omografo, e il filtro porta l'identificativo nel {{af}}
 from filtra import porta_identificativi
 _cl = [{'name': 'af', 'args': {'1': 'grc', '2': 'ὄψ', '3': '-σῐς', 't1': 'eye'}}]

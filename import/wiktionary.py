@@ -25,6 +25,8 @@ OMOGRAFE_PER_GLOSSA = (50, 0.9)
 OMOGRAFI_PER_GLOSSA = (50, 0.9)
 # Le radici omografe precisate dal campo di senso della radice (dati/campi_radici.tsv.gz): la stessa misura
 OMOGRAFE_PER_CAMPO = (50, 0.9)
+# Le parole omografe precisate dal campo della radice da cui ciascuna viene (ὄψ² < *h₃ekʷ- «eye, face, look»)
+OMOGRAFI_PER_CAMPO = (50, 0.9)
 from controlla_sensi import legate, parole
 from array import array
 from collections import Counter, defaultdict
@@ -1750,26 +1752,66 @@ class Importatore:
             else:
                 self.stat['omografi_identificativo_senza_pagina'] += 1
 
+        # La seconda regola: la glossa della citazione contro il senso di ogni omografo allargato al campo della radice
+        # da cui viene (αἶθοψ «face, appearance»: ὄψ² < *h₃ekʷ- «eye, face, look, sight», non ὄψ < *wekʷ- «speak,
+        # voice»). Solo dove la prima non decide, tutti gli omografi con un campo, misurata a parte (OMOGRAFI_PER_CAMPO).
+        campi = getattr(self, 'campi', None)
+        if campi is None:
+            campi = self.campi = campi_radici()
+        accolte = {h['esito']: h['chiave'] for h in self.ipotesi.values() if h['stato'] == 'accolta'}
+        primo = {}
+        for r in self.relazioni:
+            if r['ordine'] == 1 and accolte.get(r['esito']) == r['ipotesi']:
+                primo.setdefault(r['esito'], r['etimo'])
+
+        def campo_di(k):
+            visti = {k}
+            for _ in range(8):
+                k = primo.get(k)
+                if k is None or k in visti:
+                    return None
+                if k in campi:
+                    return campi[k]
+                visti.add(k)
+            return None
+        allargati = {}
+        for k in gruppo_di:
+            c = campo_di(k)
+            if c:
+                allargati[k] = sensi[k] + [c]
+
+        def scelta_campo(r):
+            pg = parole(self.glossa_arco.get((r['esito'], r['etimo'])) or '')
+            membri = sorted(gruppo_di[r['etimo']])
+            if not pg or not all(k in allargati for k in membri):
+                return None
+            legati = [k for k in membri if any(legate(pg, x) for x in allargati[k])]
+            return legati[0] if len(legati) == 1 else None
+
         cambi = []
         for r in self.relazioni:
             if r['etimo'] not in gruppo_di:
                 continue
-            s = scelta(r)
+            s, regola = scelta(r), 'glossa'
+            if s is None:
+                s, regola = scelta_campo(r), 'campo'
             if s is None:
                 continue
             if not generica(r['etimo']):
-                self.stat['omografi_glossa_concorde' if s == r['etimo'] else 'omografi_glossa_discorde'] += 1
+                self.stat[f'omografi_{regola}_concorde' if s == r['etimo'] else f'omografi_{regola}_discorde'] += 1
             elif s != r['etimo']:
-                cambi.append((r, s))
-        prove = self.stat['omografi_glossa_concorde'] + self.stat['omografi_glossa_discorde']
-        vale = prove >= OMOGRAFI_PER_GLOSSA[0] and self.stat['omografi_glossa_concorde'] >= OMOGRAFI_PER_GLOSSA[1] * prove
-        for r, s in cambi:
-            if self.stat['omografi_glossa_esempi'] < 40:
-                self.stat['omografi_glossa_esempi'] += 1
-                print(f"  omografo per glossa: {r['esito']} < {r['etimo']} → {s} "
+                cambi.append((r, s, regola))
+        vale = {}
+        for regola, soglia in (('glossa', OMOGRAFI_PER_GLOSSA), ('campo', OMOGRAFI_PER_CAMPO)):
+            prove = self.stat[f'omografi_{regola}_concorde'] + self.stat[f'omografi_{regola}_discorde']
+            vale[regola] = prove >= soglia[0] and self.stat[f'omografi_{regola}_concorde'] >= soglia[1] * prove
+        for r, s, regola in cambi:
+            if self.stat[f'omografi_{regola}_esempi'] < 30:
+                self.stat[f'omografi_{regola}_esempi'] += 1
+                print(f"  omografo per {regola} ({'vale' if vale[regola] else 'in attesa'}): {r['esito']} < {r['etimo']} → {s} "
                       f"(«{self.glossa_arco.get((r['esito'], r['etimo']))}»)", file=sys.stderr)
-            self.stat['omografi_glossa_' + ('precisati' if vale else 'in_attesa')] += 1
-            if vale:
+            self.stat[f'omografi_{regola}_' + ('precisati' if vale[regola] else 'in_attesa')] += 1
+            if vale[regola]:
                 self.glossa_arco[(r['esito'], s)] = self.glossa_arco.get((r['esito'], r['etimo']))
                 r['etimo'] = s
 
