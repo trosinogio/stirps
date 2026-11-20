@@ -336,7 +336,7 @@ porta_identificativi(_cl, [{'name': 'etymon', 'args': {'1': 'grc', 'id': 'sight'
 assert _cl[0]['args'].get('id1') == 'eye' and _cl[0]['args'].get('id2') == 'abstract nouns', _cl
 imp_i = Importatore()
 imp_i.voce({'w': 'ὄψ', 'l': 'grc', 'en': 1, 'tpl': [{'n': 'etymon', 'a': {'1': 'grc', 'id': 'voice'}, 'e': ''}]}, 'grc')
-imp_i.voce({'w': 'ὄψ', 'l': 'grc', 'en': 2, 'tpl': [{'n': 'etymon', 'a': {'1': 'grc', 'id': 'eye'}, 'e': ''}]}, 'grc')
+imp_i.voce({'w': 'ὄψ', 'l': 'grc', 'en': 2, 'id': 'eye', 'tpl': []}, 'grc')     # il filtro scrive l'id della pagina
 imp_i.voce({'w': 'ὄψις', 'l': 'grc', 'tpl': [{'n': 'af', 'a': {'1': 'grc', '2': 'ὄψ', '3': '-σις', 'id1': 'eye'}, 'e': ''}]}, 'grc')
 imp_i.precisa_omografi_parole()
 _ops = [r['etimo'] for r in imp_i.relazioni if r['esito'] == imp_i.chiave_di('grc', 'ὄψις')]

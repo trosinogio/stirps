@@ -820,6 +820,10 @@ if __name__ == '__main__':
                                  # ottava colonna: la riga delle forme e le accezioni, in JSON
                                  json.dumps(dati_scheda(v), ensure_ascii=False) if dati_scheda(v) else '')) + '\n')
         tpl = [{**t, 'name': ALIAS.get(t.get('name'), t.get('name'))} for t in tpl]
+        # l'identificativo che la pagina si dà ({{etymon|grc|id=eye}}: ὄψ² «occhio», non ὄψ «voce»): chi la cita con
+        # <id:eye> o id=eye cita questa voce (precisa_omografi_parole, unisci_identificativi)
+        id_pagina = next(((t.get('args') or {}).get('id', '').strip() for t in tpl
+                          if t.get('name') in ('ety', 'etymon') and (t.get('args') or {}).get('id', '').strip()), None)
         classici = [t for t in tpl if t.get('name') in UTILI]
         if not any(porta_etimo(t) for t in classici):
             # solo per le voci che non hanno già un etimo nei modelli classici: quelle che leggiamo bene non cambiano
@@ -880,7 +884,8 @@ if __name__ == '__main__':
                               'r': next((f['form'] for f in (v.get('forms') or []) if 'romanization' in (f.get('tags') or [])), None),
                               'pr': pronuncia(v),
                               'se': dati_scheda(v),
-                              'rec': (v.get('original_title') or '').startswith('Reconstruction:')}, ensure_ascii=False) + '\n')
+                              'rec': (v.get('original_title') or '').startswith('Reconstruction:'),
+                              **({'id': id_pagina} if id_pagina else {})}, ensure_ascii=False) + '\n')
         tenuti += 1
     if pos_diagnosi:
         print(f'  pos, conti in {LINGUA}: {dict(conti_pos)}', file=sys.stderr)

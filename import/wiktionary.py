@@ -856,6 +856,8 @@ class Importatore:
         if glossa:
             self.lessemi[k0].setdefault('propria', glossa[:200])   # la glossa della sua voce, non di una menzione
         self.lette.add(k0)
+        if v.get('id'):                 # scritto dal filtro: {{etymon|…|id=eye}} della pagina
+            self.id_proprio.setdefault(k0, v['id'].strip())
         for t in v.get('tpl') or []:
             if t.get('n') == 'etymon' and (t.get('a') or {}).get('id'):
                 self.id_proprio.setdefault(k0, t['a']['id'].strip())
