@@ -302,6 +302,9 @@ assert [r['etimo'] for r in imp_o.relazioni if r['esito'] == qui] == [voce1], 's
 imp_a = Importatore()
 imp_a.voce({'w': 'ὄψις', 'l': 'grc', 'tpl': [{'n': 'af', 'a': {'1': 'grc', '2': 'ὄψ', '3': '-σις', 't1': 'eye'}, 'e': ''}]}, 'grc')
 assert 'eye' in imp_a.glossa_arco.values(), imp_a.glossa_arco
+imp_b = Importatore()
+imp_b.voce({'w': 'ὄψις', 'l': 'grc', 'tpl': [{'n': 'af', 'a': {'1': 'grc', '2': 'ὄψ<t:eye>', '3': '-σις'}, 'e': ''}]}, 'grc')
+assert 'eye' in imp_b.glossa_arco.values(), ('la glossa come modificatore di {{ety}}', imp_b.glossa_arco)
 _w.OMOGRAFI_PER_GLOSSA = (50, 0.9)
 # il protosemitico ha due notazioni: *ʾil- e *ʔil- sono la stessa voce
 from wiktionary import nome_pagina as np_

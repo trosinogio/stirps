@@ -937,6 +937,10 @@ class Importatore:
                 for j in range(1, 12):
                     termine_j = (a.get(str(j + 1)) or '').strip()
                     g_j = (a.get(f't{j}') or a.get(f'gloss{j}') or '').strip()
+                    if not g_j:
+                        # la sintassi di {{ety}} porta la glossa nel termine: «ὄψ<t:eye>» (ὄψις, ὀφθαλμός)
+                        m_t = re.search(r'<(?:t|gloss):([^<>]+)>', termine_j)
+                        g_j = m_t.group(1).strip() if m_t else ''
                     if termine_j and g_j:
                         glosse_el[pulisci_parte(termine_j)[0]] = g_j[:80]
                 for i, (b, lb) in enumerate(basi, 1):
