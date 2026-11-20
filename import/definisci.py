@@ -200,9 +200,10 @@ Per ciascuna voce restituisci:
 - «senso»: il significato della radice in italiano, in poche parole («occhio, vedere»).
 
 Regole:
-- Il campo descrive la radice, non un singolo discendente: un significato che compare in un solo ramo, lontano dagli altri, non entra.
+- Il campo descrive la radice, non un singolo discendente: quando i discendenti hanno sensi diversi, lascia fuori dal campo il senso che compare in un solo discendente, lontano da tutti gli altri.
+- Una radice con discendenti in un solo ramo, o con un solo discendente, ha comunque il suo campo: il senso di quei discendenti (e della glossa, se c'è) è il senso della radice. Lo stesso per una forma ricostruita senza glossa: il senso viene dai discendenti.
 - Se la radice ha due significati distinti nelle fonti (omografe non separate), mettili tutti e due.
-- Se la glossa e i discendenti non bastano a capire il significato, lascia la voce vuota: un campo vuoto è meglio di un campo inventato.
+- Lascia la voce vuota solo se non c'è nessuna glossa e i discendenti non hanno glosse, sono soltanto nomi propri, o hanno sensi tanto diversi che non se ne ricava uno: un campo vuoto è meglio di un campo inventato.
 - Restituisci un elemento per ogni voce ricevuta, con lo stesso numero."""
 SCHEMA_CAMPI = {
     'type': 'object',
