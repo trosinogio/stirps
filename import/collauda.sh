@@ -293,6 +293,8 @@ _w.OMOGRAFI_PER_GLOSSA = (0, 0.9)
 imp_o = Importatore()
 voce1, occhio = imp_o.lessema('grc', 'ὄψ', glossa='voice'), imp_o.lessema('grc', 'ὄψ', glossa='eye', omografo=2)
 opsis, qui = imp_o.lessema('grc', 'ὄψις'), imp_o.lessema('grc', 'αἶθοψ')
+imp_o.lessemi[voce1]['propria'], imp_o.lessemi[occhio]['propria'] = 'voice', 'eye'
+imp_o.lessemi[voce1]['glosse']['eye'] += 5      # le citazioni di ὄψ² finite su ὄψ: non contano
 arco(imp_o, opsis, voce1); imp_o.glossa_arco[(opsis, voce1)] = 'eye'
 arco(imp_o, qui, voce1)
 imp_o.precisa_omografi_parole()

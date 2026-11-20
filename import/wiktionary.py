@@ -1649,7 +1649,10 @@ class Importatore:
         gruppo_di = {k: ks for ks in gruppi.values() if len(ks) > 1 for k in ks}
         if not gruppo_di:
             return
-        sensi = {k: [p for p in (parole(x) for x in self.lessemi[k]['glosse']) if p] for k in gruppo_di}
+        # la glossa della pagina di ogni omografo, non quelle delle citazioni: ὄψ «voice» aveva raccolto anche «eye» da
+        # tutte le pagine che lo citavano per ὄψ², e la regola vedeva due omografi compatibili
+        sensi = {k: [p for p in (parole(x) for x in ([self.lessemi[k]['propria']] if self.lessemi[k].get('propria')
+                                                     else self.lessemi[k]['glosse'])) if p] for k in gruppo_di}
 
         def scelta(r):
             pg = parole(self.glossa_arco.get((r['esito'], r['etimo'])) or '')
