@@ -74,6 +74,12 @@ if [ ${#MANCANTI[@]} -gt 0 ]; then
     rm -f dati/grezzi.jsonl
   else
     echo "::warning title=Chiusura::dump grezzo non disponibile: ${MANCANTI[*]} restano fuori"
+    # Kaikki che non risponde non dà un pacchetto piccolo: lo ferma. Il 20 novembre 2026 mancavano quasi tutte le lingue
+    # di chiusura e il workflow ha scritto sul ramo un pacchetto di 502 mila voci invece di 1,35 milioni
+    if [ ${#MANCANTI[@]} -gt 10 ]; then
+      echo "::error title=Chiusura::mancano ${#MANCANTI[@]} dump e il dump grezzo non si scarica: Kaikki non risponde, il pacchetto non si scrive"
+      exit 1
+    fi
   fi
 fi
 
