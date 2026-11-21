@@ -21,9 +21,32 @@ import gzip, json, re, sys, os, unicodedata
 LINGUA = os.environ.get('LINGUA', 'it')
 # radici omografe precisate dalla glossa citata: almeno quante prove, e quale accordo con le dichiarazioni {{root}}
 OMOGRAFE_PER_GLOSSA = (50, 0.9)
+# Le parole omografe (ὄψ «voce» e ὄψ² «occhio»): la stessa misura, sugli archi che citano già l'omografo preciso
+OMOGRAFI_PER_GLOSSA = (50, 0.9)
+# Le radici omografe precisate dal campo di senso della radice (dati/campi_radici.tsv.gz): la stessa misura
+OMOGRAFE_PER_CAMPO = (50, 0.9)
+# Le parole omografe precisate dal campo della radice da cui ciascuna viene (ὄψ² < *h₃ekʷ- «eye, face, look»)
+OMOGRAFI_PER_CAMPO = (50, 0.9)
 from controlla_sensi import legate, parole
 from array import array
 from collections import Counter, defaultdict
+
+def campi_radici(percorso=None):
+    """Il campo di senso di ogni radice (*kap-@head «head, cap, hat, cloak, cover», *kap-@seize «seize, grasp, take»):
+    le parole chiave che Claude ha proposto dalle glosse e dai discendenti (lotto «campi» di definisci.py), come insiemi
+    di parole piene. Vuoto se il registro non c'è."""
+    percorso = percorso or os.environ.get('CAMPI_RADICI') or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), '..', 'dati', 'campi_radici.tsv.gz')
+    campi = {}
+    if not os.path.exists(percorso):
+        return campi
+    with gzip.open(percorso, 'rt', encoding='utf-8') as f:
+        for riga in f:
+            c = riga.rstrip('\n').split('\t')
+            if len(c) > 2 and c[2].strip() and parole(c[2]):
+                campi[c[0]] = parole(c[2])
+    return campi
+
 
 CATENA = {'inh': 'eredita', 'inh+': 'eredita', 'bor': 'prestito', 'bor+': 'prestito', 'ubor': 'prestito', 'obor': 'prestito',
           'lbor': 'prestito_dotto', 'slbor': 'semidotto', 'der': 'generico', 'der+': 'generico', 'uder': 'generico',
@@ -283,10 +306,17 @@ SEGNI_SU_VOCALE = {'sh': '\u0300\u0301\u030f\u0311\u0304\u0303\u0302', 'mk': '\u
 VOCALI_SLAVE = set('aeiouAEIOUrRаеиоуяюАЕИОУЯЮрРъЪѣѢ')   # я e ю: in bulgaro следя́, ря́зък
 
 
+NOTAZIONE_SEMITICA = {'sem-pro', 'sem-wes-pro', 'afa-pro'}
+
+
 def nome_pagina(lingua, termine):
     """Il titolo della pagina: per latino e greco senza macron e brevi (carō → caro);
     per ebraico, aramaico, arabo e siriaco senza segni vocalici (אַבָּא → אבא); per inglese antico e medio e per il
     russo senza i segni che Wiktionary toglie dal titolo (SEGNI_DELLA_PAGINA)."""
+    if lingua in NOTAZIONE_SEMITICA:
+        # il protosemitico ha due notazioni per l'occlusiva glottidale e la faringale: *ʔil- e *ʾil-, *ʕayn- e *ʿayn-
+        # erano voci diverse, e l'albero dei discendenti non riconosceva la parola delle catene (19 novembre 2026)
+        termine = termine.replace('\u02be', '\u0294').replace('\u02bf', '\u0295')
     if SENZA_QUANTITA.match(lingua or ''):
         termine = unicodedata.normalize('NFC', ''.join(ch for ch in unicodedata.normalize('NFD', termine) if ch not in '\u0304\u0306'))
     elif (lingua or '').split('-')[0] in SENZA_VOCALI or lingua in SENZA_VOCALI:
@@ -729,6 +759,7 @@ class Importatore:
         self.risalita = set()        # lingue antiche (--risali hit,xcl): entra il lemma con un etimo già nel dizionario
         self.id_proprio = {}         # voce → l'identificativo che la sua pagina si dà ({{etymon|gem-pro|id=three}})
         self.con_ident = defaultdict(set)   # chiave senza identificativo → le chiavi con (*þrīz → *þrīz@three)
+        self.ident_citato = {}       # (esito, etimo attestato) → l'identificativo della citazione (ὄψις < ὄψ<id:eye>)
         self.senza_nomi = set()      # lingue intere senza nomi propri né locuzioni (--senza-nomi he)
         self.con_etimologia = set()  # lingue di chiusura di cui entrano tutte le voci con un'etimologia, ma non i lemmi
                                      # senza (--con-etimologia en): l'inglese ha centinaia di migliaia di lemmi vuoti
@@ -827,6 +858,8 @@ class Importatore:
         if glossa:
             self.lessemi[k0].setdefault('propria', glossa[:200])   # la glossa della sua voce, non di una menzione
         self.lette.add(k0)
+        if v.get('id'):                 # scritto dal filtro: {{etymon|…|id=eye}} della pagina
+            self.id_proprio.setdefault(k0, v['id'].strip())
         for t in v.get('tpl') or []:
             if t.get('n') == 'etymon' and (t.get('a') or {}).get('id'):
                 self.id_proprio.setdefault(k0, t['a']['id'].strip())
@@ -923,6 +956,22 @@ class Importatore:
                     in_attesa = affissi
                     continue
                 tipo = 'derivazione' if len(basi) == 1 else 'composizione'
+                # le glosse degli elementi ({{af|grc|ὄψ|-σις|t1=eye}}): tN o glossN, per la posizione del termine
+                glosse_el, ident_el = {}, {}
+                for j in range(1, 12):
+                    termine_j = (a.get(str(j + 1)) or '').strip()
+                    # l'omografo che l'elemento cita: id1 o «ὄψ<id:eye>» (ὄψ², che si dà id=eye, non ὄψ «voce»)
+                    m_id = re.search(r'<id:([^<>]+)>', termine_j)
+                    id_j = (a.get(f'id{j}') or (m_id.group(1) if m_id else '')).strip()
+                    if termine_j and id_j:
+                        ident_el[pulisci_parte(termine_j)[0]] = id_j
+                    g_j = (a.get(f't{j}') or a.get(f'gloss{j}') or '').strip()
+                    if not g_j:
+                        # la sintassi di {{ety}} porta la glossa nel termine: «ὄψ<t:eye>» (ὄψις, ὀφθαλμός)
+                        m_t = re.search(r'<(?:t|gloss):([^<>]+)>', termine_j)
+                        g_j = m_t.group(1).strip() if m_t else ''
+                    if termine_j and g_j:
+                        glosse_el[pulisci_parte(termine_j)[0]] = g_j[:80]
                 for i, (b, lb) in enumerate(basi, 1):
                     lingua_b, forma_b = lb or codice_lingua(a.get('1')) or lingua_voce, None
                     fx = None
@@ -933,10 +982,14 @@ class Importatore:
                     if fx:
                         kb, forma_b = self.lessema(lr, pr, omografo=omo_r), fx
                     else:
-                        kb = self.lessema(lingua_b, b)
+                        kb = self.lessema(lingua_b, b, ident=ident_el.get(b))
+                        if ident_el.get(b) and not b.startswith('*'):
+                            self.ident_citato.setdefault((k0, kb), ident_el[b])
                     if kb != k0:
                         archi.append({'etimo': kb, 'esito': k0, 'tipo': tipo, 'ordine': i,
                                       'affisso': ' '.join(affissi) or None, 'conf': 3, 'forma': forma_b})
+                        if glosse_el.get(b):
+                            self.glossa_arco.setdefault((k0, kb), glosse_el[b])
                 primo = False
                 prec = None             # la catena non prosegue oltre l'analisi in affissi
                 continue
@@ -985,6 +1038,10 @@ class Importatore:
                     self.stat['termini_multipli'] += 1
                     if not termine:
                         continue
+                # due grafie della stessa forma («*q-d-m//*qdm», nella radice ebraica ק־ד־ם): vale la prima, come in lessema()
+                if '//' in termine:
+                    termine = termine.split('//')[0].strip()
+                    self.stat['termini_con_due_grafie'] += 1
                 if '/' in termine or re.match(r'^[A-Z][a-z]+:', termine):
                     self.stat['termini_spuri'] += 1       # «i/languages A to L»: link interni di Wiktionary
                     continue
@@ -1012,6 +1069,8 @@ class Importatore:
                 lingua, termine, omo_t, forma_extra = self.risolvi(lingua, termine, mostra)
                 mostra = mostra or forma_extra
                 kt = self.lessema(lingua, termine, glossa=glossa_t, translit=tr, omografo=omo_t, ident=(a.get('id') or '').strip() or None)
+                if (a.get('id') or '').strip() and not termine.startswith('*'):
+                    self.ident_citato.setdefault((k0, kt), a['id'].strip())
                 if glossa_t and termine.startswith('*') and termine.endswith('-'):
                     # per il controllo delle radici omografe (GLOSSE_RADICI): chi cita la radice, e con quale senso
                     citanti = self.lessemi[kt].setdefault('citanti', {}).setdefault(glossa_t, [])
@@ -1037,8 +1096,9 @@ class Importatore:
                                       'conf': min(conf, conf_voce), 'forma': mostra})
                         if in_attesa:
                             self.stat['prefissi_con_la_base_dopo_il_piu'] += 1
-                        if glossa_t and termine.startswith('*') and termine.endswith('-'):
-                            self.glossa_arco.setdefault((k0, kt), glossa_t)
+                        if glossa_t:
+                            # (le radici omografe, precisa_omografe; le parole omografe, precisa_omografi_parole)
+                            self.glossa_arco.setdefault((k0, kt), glossa_t[:80])
                     in_attesa = None
                     primo, prec = False, kt
                     continue
@@ -1066,8 +1126,8 @@ class Importatore:
                 if kt != prec:
                     self.intermedi[prec][(kt, tipo, conf, mostra)] += 1
                     self.stat['anelli_intermedi'] += 1
-                    if glossa_t and termine.startswith('*') and termine.endswith('-'):
-                        self.glossa_arco.setdefault((prec, kt), glossa_t)
+                    if glossa_t:
+                        self.glossa_arco.setdefault((prec, kt), glossa_t[:80])
                 prec = kt
         if k0 not in self.attestazioni:
             d = data_prosa(testo)
@@ -1108,6 +1168,8 @@ class Importatore:
         kt = self.lessema(lingua, termine, glossa=glossa_t, omografo=omo_t, ident=(a.get('id') or '').strip() or None)
         if kt == k0 or any(x['etimo'] == kt for x in archi + alternative):
             return None
+        if (a.get('id') or '').strip() and not termine.startswith('*'):
+            self.ident_citato.setdefault((k0, kt), a['id'].strip())
         return kt
 
     # ---- chiusura delle catene: le voci delle lingue intermedie ----
@@ -1598,15 +1660,160 @@ class Importatore:
                 self.stat['omografe_precisate'] += 1
             else:
                 self.stat['omografe_ambigue'] += 1
-        for rid, (r, k) in per_glossa.items():
+        # Il campo di senso delle omografe (*kap-@head «head, cap, hat…», *kap-@seize «seize, grasp, take…»): se la
+        # pagina non dà una glossa della citazione, vale la glossa della parola che cita la radice (*kaput «head»). Una
+        # sola omografa con una parola in comune, e tutte le omografe con il loro campo; la regola si misura come quella
+        # delle glosse, sugli archi che le dichiarazioni decidono da sole (OMOGRAFE_PER_CAMPO), e mai contro di loro.
+        campi = getattr(self, 'campi', None)
+        if campi is None:
+            campi = self.campi = campi_radici()
+        per_campo = {}
+        for r in self.relazioni:
+            if r['etimo'] not in varianti or accolte.get(r['esito']) != r['ipotesi'] or id(r) in per_glossa:
+                continue
+            if not all(k in campi for k in varianti[r['etimo']]):
+                continue
+            le = self.lessemi.get(r['esito']) or {}
+            g = self.glossa_arco.get((r['esito'], r['etimo'])) or le.get('propria') or \
+                next((x for x, _ in (le.get('glosse') or Counter()).most_common(1)), '')
+            pg = parole(g)
+            if not pg:
+                continue
+            legati = [k for k in sorted(varianti[r['etimo']]) if legate(pg, campi[k])]
+            if len(legati) == 1:
+                per_campo[id(r)] = (r, legati[0])
+            else:
+                self.stat['omografe_campo_non_decide'] += 1
+        for rid, (r, k) in per_campo.items():
             if rid in voti and len(voti[rid]) == 1:
-                continue                        # l'ha già decisa la dichiarazione
-            if rid in voti and k not in voti[rid]:
-                self.stat['omografe_glossa_contro_le_dichiarazioni'] += 1
-                continue                        # le parole sotto dichiarano altre omografe: resta com'è
-            self.stat['omografe_glossa_' + ('precisate' if vale else 'in_attesa')] += 1
-            if vale:
-                r['etimo'] = k
+                self.stat['omografe_campo_concorde' if next(iter(voti[rid])) == k else 'omografe_campo_discorde'] += 1
+        prove_c = self.stat['omografe_campo_concorde'] + self.stat['omografe_campo_discorde']
+        vale_c = prove_c >= OMOGRAFE_PER_CAMPO[0] and self.stat['omografe_campo_concorde'] >= OMOGRAFE_PER_CAMPO[1] * prove_c
+        for regola, scelte, ok in (('glossa', per_glossa, vale), ('campo', per_campo, vale_c)):
+            for rid, (r, k) in scelte.items():
+                if rid in voti and len(voti[rid]) == 1:
+                    continue                        # l'ha già decisa la dichiarazione
+                if rid in voti and k not in voti[rid]:
+                    self.stat[f'omografe_{regola}_contro_le_dichiarazioni'] += 1
+                    continue                        # le parole sotto dichiarano altre omografe: resta com'è
+                self.stat[f'omografe_{regola}_' + ('precisate' if ok else 'in_attesa')] += 1
+                if ok:
+                    if regola == 'campo' and self.stat['omografe_campo_esempi'] < 30:
+                        self.stat['omografe_campo_esempi'] += 1
+                        print(f"  omografa per campo: {r['esito']} < {r['etimo']} → {k}", file=sys.stderr)
+                    r['etimo'] = k
+
+    def precisa_omografi_parole(self):
+        """ὄψις «From ὄψ (óps, “eye”) + -σῐς»: Wiktionary cita la parola senza dire quale degli omografi (ὄψ «voce»,
+        ὄψ² «occhio»), e il parser prendeva il primo: ὄψις, -οψία, *autopsia*, ὀπτικός finivano sotto *wekʷ- «parlare».
+        Se la glossa della citazione ha una linea di senso con uno solo degli omografi, e non con quello scelto, l'arco
+        passa a quello. Prima di usarla la regola si misura sugli archi che citano già l'omografo preciso (con il
+        numero dell'etimologia o l'identificativo): vale solo se concorda nove volte su dieci, su almeno 50 archi
+        (OMOGRAFI_PER_GLOSSA)."""
+        gruppi = defaultdict(list)
+        for k, l in self.lessemi.items():
+            if not l.get('ricostruito'):
+                gruppi[(l['lingua'], l['lemma'])].append(k)
+        gruppo_di = {k: ks for ks in gruppi.values() if len(ks) > 1 for k in ks}
+        if not gruppo_di:
+            return
+        # la glossa della pagina di ogni omografo, non quelle delle citazioni: ὄψ «voice» aveva raccolto anche «eye» da
+        # tutte le pagine che lo citavano per ὄψ², e la regola vedeva due omografi compatibili
+        sensi = {k: [p for p in (parole(x) for x in ([self.lessemi[k]['propria']] if self.lessemi[k].get('propria')
+                                                     else self.lessemi[k]['glosse'])) if p] for k in gruppo_di}
+
+        def scelta(r):
+            pg = parole(self.glossa_arco.get((r['esito'], r['etimo'])) or '')
+            if not pg:
+                return None
+            legati = [k for k in sorted(gruppo_di[r['etimo']]) if any(legate(pg, s) for s in sensi[k])]
+            return legati[0] if len(legati) == 1 else None
+
+        def generica(k):
+            return k == chiave(self.lessemi[k]['lingua'], self.lessemi[k]['lemma'], 1)
+
+        # l'omografo che la citazione dichiara con il suo identificativo (ὄψις: «ὄψ<id:eye>», e ὄψ² si dà id=eye) è
+        # quello: è Wiktionary che lo dice, non una somiglianza di glosse
+        per_ident = {}
+        for k in gruppo_di:
+            if self.id_proprio.get(k):
+                per_ident.setdefault((tuple(sorted(gruppo_di[k])), self.id_proprio[k]), k)
+        for r in self.relazioni:
+            ident = self.ident_citato.get((r['esito'], r['etimo']))
+            if not ident or r['etimo'] not in gruppo_di:
+                continue
+            s = per_ident.get((tuple(sorted(gruppo_di[r['etimo']])), ident))
+            if s and s != r['etimo']:
+                self.glossa_arco[(r['esito'], s)] = self.glossa_arco.get((r['esito'], r['etimo']))
+                r['etimo'] = s
+                self.stat['omografi_per_identificativo'] += 1
+            elif s:
+                self.stat['omografi_identificativo_gia_giusto'] += 1
+            else:
+                self.stat['omografi_identificativo_senza_pagina'] += 1
+
+        # La seconda regola: la glossa della citazione contro il senso di ogni omografo allargato al campo della radice
+        # da cui viene (αἶθοψ «face, appearance»: ὄψ² < *h₃ekʷ- «eye, face, look, sight», non ὄψ < *wekʷ- «speak,
+        # voice»). Solo dove la prima non decide, tutti gli omografi con un campo, misurata a parte (OMOGRAFI_PER_CAMPO).
+        campi = getattr(self, 'campi', None)
+        if campi is None:
+            campi = self.campi = campi_radici()
+        accolte = {h['esito']: h['chiave'] for h in self.ipotesi.values() if h['stato'] == 'accolta'}
+        primo = {}
+        for r in self.relazioni:
+            if r['ordine'] == 1 and accolte.get(r['esito']) == r['ipotesi']:
+                primo.setdefault(r['esito'], r['etimo'])
+
+        def campo_di(k):
+            visti = {k}
+            for _ in range(8):
+                k = primo.get(k)
+                if k is None or k in visti:
+                    return None
+                if k in campi:
+                    return campi[k]
+                visti.add(k)
+            return None
+        allargati = {}
+        for k in gruppo_di:
+            c = campo_di(k)
+            if c:
+                allargati[k] = sensi[k] + [c]
+
+        def scelta_campo(r):
+            pg = parole(self.glossa_arco.get((r['esito'], r['etimo'])) or '')
+            membri = sorted(gruppo_di[r['etimo']])
+            if not pg or not all(k in allargati for k in membri):
+                return None
+            legati = [k for k in membri if any(legate(pg, x) for x in allargati[k])]
+            return legati[0] if len(legati) == 1 else None
+
+        cambi = []
+        for r in self.relazioni:
+            if r['etimo'] not in gruppo_di:
+                continue
+            s, regola = scelta(r), 'glossa'
+            if s is None:
+                s, regola = scelta_campo(r), 'campo'
+            if s is None:
+                continue
+            if not generica(r['etimo']):
+                self.stat[f'omografi_{regola}_concorde' if s == r['etimo'] else f'omografi_{regola}_discorde'] += 1
+            elif s != r['etimo']:
+                cambi.append((r, s, regola))
+        vale = {}
+        for regola, soglia in (('glossa', OMOGRAFI_PER_GLOSSA), ('campo', OMOGRAFI_PER_CAMPO)):
+            prove = self.stat[f'omografi_{regola}_concorde'] + self.stat[f'omografi_{regola}_discorde']
+            vale[regola] = prove >= soglia[0] and self.stat[f'omografi_{regola}_concorde'] >= soglia[1] * prove
+        for r, s, regola in cambi:
+            if self.stat[f'omografi_{regola}_esempi'] < 30:
+                self.stat[f'omografi_{regola}_esempi'] += 1
+                print(f"  omografo per {regola} ({'vale' if vale[regola] else 'in attesa'}): {r['esito']} < {r['etimo']} → {s} "
+                      f"(«{self.glossa_arco.get((r['esito'], r['etimo']))}»)", file=sys.stderr)
+            self.stat[f'omografi_{regola}_' + ('precisati' if vale[regola] else 'in_attesa')] += 1
+            if vale[regola]:
+                self.glossa_arco[(r['esito'], s)] = self.glossa_arco.get((r['esito'], r['etimo']))
+                r['etimo'] = s
 
     def togli_archi_impossibili(self):
         """Ultimo controllo su tutti gli archi (arco_impossibile): quelli che non possono stare escono, e con loro le
@@ -1973,6 +2180,38 @@ class Importatore:
             self.stat['discendenti_collegati'] += 1
             self.stat[f"discendenti_collegati_{self.lessemi[figlio]['lingua']}"] += 1
 
+    def collega_radici_corrispondenti(self, percorsi):
+        """Le pagine delle radici ebraiche dichiarano la radice araba corrispondente («ש־ל־ם: From Proto-Semitic
+        *š-l-m. Cognate with Arabic root س ل م»; RADICI_CORRISPONDENTI di filtra.py). Se la radice che dichiara ha un etimo
+        protosemitico e quella corrispondente non ne ha nessuno, la corrispondente prende lo stesso etimo: due radici
+        cognate continuano la stessa forma. Certezza 2, con la sua etichetta; mai da una radice senza etimo protosemitico."""
+        accolte = {h['chiave'] for h in self.ipotesi.values() if h['stato'] == 'accolta'}
+        con_ipotesi = {h['esito'] for h in self.ipotesi.values()}
+        etimo_di = defaultdict(list)
+        for r in self.relazioni:
+            if r['ipotesi'] in accolte:
+                etimo_di[r['esito']].append(r)
+        for lingua, percorso in percorsi:
+            file = os.path.join(os.path.dirname(percorso), 'radici_corrispondenti.tsv')
+            if not os.path.exists(file):
+                continue
+            for riga in open(file, encoding='utf-8'):
+                c = riga.rstrip('\n').split('\t')
+                if len(c) < 3:
+                    continue
+                ka, kb = self.chiave_di(lingua, c[0]), self.chiave_di(c[1], c[2])
+                self.stat['radici_corrispondenti_dichiarate'] += 1
+                proto = [r for r in etimo_di.get(ka, []) if self.lessemi.get(r['etimo'], {}).get('lingua') in NOTAZIONE_SEMITICA]
+                if len(proto) != 1 or kb not in self.lessemi or kb in con_ipotesi:
+                    continue
+                kh = kb + '#wikt-corrispondente'
+                self.ipotesi[kh] = {'chiave': kh, 'esito': kb, 'etichetta': 'Wiktionary (radice corrispondente dichiarata)',
+                                    'stato': 'accolta', 'confidenza': 2, 'origine': 'etimo', 'nota': None}
+                self.relazioni.append({'chiave': kh + '#0', 'ipotesi': kh, 'etimo': proto[0]['etimo'], 'esito': kb,
+                                       'tipo': proto[0]['tipo'], 'ordine': 1, 'affisso': None, 'conf': 2, 'forma': None})
+                con_ipotesi.add(kb)
+                self.stat['radici_corrispondenti_collegate'] += 1
+
     # ---- niente cicli: si toglie l'arco che chiude il ciclo (tipicamente un prestito di ritorno) ----
     def togli_cicli(self):
         figli = defaultdict(list)
@@ -2275,10 +2514,12 @@ if __name__ == '__main__':
     passo('unisci_identificativi', imp.unisci_identificativi)
     passo('risolvi_intermedi', imp.risolvi_intermedi)
     passo('precisa_omografe', imp.precisa_omografe)
+    passo('precisa_omografi_parole', imp.precisa_omografi_parole)
     passo('elementi_di_composizione', imp.elementi_di_composizione)
     passo('unisci_varianti', imp.unisci_varianti)
     if discendenti:
         passo('collega_discendenti', imp.collega_discendenti, discendenti)
+        passo('collega_radici_corrispondenti', imp.collega_radici_corrispondenti, discendenti)
     passo('chiudi_su_radici', imp.chiudi_su_radici)
     passo('togli_cicli', imp.togli_cicli)
     # prima dei lemmi interi: un lemma latino o greco seminato e rimasto senza legami rientra come ogni lemma (Dionysia)

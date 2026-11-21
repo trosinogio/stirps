@@ -42,6 +42,8 @@ assert ff({'senses': [{'glosses': ['genitive singular of nox'], 'form_of': [{'wo
 assert not ff(s('perfect passive participle of amō', 'beloved, dear')), 'un senso lessicale e la voce resta'
 assert not ff(s('alternative form of riappressare')) and not ff(s('comparative studies')), 'varianti e falsi amici restano'
 assert ff(s('to-infinitive of הִכְעִיס (hikh\'ís)')) and ff(s('bare infinitive (infinitive construct or gerund) of יָשַׁב')), 'gli infiniti ebraici sono forme'
+assert ff({'senses': [{'tags': ['form-i', 'no-gloss']}], 'head_templates': [{'expansion': 'أُنَّا • (ʔunnā) (form I)\n# first-person'}]}), 'una forma verbale araba senza glossa'
+assert not ff({'senses': [{'tags': ['no-gloss']}], 'head_templates': [{'expansion': 'كَتَبَ • (kataba) I'}]}), 'senza glossa ma senza segni di forma: resta'
 assert ff(s('construct state of שָׂכָר')) and not ff(s('defective spelling of קיבוץ')), 'lo stato costrutto è una forma, la grafia difettiva una variante'
 # {{ety}}/{{etymon}}, il sistema nuovo di Wiktionary, diventa il modello classico equivalente
 from filtra import da_ety
@@ -168,6 +170,27 @@ assert (imp.stat['omografe_glossa_concorde'], imp.stat['omografe_glossa_in_attes
 imp, etimo, (gen, cut, turn, curtus, corona, crux) = omografe_per_glossa((1, 0.9))
 assert etimo[corona] == turn and etimo[crux] == gen, 'misurata, la glossa «to bend; to turn» porta a *(s)ker- «girare»; «to turn; to cut» non decide'
 wiktionary.OMOGRAFE_PER_GLOSSA = (50, 0.9)
+# il campo di senso delle omografe: senza la glossa della citazione vale la glossa della parola che cita la radice
+# (*kaput «head» < *kap-: *kap-@head «head, cap, hat»), misurata come la regola delle glosse e mai contro le dichiarazioni
+from wiktionary import parole as _parole
+def omografe_per_campo(soglia):
+    wiktionary.OMOGRAFE_PER_CAMPO = soglia
+    imp = Importatore()
+    gen, testa, prendo = imp.lessema('ine-pro', '*kap-'), imp.lessema('ine-pro', '*kap-', ident='head'), imp.lessema('ine-pro', '*kap-', ident='seize')
+    imp.campi = {testa: _parole('head, cap, hat, cloak, cover'), prendo: _parole('seize, grasp, take, catch, hold')}
+    kaput, kapio, haft = imp.lessema('itc-pro', '*kaput', glossa='head'), imp.lessema('itc-pro', '*kapiō', glossa='to take'), imp.lessema('gem-pro', '*haftaz', glossa='captive, seized')
+    neutro = imp.lessema('gem-pro', '*hōbą', glossa='hoof')
+    for k in (kaput, kapio, haft, neutro):
+        arco(imp, k, gen)
+    imp.radici = {(haft, prendo)}
+    imp.precisa_omografe()
+    return imp, {r['esito']: r['etimo'] for r in imp.relazioni}, (gen, testa, prendo, kaput, kapio, haft, neutro)
+imp, etimo, (gen, testa, prendo, kaput, kapio, haft, neutro) = omografe_per_campo((50, 0.9))
+assert etimo[haft] == prendo and etimo[kaput] == gen, 'senza misura il campo non sposta archi'
+assert imp.stat['omografe_campo_concorde'] == 0 and imp.stat['omografe_campo_in_attesa'] == 2, dict(imp.stat)
+imp, etimo, (gen, testa, prendo, kaput, kapio, haft, neutro) = omografe_per_campo((0, 0.9))
+assert etimo[kaput] == testa and etimo[kapio] == prendo and etimo[neutro] == gen, ('il campo sceglie; «hoof» non decide', etimo)
+wiktionary.OMOGRAFE_PER_CAMPO = (50, 0.9)
 # audientia: il ripiego sulla radice dichiarata non sceglie a caso tra due radici
 imp = Importatore()
 aud, audience = imp.lessema('la', 'audientia'), imp.lessema('it', 'audience')
@@ -281,6 +304,74 @@ imp = Importatore()
 radius, mens, frustum = imp.lessema('la', 'radius', pos='s.'), imp.lessema('la', 'mens', pos='s.f.'), imp.lessema('la', 'frustum', pos='s.')
 radio_, mente_, ulentus_ = imp.lessema('it', 'radio-'), imp.lessema('it', '-mente'), imp.lessema('la', '-ulentus')
 arco(imp, radio_, radius); arco(imp, mente_, mens); arco(imp, ulentus_, frustum)
+# una radice ebraica con l'etimo in due grafie («*q-d-m//*qdm»): vale la prima, non è un link interno di Wiktionary
+imp_q = Importatore()
+imp_q.voce({'w': 'ק־ד־ם', 'l': 'he', 'tpl': [{'n': 'inh', 'a': {'1': 'he', '2': 'sem-pro', '3': '*q-d-m//*qdm'}, 'e': ''}]}, 'he')
+assert any(r['etimo'] == imp_q.chiave_di('sem-pro', '*q-d-m') for r in imp_q.relazioni), imp_q.relazioni
+# ὄψις «From ὄψ (óps, “eye”)»: tra ὄψ «voice» e ὄψ² «eye» vale l'omografo della glossa della citazione
+import wiktionary as _w
+_w.OMOGRAFI_PER_GLOSSA = (0, 0.9)
+imp_o = Importatore()
+voce1, occhio = imp_o.lessema('grc', 'ὄψ', glossa='voice'), imp_o.lessema('grc', 'ὄψ', glossa='eye', omografo=2)
+opsis, qui = imp_o.lessema('grc', 'ὄψις'), imp_o.lessema('grc', 'αἶθοψ')
+imp_o.lessemi[voce1]['propria'], imp_o.lessemi[occhio]['propria'] = 'voice', 'eye'
+imp_o.lessemi[voce1]['glosse']['eye'] += 5      # le citazioni di ὄψ² finite su ὄψ: non contano
+arco(imp_o, opsis, voce1); imp_o.glossa_arco[(opsis, voce1)] = 'eye'
+arco(imp_o, qui, voce1)
+imp_o.precisa_omografi_parole()
+assert [r['etimo'] for r in imp_o.relazioni if r['esito'] == opsis] == [occhio], imp_o.relazioni
+assert [r['etimo'] for r in imp_o.relazioni if r['esito'] == qui] == [voce1], 'senza glossa resta com\'è'
+# la glossa di un elemento di {{af}} (t1=eye) si conserva per l'arco
+imp_a = Importatore()
+imp_a.voce({'w': 'ὄψις', 'l': 'grc', 'tpl': [{'n': 'af', 'a': {'1': 'grc', '2': 'ὄψ', '3': '-σις', 't1': 'eye'}, 'e': ''}]}, 'grc')
+assert 'eye' in imp_a.glossa_arco.values(), imp_a.glossa_arco
+imp_b = Importatore()
+imp_b.voce({'w': 'ὄψις', 'l': 'grc', 'tpl': [{'n': 'af', 'a': {'1': 'grc', '2': 'ὄψ<t:eye>', '3': '-σις'}, 'e': ''}]}, 'grc')
+assert 'eye' in imp_b.glossa_arco.values(), ('la glossa come modificatore di {{ety}}', imp_b.glossa_arco)
+_w.OMOGRAFI_PER_GLOSSA = (50, 0.9)
+# αἶθοψ «face, appearance»: il campo della radice di ogni omografo (ὄψ² < *h₃ekʷ- «eye, face, look») decide
+_w.OMOGRAFI_PER_CAMPO = (0, 0.9)
+imp_c = Importatore()
+v1, v2 = imp_c.lessema('grc', 'ὄψ', glossa='voice'), imp_c.lessema('grc', 'ὄψ', glossa='eye', omografo=2)
+r1, r2 = imp_c.lessema('ine-pro', '*wekʷ-'), imp_c.lessema('ine-pro', '*h₃ekʷ-')
+imp_c.lessemi[v1]['propria'], imp_c.lessemi[v2]['propria'] = 'voice', 'eye'
+imp_c.campi = {r1: _parole('speak, say, voice, word'), r2: _parole('eye, face, look, sight')}
+aith = imp_c.lessema('grc', 'αἶθοψ')
+arco(imp_c, v1, r1); arco(imp_c, v2, r2); arco(imp_c, aith, v1); imp_c.glossa_arco[(aith, v1)] = 'face, appearance'
+imp_c.precisa_omografi_parole()
+assert [r['etimo'] for r in imp_c.relazioni if r['esito'] == aith] == [v2], imp_c.relazioni
+_w.OMOGRAFI_PER_CAMPO = (50, 0.9)
+# ὄψις: «{{etymon|grc|:af|grc:ὄψ<id:eye>|…}}» dichiara l'omografo, e il filtro porta l'identificativo nel {{af}}
+from filtra import porta_identificativi
+_cl = [{'name': 'af', 'args': {'1': 'grc', '2': 'ὄψ', '3': '-σῐς', 't1': 'eye'}}]
+porta_identificativi(_cl, [{'name': 'etymon', 'args': {'1': 'grc', 'id': 'sight', '2': ':af', '3': 'grc:ὄψ<id:eye>', '4': 'grc:-σῐς<id:abstract nouns>'}}], 'grc')
+assert _cl[0]['args'].get('id1') == 'eye' and _cl[0]['args'].get('id2') == 'abstract nouns', _cl
+imp_i = Importatore()
+imp_i.voce({'w': 'ὄψ', 'l': 'grc', 'en': 1, 'tpl': [{'n': 'etymon', 'a': {'1': 'grc', 'id': 'voice'}, 'e': ''}]}, 'grc')
+imp_i.voce({'w': 'ὄψ', 'l': 'grc', 'en': 2, 'id': 'eye', 'tpl': []}, 'grc')     # il filtro scrive l'id della pagina
+imp_i.voce({'w': 'ὄψις', 'l': 'grc', 'tpl': [{'n': 'af', 'a': {'1': 'grc', '2': 'ὄψ', '3': '-σις', 'id1': 'eye'}, 'e': ''}]}, 'grc')
+imp_i.precisa_omografi_parole()
+_ops = [r['etimo'] for r in imp_i.relazioni if r['esito'] == imp_i.chiave_di('grc', 'ὄψις')]
+assert _ops == [imp_i.chiave_di('grc', 'ὄψ') + ':2'], ('l\'omografo dell\'identificativo', _ops, list(imp_i.lessemi))
+# i derivati trasparenti: le regole di una coppia (abolition < abolish, reaeration < aeration)
+from apprendi_derivati import regole_della_coppia as rdc
+assert ('S', 'ition', 'ish') in rdc('abolition', 'abolish') and ('P', 're') in rdc('reaeration', 'aeration'), rdc('abolition', 'abolish')
+assert not rdc('cane', 'gatto'), 'senza una parte comune nessuna regola'
+# il protosemitico ha due notazioni: *ʾil- e *ʔil- sono la stessa voce
+from wiktionary import nome_pagina as np_
+assert np_('sem-pro', '*ʾil-') == '*ʔil-' and np_('sem-pro', '*ʿayn-') == '*ʕayn-' and np_('ar', 'ʿayn') == 'ʿayn'
+# le radici corrispondenti dichiarate: ש־ל־ם < *š-l-m e «Cognate with Arabic root س ل م» → س ل م < *š-l-m
+import tempfile, os as _os
+_d = tempfile.mkdtemp(); _os.makedirs(_d + '/he')
+open(_d + '/he/radici_corrispondenti.tsv', 'w', encoding='utf-8').write('ש־ל־ם\tar\tس ل م\nז־כ־ר\tar\tذ ك ر\n')
+imp_r = Importatore()
+shlm, slm, zkr, dkr = imp_r.lessema('he', 'ש־ל־ם'), imp_r.lessema('ar', 'س ل م'), imp_r.lessema('he', 'ז־כ־ר'), imp_r.lessema('ar', 'ذ ك ر')
+arco(imp_r, shlm, imp_r.lessema('sem-pro', '*š-l-m'))
+imp_r.collega_radici_corrispondenti([('he', _d + '/he/discendenti.tsv')])
+assert ha(imp_r, slm) and not ha(imp_r, dkr), 'la radice araba prende l\'etimo della radice ebraica cognata, solo se quella ne ha uno protosemitico'
+import sys as _sys; _sys.path.insert(0, '.')
+from controlla_semitico import ha_le_consonanti as hc
+assert hc('ar', 'ب ي ت', '*bayt-') and hc('ar', 'س ل م', '*š-l-m') and hc('he', 'צ־ר־ר', '*ṯ̣urr-') and not hc('ar', 'ب ي ت', '*kalb-')
 imp.voce({'w': 'radioattivo', 'tpl': [{'n': 'af', 'a': {'1': 'it', '2': 'radio-', '3': 'attivo'}, 'e': ''}]})
 imp.voce({'w': 'velocemente', 'tpl': [{'n': 'af', 'a': {'1': 'it', '2': 'veloce', '3': '-mente'}, 'e': ''}]})
 imp.voce({'w': 'vinolentus', 'tpl': [{'n': 'af', 'a': {'1': 'la', '2': 'vinum', '3': '-ulentus'}, 'e': ''}]}, lingua_voce='la', parola='vinolentus')

@@ -45,7 +45,7 @@ for voce in $(printf '%s' "$CHIUSURA" | sed 's/ \([a-z][a-z-]*:\)/\n\1/g' | tr '
   echo "     chiusura delle catene: $nome"
   mkdir -p "dati/$codice"
   # un dump che Kaikki non ha per lingua (protoellenico, francone…) si cerca dopo nel dump grezzo di tutte le lingue
-  if ! scarica "$nome" | LINGUA=$codice FORME="dati/$codice/forme.tsv" VARIANTI="dati/$codice/varianti.tsv" DISCENDENTI="dati/$codice/discendenti.tsv" python3 filtra.py "dati/$codice/lemmi.jsonl" "dati/$codice/glosse.tsv"; then
+  if ! scarica "$nome" | LINGUA=$codice FORME="dati/$codice/forme.tsv" VARIANTI="dati/$codice/varianti.tsv" DISCENDENTI="dati/$codice/discendenti.tsv" RADICI_CORRISPONDENTI="dati/$codice/radici_corrispondenti.tsv" MEMBRI_RADICE="dati/$codice/membri_radice.tsv" python3 filtra.py "dati/$codice/lemmi.jsonl" "dati/$codice/glosse.tsv"; then
     MANCANTI+=("$codice")
     continue
   fi
@@ -61,7 +61,7 @@ if [ ${#MANCANTI[@]} -gt 0 ]; then
        | grep -E "\"lang_code\": ?\"($codici)\"" > dati/grezzi.jsonl; then
     for codice in "${MANCANTI[@]}"; do
       grep -E "\"lang_code\": ?\"$codice\"" dati/grezzi.jsonl \
-        | LINGUA=$codice FORME="dati/$codice/forme.tsv" VARIANTI="dati/$codice/varianti.tsv" DISCENDENTI="dati/$codice/discendenti.tsv" python3 filtra.py "dati/$codice/lemmi.jsonl" "dati/$codice/glosse.tsv" || true
+        | LINGUA=$codice FORME="dati/$codice/forme.tsv" VARIANTI="dati/$codice/varianti.tsv" DISCENDENTI="dati/$codice/discendenti.tsv" RADICI_CORRISPONDENTI="dati/$codice/radici_corrispondenti.tsv" MEMBRI_RADICE="dati/$codice/membri_radice.tsv" python3 filtra.py "dati/$codice/lemmi.jsonl" "dati/$codice/glosse.tsv" || true
       if [ -s "dati/$codice/lemmi.jsonl" ]; then
         echo "     $codice: $(wc -l < "dati/$codice/lemmi.jsonl") voci dal dump grezzo"
         ARGOMENTI+=(--chiudi "$codice=dati/$codice/lemmi.jsonl,dati/$codice/glosse.tsv,dati/$codice/forme.tsv,dati/$codice/varianti.tsv")
@@ -74,6 +74,12 @@ if [ ${#MANCANTI[@]} -gt 0 ]; then
     rm -f dati/grezzi.jsonl
   else
     echo "::warning title=Chiusura::dump grezzo non disponibile: ${MANCANTI[*]} restano fuori"
+    # Kaikki che non risponde non dà un pacchetto piccolo: lo ferma. Il 20 novembre 2026 mancavano quasi tutte le lingue
+    # di chiusura e il workflow ha scritto sul ramo un pacchetto di 502 mila voci invece di 1,35 milioni
+    if [ ${#MANCANTI[@]} -gt 10 ]; then
+      echo "::error title=Chiusura::mancano ${#MANCANTI[@]} dump e il dump grezzo non si scarica: Kaikki non risponde, il pacchetto non si scrive"
+      exit 1
+    fi
   fi
 fi
 
@@ -112,6 +118,13 @@ if [ "$DIZIONARI" = 1 ]; then
     cat "$DATI/rapporto_greco.txt" >&2; exit 1
   fi
   cat "$DATI/rapporto_greco.txt"
+  # i derivati trasparenti senza etimologia nelle altre lingue (aerazione < aerare): regole imparate e misurate per
+  # lingua, solo dove mettono la parola nella famiglia giusta almeno l'85% delle volte (apprendi_derivati.py)
+  if ! python3 apprendi_derivati.py "$DATI/tsv/etimi_dizionari.tsv" "$DATI/tsv/lessemi.tsv" "$DATI/tsv/ipotesi.tsv" \
+       "$DATI/tsv/relazioni.tsv" 2> "$DATI/rapporto_derivati.txt"; then
+    cat "$DATI/rapporto_derivati.txt" >&2; exit 1
+  fi
+  cat "$DATI/rapporto_derivati.txt"
   # stime della prima attestazione: l'autore datato più antico citato nella voce (DATAZIONI.md, passo 1)
   python3 datatore_dizionari.py autori "$DATI/tsv/autori.tsv"
   python3 datatore_dizionari.py stime "$DATI/tsv/autori.tsv" "$DATI/tsv/stime.tsv" "${locali[@]}"

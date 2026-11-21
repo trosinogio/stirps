@@ -186,8 +186,36 @@ where r.provenienza in ('wiktionary', 'perseus') and r.stato_editoriale = 'impor
 order by r.id_esterno"""
 
 
+# Il campo di senso di ogni radice (lotto «campi», registro dati/campi_radici.tsv.gz): le parole chiave inglesi del suo
+# significato, con cui il parser controlla che una parola stia nella famiglia giusta (ὄψις «sight» sotto *wekʷ- «speak»
+# no, sotto *h₃ekʷ- «eye, see» sì) e sceglie tra due omografi quando la pagina non dice quale
+SQL_CAMPI = SQL_RADICI.replace("json_build_object('tipo', 'radice',", "json_build_object('tipo', 'campo',").replace(
+    "where " + DECLARATA + " and r.id_esterno", "where r.ricostruito and r.id_esterno")
+SISTEMA_CAMPI = """Sei un linguista storico. Lavori a Stirps, un dizionario etimologico che raccoglie le parole in famiglie, ciascuna discesa da una radice o da una forma ricostruita (indoeuropea, protogermanica, protosemitica…). Per ogni radice serve il suo campo di senso: le parole chiave con cui lo strumento controlla che una parola stia nella famiglia giusta. Per esempio *h₃ekʷ- «eye, to see» ha il campo «eye, see, sight, look, view, face, vision, appearance», e *wekʷ- «to speak» il campo «speak, say, voice, word, call, utter».
+
+Per ogni voce ricevi un numero tra parentesi quadre, la lingua, la forma ricostruita, la glossa e i discendenti più vicini con le loro glosse.
+
+Per ciascuna voce restituisci:
+- «campo»: da 5 a 10 parole chiave inglesi, minuscole, separate da virgole: il significato ricostruito della radice e i sensi che ne derivano in modo regolare nei discendenti (il nome, il verbo, la qualità). Parole singole e comuni, come quelle delle glosse dei dizionari; niente frasi, niente nomi propri, niente parole che valgono per qualunque radice («thing», «make», «have»).
+- «senso»: il significato della radice in italiano, in poche parole («occhio, vedere»).
+
+Regole:
+- Il campo descrive la radice, non un singolo discendente: quando i discendenti hanno sensi diversi, lascia fuori dal campo il senso che compare in un solo discendente, lontano da tutti gli altri.
+- Una radice con discendenti in un solo ramo, o con un solo discendente, ha comunque il suo campo: il senso di quei discendenti (e della glossa, se c'è) è il senso della radice. Lo stesso per una forma ricostruita senza glossa: il senso viene dai discendenti.
+- Se la radice ha due significati distinti nelle fonti (omografe non separate), mettili tutti e due.
+- Lascia la voce vuota solo se non c'è nessuna glossa e i discendenti non hanno glosse, sono soltanto nomi propri, o hanno sensi tanto diversi che non se ne ricava uno: un campo vuoto è meglio di un campo inventato.
+- Restituisci un elemento per ogni voce ricevuta, con lo stesso numero."""
+SCHEMA_CAMPI = {
+    'type': 'object',
+    'properties': {'voci': {'type': 'array', 'items': {
+        'type': 'object',
+        'properties': {'n': {'type': 'integer'}, 'campo': {'type': 'string'}, 'senso': {'type': 'string'}},
+        'required': ['n', 'campo', 'senso'], 'additionalProperties': False}}},
+    'required': ['voci'], 'additionalProperties': False}
+
+
 # il prompt e lo schema di ogni tipo di voce; gli altri tipi (radice, voce) hanno SISTEMA e SCHEMA
-PER_TIPO = {'area': (SISTEMA_AREE, SCHEMA_AREE), 'glossa': (SISTEMA_GLOSSE, SCHEMA_GLOSSE)}
+PER_TIPO = {'area': (SISTEMA_AREE, SCHEMA_AREE), 'glossa': (SISTEMA_GLOSSE, SCHEMA_GLOSSE), 'campo': (SISTEMA_CAMPI, SCHEMA_CAMPI)}
 
 
 # Le voci di un elenco di chiavi (un file, una chiave per riga) che hanno una glossa inglese: le voci nuove di un import,
@@ -208,7 +236,7 @@ def estrai(pgurl, che, uscita):
     if che.startswith('elenco='):
         sql = SQL_ELENCO.replace('{file}', os.path.abspath(che.split('=', 1)[1]))
     else:
-        sql = {'radici': SQL_RADICI, 'aree': SQL_AREE, 'omografi': SQL_OMOGRAFI, 'campione': SQL_CAMPIONE}[che]
+        sql = {'radici': SQL_RADICI, 'aree': SQL_AREE, 'campi': SQL_CAMPI, 'omografi': SQL_OMOGRAFI, 'campione': SQL_CAMPIONE}[che]
     out = subprocess.run(['psql', '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1', pgurl], input=sql, capture_output=True,
                          text=True, check=True).stdout
     righe = [r for r in out.splitlines() if r.startswith('{')]
@@ -352,22 +380,31 @@ def esegui(lotto, modello, uscita, sforzo='medium', per_richiesta=None, registro
 def blocchi(lotto, cartella, per_blocco=500):
     """Il lotto in blocchi per gli agenti: le istruzioni e le voci numerate in blocco_NN.txt, le chiavi in blocco_NN.json."""
     voci = [json.loads(r) for r in gzip.open(lotto, 'rt', encoding='utf-8')]
-    assert all(v['tipo'] == 'glossa' for v in voci), 'i blocchi valgono per i lotti di sole glosse'
+    tipi = {v['tipo'] for v in voci}
+    assert tipi in ({'glossa'}, {'campo'}), 'i blocchi valgono per i lotti di sole glosse o di soli campi'
     voci.sort(key=lambda v: (v['lingua'], v['chiave']))
     os.makedirs(cartella, exist_ok=True)
-    istruzioni = SISTEMA_GLOSSE.replace(
-        'Restituisci un elemento per ogni voce ricevuta, con lo stesso numero.',
-        'Scrivi una riga per ogni voce ricevuta, nell’ordine ricevuto: il numero, un carattere di tabulazione e la traduzione '
-        '(niente dopo la tabulazione se la lasci vuota). Nessuna riga in più, nessuna intestazione.')
-    assert istruzioni != SISTEMA_GLOSSE
+    if tipi == {'campo'}:
+        istruzioni = SISTEMA_CAMPI.replace(
+            'Restituisci un elemento per ogni voce ricevuta, con lo stesso numero.',
+            'Scrivi una riga per ogni voce ricevuta, nell’ordine ricevuto: il numero, un carattere di tabulazione, il campo, '
+            'un altro carattere di tabulazione e il senso (niente dopo il numero se lasci la voce vuota). Nessuna riga in più, '
+            'nessuna intestazione.')
+        assert istruzioni != SISTEMA_CAMPI
+    else:
+        istruzioni = SISTEMA_GLOSSE.replace(
+            'Restituisci un elemento per ogni voce ricevuta, con lo stesso numero.',
+            'Scrivi una riga per ogni voce ricevuta, nell’ordine ricevuto: il numero, un carattere di tabulazione e la traduzione '
+            '(niente dopo la tabulazione se la lasci vuota). Nessuna riga in più, nessuna intestazione.')
+        assert istruzioni != SISTEMA_GLOSSE
     for b, i in enumerate(range(0, len(voci), per_blocco), 1):
         gruppo = voci[i:i + per_blocco]
         with open(os.path.join(cartella, f'blocco_{b:02d}.txt'), 'w', encoding='utf-8') as f:
             f.write(istruzioni + f'\n\nLe voci sono {len(gruppo)}, numerate da 1 a {len(gruppo)}:\n\n'
                     + '\n\n'.join(riga(v, n) for n, v in enumerate(gruppo, 1)) + '\n')
         with open(os.path.join(cartella, f'blocco_{b:02d}.json'), 'w', encoding='utf-8') as f:
-            json.dump([{'chiave': v['chiave'], 'originale': v['originale'], 'lingua': v['lingua'], 'lemma': v['lemma']}
-                       for v in gruppo], f, ensure_ascii=False)
+            json.dump([{'chiave': v['chiave'], 'originale': v['originale'], 'lingua': v['lingua'], 'lemma': v['lemma'],
+                        'tipo': v['tipo']} for v in gruppo], f, ensure_ascii=False)
     print(f'{lotto}: {len(voci)} voci in {b} blocchi da {per_blocco}', file=sys.stderr)
 
 
@@ -383,7 +420,7 @@ def raccogli(cartella, modello, uscita, registro=None):
             continue
         tr = {}
         for r in open(esito, encoding='utf-8'):
-            m = re.match(r'^(\d+)(?:\t(.*))?$', r.rstrip('\n'))
+            m = re.match(r'^(\d+)(?:\t(.*))?$', r.rstrip('\n'), re.S)
             if not m:
                 if r.strip():
                     difetti.append(f'{nome}: riga non letta «{r.strip()[:40]}»')
@@ -397,6 +434,13 @@ def raccogli(cartella, modello, uscita, registro=None):
         for n, v in enumerate(voci, 1):
             if v['chiave'] in fatte:
                 conti['già nel registro'] += 1          # una definizione o una traduzione che c'è già non si riscrive
+                continue
+            if v.get('tipo') == 'campo':
+                # «eye, see, sight, look\tocchio, vedere»: il campo va nella traduzione, il senso nella definizione
+                kw, _, senso = tr[n].partition('\t')
+                kw = ', '.join(x.strip().lower() for x in pulisci(kw).split(',') if x.strip())[:200]
+                conti['tradotte' if kw else 'vuote'] += 1
+                nuove[v['chiave']] = (v['originale'], kw, pulisci(senso)[:80].rstrip('.') if kw else '', modello)
                 continue
             t = pulisci(tr[n])[:150].rstrip('.')
             if v['lingua'] == 'italiano' and t.lower() == v['lemma'].lower():
