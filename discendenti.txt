@@ -1,0 +1,212 @@
+discendenti dichiarati: 164455 pagine, 2079220 righe, 1099614 archi distinti; dove la parola ha già un'etimologia l'albero concorda nel 91% su 326154 (diretto 242564, più su 19909, nella stessa famiglia per altra via 35829, diverso 27818, rovesciato 34); archi nuovi possibili 3844; figlio assente 669181, genitore assente 100435
+per segno dell'arco: calco 57% su 887, nuovi 54; derivato 87% su 663, nuovi 383; ereditato 91% su 225488, nuovi 2384; incerto 72% su 2012, nuovi 238; prestito 93% su 97104, nuovi 785
+per lingua del figlio (concordanza, nuovi, figlio assente):
+  en: 88% su 33558, nuovi 90, assenti 15513
+  it: 95% su 15342, nuovi 120, assenti 3812
+  es: 94% su 13854, nuovi 40, assenti 2703
+  enm: 78% su 13158, nuovi 293, assenti 42213
+  fr: 93% su 14629, nuovi 52, assenti 3884
+  pt: 94% su 12186, nuovi 43, assenti 4069
+  sh: 94% su 8614, nuovi 34, assenti 5735
+  ca: 95% su 8910, nuovi 16, assenti 2666
+  de: 92% su 8871, nuovi 62, assenti 5404
+  pl: 93% su 7747, nuovi 18, assenti 3426
+  ro: 94% su 9888, nuovi 10, assenti 1360
+  nl: 92% su 7338, nuovi 62, assenti 3920
+  la: 92% su 6650, nuovi 141, assenti 4200
+  ru: 94% su 6704, nuovi 29, assenti 5441
+  ang: 91% su 5710, nuovi 67, assenti 5833
+  gl: 92% su 5254, nuovi 24, assenti 3568
+  cs: 93% su 4565, nuovi 31, assenti 2514
+  sv: 89% su 4674, nuovi 38, assenti 4275
+  gmw-pro: 96% su 3714, nuovi 36, assenti 1291
+  bg: 92% su 4320, nuovi 20, assenti 3134
+  fro: 87% su 3961, nuovi 60, assenti 4194
+  is: 94% su 3771, nuovi 26, assenti 2900
+  non: 90% su 3589, nuovi 55, assenti 2588
+  gmh: 91% su 4024, nuovi 67, assenti 10793
+  nn: 90% su 3725, nuovi 52, assenti 3132
+  mk: 96% su 3217, nuovi 7, assenti 1230
+  da: 89% su 3964, nuovi 20, assenti 2159
+  goh: 93% su 3263, nuovi 41, assenti 7706
+  af: 94% su 2897, nuovi 54, assenti 3153
+  uk: 91% su 3545, nuovi 16, assenti 5039
+per lingua del genitore (concordanza, nuovi, figlio assente):
+  la: 94% su 93479, nuovi 316, assenti 58797
+  sla-pro: 93% su 26619, nuovi 359, assenti 27385
+  enm: 80% su 15936, nuovi 302, assenti 44250
+  fr: 96% su 13667, nuovi 64, assenti 15098
+  non: 90% su 14299, nuovi 195, assenti 20162
+  gmw-pro: 92% su 13039, nuovi 152, assenti 24293
+  grc: 93% su 12620, nuovi 158, assenti 17804
+  gem-pro: 93% su 9934, nuovi 116, assenti 6924
+  ang: 78% su 10703, nuovi 255, assenti 34031
+  fro: 87% su 11325, nuovi 112, assenti 17802
+  gmh: 92% su 8748, nuovi 112, assenti 13443
+  en: 92% su 5648, nuovi 41, assenti 16670
+  ine-pro: 83% su 4593, nuovi 607, assenti 12874
+  de: 92% su 4756, nuovi 25, assenti 4224
+  dum: 90% su 4478, nuovi 59, assenti 5584
+  zlw-opl: 98% su 3805, nuovi 7, assenti 3208
+  ota: 95% su 3565, nuovi 43, assenti 23810
+  nl: 93% su 3532, nuovi 64, assenti 21092
+  goh: 90% su 4223, nuovi 76, assenti 11726
+  roa-opt: 97% su 3691, nuovi 12, assenti 2717
+  it: 94% su 3179, nuovi 30, assenti 4246
+  frm: 92% su 3726, nuovi 15, assenti 1645
+  ar: 86% su 2703, nuovi 64, assenti 29618
+  zlw-ocs: 97% su 2507, nuovi 12, assenti 1073
+  ofs: 95% su 2950, nuovi 28, assenti 7336
+  gml: 87% su 2790, nuovi 70, assenti 14884
+  odt: 91% su 2409, nuovi 13, assenti 5760
+  orv: 95% su 2768, nuovi 11, assenti 6800
+  es: 94% su 2051, nuovi 20, assenti 7089
+  ru: 96% su 1777, nuovi 5, assenti 16276
+diverso, un campione a caso:
+  en such < enm sik (ereditato); ora: enm:such
+  da aldrig < non -gi (ereditato); ora: non:aldri
+  roa-opt galgo < la Gallicus (ereditato); ora: la-vul:Gallicus
+  pro carpentier < la carpentarius (ereditato); ora: la:carpentarius
+  sk pec < zlw-osk pec (ereditato); ora: sla-pro:*peťь
+  ru безде́ятельность < fr inaction (ereditato); ora: ru:деятельность
+  fro cail < la coagulum (ereditato); ora: cel-gau:cagiíum
+  en plenish < fro plenir (prestito); ora: sco:plenish
+  en repulse < la repulsus (prestito); ora: enm:repulse, enm:repulsen
+  uk фа́йтинг < en fighting (prestito); ora: en:fighting
+  stq Floite < gml flöite (prestito); ora: gml:vloite
+  nb nerve < la nervus (prestito); ora: grc:νεῦρον
+  af bladsy < nl bladzijde (ereditato); ora: nl:bladzij
+  pl przedsiębrać < fr entreprendre (calco); ora: pl:brać, pl:przedsię
+  pl sznaucer < de Schnauzer (prestito); ora: de:Schnauzer
+  en hire < enm here (ereditato); ora: enm:hire, enm:hiren:2
+  itc-ola ollus < itc-pro *olnos (ereditato); ora: ine-pro:*h₂el-
+  uk янта́р < zle-ort єнтарь (ereditato); ora: zle-muk:єнта́рь
+  frm mieulx < fro meillor (ereditato); ora: fro:mielz
+  is borða < non borði (ereditato); ora: is:borð
+  da tavl < gmq-oda taghæl (ereditato); ora: non:tafl
+  enm lai < ang lagu (incerto); ora: fro:lai:3
+  gsw Räätrich < gmh retich (ereditato); ora: goh:rātih
+  he רץ < de Läufer (ereditato); ora: he:ר־ו־ץ
+  sh záslon < sla-pro *zaslonъ (ereditato); ora: sh:zasloniti
+  es carpintero < la carpentarius (ereditato); ora: osp:carpentero
+  it invito < la invitus (ereditato); ora: it:invitare
+  en -st < enm -ist (ereditato); ora: enm:-st
+  nds hör < gml ere (ereditato); ora: ofs:hiri
+  zlw-ocs hrzati < sla-pro *rъzati (ereditato); ora: sla-pro:*gryzti
+  fa می < en May (prestito); ora: peo:*𐎶𐎯
+  yol harr < enm her (ereditato); ora: enm:herre
+  uk -іч < orv -ичь (ereditato); ora: uk:-ич
+  mk улиште < sla-pro *ulьjь (ereditato); ora: sla-pro:*ulьjьšče
+  pl mienić < zlw-opl mienić (ereditato); ora: pl:miano, sla-pro:*měniti, sla-pro:*měniti@think
+  sv -ig < non -ugr (ereditato); ora: gml:-ich
+  cs kadeř < sla-pro *kǫdrь (ereditato); ora: zlw-ocs:kadeřě
+  es -céfalo < grc κεφαλή (prestito); ora: grc:-κέφαλος
+  sv kor < non kør (ereditato); ora: gmq-osw:kor
+  yi גראַד < gmh gerat (ereditato); ora: fr:grade
+rovesciato, un campione a caso:
+  fro parlement < enm parlement (ereditato); ora: fro:parler
+  grc Ἀβρᾱᾱ́μ < he אברהם (prestito); ora: hbo:אברהם
+  frm charlatan < it ciarlatano (prestito); ora: roa-oit:ciarlatano
+  en prompt < fr prompt (prestito); ora: enm:prompte
+  fr crucial < en crucial (ereditato); ora: la:crux
+  he תּחת < yi תּחת (ereditato); ora: he:ת־ח־ת
+  la noctula < fr noctule (prestito); ora: la:noctua
+  en chit < en chitty (ereditato); ora: enm:*chit, enm:chitte, hi:चिट्ठी
+  grc αὐξάνω < grc αὔξω (ereditato); ora: ine-pro:*h₂weks-
+  gmw-pro *kirikā < grc κυριακόν (prestito); ora: grc:κύριος
+  sa भाष् < sa भाषा (incerto); ora: ine-pro:*bʰel-@sound
+  fr hulotte < enm howlat (prestito); ora: frm:huller
+  ta மிருதங்கம் < sa मृदङ्ग (prestito); ora: hi:मृदङ्ग
+  gem-pro *bugô < gem-pro *bukkōną (ereditato); ora: ine-pro:*bʰugʰ-
+  de Lohe < de lohen (ereditato); ora: gmh:lohe, gmh:lōwen
+  la iuncus < it giunco (prestito); ora: itc-pro:*joinikos
+  sla-pro *čь < sla-pro *čьto (ereditato); ora: ine-bsl-pro:*ki
+  pl żłób < yi זשלאָב (ereditato); ora: zlw-opl:żłób
+  grc ἐσθίω < grc ἔδω (ereditato); ora: ine-pro:*h₁ed-
+  grc κάρταλος < syc ܩܪܛܠܐ (prestito); ora: grc:κυρτία
+  it morena < fr moraine (prestito); ora: frp:mor
+  enm bef < fro boef (prestito); ora: xno:beof
+  la iuncus < it giunca (prestito); ora: itc-pro:*joinikos
+  inc-ash 𑀅𑀁𑀩 < pra 𑀅𑀁𑀩 (ereditato); ora: sa:आम्र
+  la armentum < la armenta (ereditato); ora: ine-pro:*h₂er-mn̥-teh₂
+  fr medjidié < ota مجیدیه (prestito); ora: ar:مجيد
+  arc קַסִּיטְרָא < grc κασσίτερος (prestito); ora: grc:κασσίτερον
+  es moho < pt mofo (prestito); ora: goh:*muff
+  fr fennec < en fennec (prestito); ora: ar:فنك
+  de Handy < en handy (incerto); ora: en:handie-talkie
+  pt tanque < en tank (ereditato); ora: gu:ટાંકી
+  nl daler < gml daler (prestito); ora: nl:dalen
+  en boss < ja ボス (prestito); ora: en:bast, enm:bos, nl:baas
+  en quag < en quagmire (ereditato); ora: enm:quabbe
+nuovo, un campione a caso:
+  enm mon < ang mān (ereditato)
+  ine-pro *h₃r̥-yé-ti < ine-pro *h₃er- (derivato)
+  gsw zwei < gmh zwēne (ereditato)
+  ang stela < gmw-pro *stelō (ereditato)
+  bg челове́к < sla-pro *čelověkъ (ereditato)
+  af broeder < nl broeder (ereditato)
+  ine-toc-pro *āk- < ine-pro *h₂eǵ- (derivato)
+  ar بَشَام < grc βάλσαμον (prestito)
+  ine-pro *ǵnoh₃-dʰlo- < ine-pro *ǵneh₃- (derivato)
+  non framandi < gml vremede (prestito)
+  grc γελανδρόν < ine-pro *gel- (incerto)
+  non framandi < gml vrömde (prestito)
+  orv *хуи < sla-pro *xujь (ereditato)
+  sco glamour < enm gramer (ereditato)
+  la-vul *modellus < la modulus (ereditato)
+  sv tut < gml tûte (prestito)
+  af broeder < nl broer (ereditato)
+  yol plowe < enm plough (ereditato)
+  goh dio < gmw-pro *þeu (ereditato)
+  ine-pro *tm̥-ne-h₁-ti < ine-pro *temh₁- (derivato)
+  ine-pro *woyh₁-éh₂-ti < ine-pro *weyh₁- (derivato)
+  fr Ismaël < la Ismāhēl (prestito)
+  gmq-oda slenghe < non sløngva (ereditato)
+  arc פְּרָת < akk 𒀀𒇉𒌓𒄒𒉣 (prestito)
+  fr celte < la celta (ereditato)
+  en snark < enm *snarken (ereditato)
+  ar كلك < syc ܟܠܟܐ (prestito)
+  zlw-ocs s < sla-pro *sъ(n) (ereditato)
+  enm grome < ang grama (ereditato)
+  enm ei < ang ǣg- (ereditato)
+  sco bark < enm bark (ereditato)
+  sv -log < la -logos (prestito)
+  hu köpenyeg < ota كپنك (prestito)
+  es plomo < roa-oca plom (incerto)
+  hu kukorica < sh кукуруз (prestito)
+  nn krit < gml krîte (prestito)
+  ine-pro *gʰreh₂w- < ine-pro *gʰer- (derivato)
+  stq Früünd < ofs friōnd (ereditato)
+  ar فِرْجَار < fa پرگار (prestito)
+  pt consoar < la consono (ereditato)
+nuovi con il greco antico da una parte: 209
+  ar أَنَاغَالِيس < grc ἀναγαλλίς (prestito)
+  grc λάχνος < ine-pro *h₂welh₁- (ereditato)
+  ar أَغَارِيقُون < grc ἀγαρικόν (prestito)
+  grc ἀτρεκής < ine-pro *terkʷ- (ereditato)
+  la murēna < grc μύραινα (prestito)
+  he פילוסוף < grc φιλόσοφος (prestito)
+  grc κέλυφος < ine-pro *ḱel- (derivato)
+  grc περάω < grc πέρᾱ (ereditato)
+  ar أَفِيتِيمُون < grc ἐπίθυμον (prestito)
+  la idiōticus < grc ἰδιωτικός (prestito)
+  grc σκᾰ́λοψ < ine-pro *(s)kel(H)-p- (incerto)
+  grc θρᾶνος < ine-pro *dʰer- (ereditato)
+  he אוטו < grc Ὄθων (prestito)
+  syc ܢܘܩܝܐ < grc οὐγγία (ereditato)
+  la Dāvīd < grc Δαυῑ̈́δης (prestito)
+  la mīmus < grc μῖμος (prestito)
+  grc ὅρμενος < ine-pro *h₃er- (ereditato)
+  ar مَقْدُونِس < grc μακεδονήσιον (prestito)
+  sh koma < grc κῶμα (prestito)
+  grc βᾰ́λσᾱ̆μον < he בושם (prestito)
+  ar غَزَّة < grc Γάζα (incerto)
+  grc Ἱερουσαλήμ < arc יְרוּשְׁלֶם (prestito)
+  grc καναχή < ine-pro *keh₂n- (ereditato)
+  grc Ἰησοῦς < he ישוע (prestito)
+  en -log < grc λόγος (prestito)
+  gem-pro *paidō < grc βαίτη (incerto)
+  grc Ῐ̔ερουσᾱλήμ < arc יְרוּשְׁלֶם (prestito)
+  it sin- < grc ξῠ́ν (prestito)
+  ar أَسْفَارَاج < grc ἀσφάραγος (prestito)
+  el πεταλούδα < grc πέταλον (incerto)
