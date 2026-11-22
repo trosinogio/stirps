@@ -1654,12 +1654,6 @@ class Importatore:
                 self.stat['omografe_glossa_concorde' if next(iter(voti[rid])) == k else 'omografe_glossa_discorde'] += 1
         prove = self.stat['omografe_glossa_concorde'] + self.stat['omografe_glossa_discorde']
         vale = prove >= OMOGRAFE_PER_GLOSSA[0] and self.stat['omografe_glossa_concorde'] >= OMOGRAFE_PER_GLOSSA[1] * prove
-        for rid, conta in voti.items():
-            if len(conta) == 1:
-                archi[rid]['etimo'] = next(iter(conta))
-                self.stat['omografe_precisate'] += 1
-            else:
-                self.stat['omografe_ambigue'] += 1
         # Il campo di senso delle omografe (*kap-@head «head, cap, hat…», *kap-@seize «seize, grasp, take…»): se la
         # pagina non dà una glossa della citazione, vale la glossa della parola che cita la radice (*kaput «head»). Una
         # sola omografa con una parola in comune, e tutte le omografe con il loro campo; la regola si misura come quella
@@ -1689,6 +1683,14 @@ class Importatore:
                 self.stat['omografe_campo_concorde' if next(iter(voti[rid])) == k else 'omografe_campo_discorde'] += 1
         prove_c = self.stat['omografe_campo_concorde'] + self.stat['omografe_campo_discorde']
         vale_c = prove_c >= OMOGRAFE_PER_CAMPO[0] and self.stat['omografe_campo_concorde'] >= OMOGRAFE_PER_CAMPO[1] * prove_c
+        # le dichiarazioni si applicano dopo le misure: prima, gli archi che decidono non puntavano più al nodo
+        # generico, e la regola del campo non aveva prove (22 novembre 2026: 0 su 762 proposte)
+        for rid, conta in voti.items():
+            if len(conta) == 1:
+                archi[rid]['etimo'] = next(iter(conta))
+                self.stat['omografe_precisate'] += 1
+            else:
+                self.stat['omografe_ambigue'] += 1
         for regola, scelte, ok in (('glossa', per_glossa, vale), ('campo', per_campo, vale_c)):
             for rid, (r, k) in scelte.items():
                 if rid in voti and len(voti[rid]) == 1:

@@ -187,10 +187,19 @@ def omografe_per_campo(soglia):
     return imp, {r['esito']: r['etimo'] for r in imp.relazioni}, (gen, testa, prendo, kaput, kapio, haft, neutro)
 imp, etimo, (gen, testa, prendo, kaput, kapio, haft, neutro) = omografe_per_campo((50, 0.9))
 assert etimo[haft] == prendo and etimo[kaput] == gen, 'senza misura il campo non sposta archi'
-assert imp.stat['omografe_campo_concorde'] == 0 and imp.stat['omografe_campo_in_attesa'] == 2, dict(imp.stat)
+assert imp.stat['omografe_campo_in_attesa'] == 2, dict(imp.stat)
 imp, etimo, (gen, testa, prendo, kaput, kapio, haft, neutro) = omografe_per_campo((0, 0.9))
 assert etimo[kaput] == testa and etimo[kapio] == prendo and etimo[neutro] == gen, ('il campo sceglie; «hoof» non decide', etimo)
+# un arco che la dichiarazione decide entra nella misura del campo (*kapiō «to take», dichiarato *kap-@seize)
 wiktionary.OMOGRAFE_PER_CAMPO = (50, 0.9)
+imp = Importatore()
+gen, testa, prendo = imp.lessema('ine-pro', '*kap-'), imp.lessema('ine-pro', '*kap-', ident='head'), imp.lessema('ine-pro', '*kap-', ident='seize')
+imp.campi = {testa: _parole('head, cap, hat'), prendo: _parole('seize, grasp, take')}
+kapio = imp.lessema('itc-pro', '*kapiō', glossa='to take')
+arco(imp, kapio, gen)
+imp.radici = {(kapio, prendo)}
+imp.precisa_omografe()
+assert imp.stat['omografe_campo_concorde'] == 1 and [r['etimo'] for r in imp.relazioni] == [prendo], dict(imp.stat)
 # audientia: il ripiego sulla radice dichiarata non sceglie a caso tra due radici
 imp = Importatore()
 aud, audience = imp.lessema('la', 'audientia'), imp.lessema('it', 'audience')
