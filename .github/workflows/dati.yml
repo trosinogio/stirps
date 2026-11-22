@@ -50,8 +50,8 @@ jobs:
       # l'arabo intero come l'ebraico, senza nomi propri né locuzioni (19 novembre 2026, «completare l'arabo»)
       SENZA_NOMI: he,ar
       # la stima dopo ogni giro (stima_import.py), per le lingue slave
-      STIMA_LINGUE: ar,mt,am,gez
-      STIMA_ATTUALE: '2580'
+      STIMA_LINGUE: en
+      STIMA_ATTUALE: '2622'
       STIMA_FREQUENZE: ar=dati/frequenze_ar.tsv.gz
       # sotto le voci dei rami antichi e del latino entrano anche i discendenti dichiarati che il dizionario non ha
       # (import/wiktionary.py; il latino dal 15 novembre 2026, decisione di Giovanni: le lingue romanze)
@@ -339,6 +339,14 @@ jobs:
             /tmp/glosse_radici.tsv
             /tmp/omografe_fuori.tsv
           retention-days: 14
+
+      - name: Stima dei derivati inglesi
+        continue-on-error: true
+        run: |
+          # i lemmi inglesi che il dizionario non ha (aeration): con un etimo nel dizionario, derivati trasparenti, altri
+          python3 import/stima_derivati.py en import/dati/en/glosse.tsv import/dati/en/lemmi.jsonl dati/lessemi.tsv.gz \
+            dati/frequenze_en.tsv.gz | tee /tmp/derivati.txt
+          echo "::notice title=Derivati inglesi::$(head -2 /tmp/derivati.txt | tr '\n' ' ') $(grep '^  ' /tmp/derivati.txt | tr '\n' ' ' | cut -c1-900)"
 
       - name: Stima dell'import
         continue-on-error: true
