@@ -1,0 +1,61 @@
+  grezza (fr): {"word": "accueil", "etymology_texts": ["Déverbal de accueillir."]}
+  grezza (fr): {"word": "lire", "etymology_texts": ["Du latin lĕgĕre (« id. »), proprement « recueillir »"]}
+  grezza (fr): {"word": "encyclopédie", "etymology_texts": ["Du latin encyclopaedia forgé à la Renaissance, fausse lecture d’un manuscrit pour ἐγκύκλοπαιδεία ; mot tiré du grec ancien ἐγκύκλιος, énkúklios (« circulaire ») — voir encyclique — et παιδεία, paideía (« instruction ») soit le sens de « éducation compren
+  grezza (grc): {"word": "ἄγω", "etymology_texts": ["Du radical indo-européen commun *h₂eǵ- (« conduire », « mener »), qui donne également le latin ago (« conduire », « mouvoir »), le sanskrit अजति, ájati (« conduire »), et en arménien ancien ածեմ, acem (« porter »)."]}
+  grezza (grc): {"word": "ἄλφα", "etymology_texts": ["Le nom de cette lettre a été emprunté presque tel quel au nom qu'elle avait en phénicien (mais où elle transcrivait un autre son - sottise) : aleph (« bœuf, taureau ») ; la finale en -a vient peut-être de l’araméen."]}
+  grezza (grc): {"word": "ἄγος", "etymology_texts": ["La variante ἅγος, hágos porte la trace d’un ancien s- aspiré que certains rapprochent de sanguis (« sang, sang versé, meurtre »).", "Apparenté à ache (« douleur ») en anglais, आगस्, āgas (« faute, péché »), en sanscrit, de l’indo-européen commun *agos- (« faute,
+etimologie del Wiktionnaire (fr): {'con etimologia': 425504, 'derivazione': 18295, 'lette': 33820, 'generico': 14517, 'non lette': 241205, 'non voci': 150479, 'senza etimologia': 1649033, 'composizione': 1008}
+etimologie del Wiktionnaire (grc): {'con etimologia': 11455, 'non lette': 2763, 'senza etimologia': 2581, 'derivazione': 5335, 'lette': 8123, 'non voci': 569, 'generico': 202, 'composizione': 2586}
+  voci lette per lingua: {'fr': 2112393, 'it': 1199070, 'se': 741408, 'de': 530421, 'pt': 311098, 'fi': 247235, 'es': 219254, 'ru': 212692}
+  fr accueil: Déverbal de accueillir. → fr:accueillir
+  fr abacule: Du latin abaculus (« abacule, élément de mosaïque »). → la:abaculus
+  fr Roumain: Du latin Romanus (« Romain »). → la:Romanus
+  fr carte: Du latin charta (« papier, écrit, livre »), lui-même du grec ancien χάρτης, khártês (« feu → la:charta
+  fr magazine: De l’anglais magazine, lui-même issu du français magasin. → en:magazine
+  fr long: Du latin longus (« qui dure longtemps »). Long terme apparaît en 1250. (1080) lonc. → la:longus
+  fr saphir: Du latin sapphirus, lui-même issu du grec ancien ἡ σάπφειρος, hē sáppheiros (« pierre préc → la:sapphirus
+  fr lignine: Du latin lignum (« bois ») et -ine. → la:lignum
+  fr vacance: Du latin văcāre (« être sans ») référence nécessaire (résoudre le problème). → la:vaco
+  fr béryllium: Dérivé de béryl, avec le suffixe -ium. Le chimiste français Nicolas-Louis Vauquelin identi → fr:béryl
+  fr trompeuse: Dérivé de tromper, avec le suffixe -euse → voir tromperesse. → fr:tromper
+  fr argon: De l’anglais argon, créé en 1894 à partir du grec ancien άργόν, argon, neutre de ἀργός, ar → en:argon
+  fr cingler: De l’ancien français sigler dérivé du vieux norrois segl (« voile »), apparenté à Segel (« → fro:sigler
+  fr minimessage: dérivé de message, avec le préfixe mini-. → fr:message
+  fr spallation: De l’anglais spallation. → en:spallation
+  fr banal: Dérivé de ban, avec le suffixe -al. (1269) bannel. → fr:ban
+  fr involontairement: Dérivé de involontaire avec le suffixe -ment. → fr:involontaire
+  fr éloquemment: Dérivé de éloquent avec le suffixe -ment. → fr:éloquent
+  fr temporellement: Dérivé de temporel, par son féminin temporelle, avec le suffixe -ment. → fr:temporel
+  fr fictivement: Dérivé de fictif, par son féminin fictive, avec le suffixe -ment. → fr:fictif
+  fr accoudoir: Dérivé de accouder, avec le suffixe -oir. → fr:accouder
+  fr utile: Du latin utilis (« utile »), dérivé de uti (« jouir », « profiter de »), participe passé u → la:utilis
+  fr auditorium: Du latin auditorium. → la:auditorium
+  fr jungle: De l’anglais jungle, lui-même du hindi जंगल, jaṅgal (« forêt ») ou de l’ourdou جنگل, jaṅga → en:jungle
+  fr absence: Du latin absentia, lui-même issu de absēns (« absent »), participe présent de absum (« êtr → la:absentia
+  fr, inizi non letti più frequenti: voir à (101082); composé de (21138); → voir (15614); étymologie manquante (9614); composée de (3688); du nom (2663); de l’anglais (2468); dérivé du (2125); du latin (1988); dérivé de (1399); de l’italien (1359); composé du (1256); initiales de (1249); de l’espagnol (988); du japonais (982); du grec (982); variante de (860); du participe (846); sigle de (706); termecomposé de (658); féminisation de (655); de l’arabe (643); termedérivé de (601); de la (601); de l’occitan (585); abréviation de (577); du préfixe (570); calque de (510); du verbe (465); de l’allemand (450)
+  grc ἀπρόσικτος: dérivé de προσιτός, prositós (« accessible »), avec le préfixe ἀ-, a- (« in-, non »), lui- → grc:προσιτός
+  grc γένος: De γίγνομαι, apparenté au latin genus, au sanskrit जनस्, jánas, à ծին cin en arménien anci → grc:γίγνομαι
+  grc παραφορά: Déverbal de παραφέρω, paraphérô (« emporter »). → grc:παραφέρω
+  grc θαυμάζω: dérivé de θαῦμα, thaúma (« objet d'admiration ou de curiosité »), avec le suffixe -άζω, -á → grc:θαῦμα
+  grc γεῦμα: Dérivé de γεύω, geúō (« goûter »), avec le suffixe -μα, -ma. → grc:γεύω
+  grc διάβολος: Déverbal de διαβάλλω, diabállō (« accuser, attaquer »). → grc:διαβάλλω
+  grc διπλόος: Voir δίς, dís (« deux ») et ἁπλόος, aplóos (« simple »), le latin duplex. → grc:δίς
+  grc κοιμάω: De κεῖμαι, keímai (« être couché »). → grc:κεῖμαι
+  grc Σαρδόνιος: De Σαρδώ. → grc:Σαρδώ
+  grc θρόνος: De θρῆνυς, thrếnus (« escabeau pour les pieds ») et, plus avant, de θράω, thráô (« tenir,  → grc:θρῆνυς
+  grc Σωκράτης: composé de σῶς, sôs (« sauf », « sain ») et de κράτος, krátos (« force »). → grc:σῶς + grc:κράτος
+  grc φίλτρον: De φιλέω, philéô (« aimer ») avec le suffixe -τρον → voir -trum en latin. → grc:φιλέω
+  grc τρίχα: De τρίς, trís (« trois fois »), τρεῖς, treís (« trois »). → grc:τρίς
+  grc καταρρέω: composé de κατά, katá et de ῥέω, rhéô (« couler »). → grc:κατά + grc:ῥέω
+  grc ἀγαπάω: Dénominal de ἀγάπη. → grc:ἀγάπη
+  grc κανών: De κάννα, kánna (« roseau »). → grc:κάννα
+  grc μονογαμία: dérivé de μονόγαμος, monógamos (« monogame »), avec le suffixe -ία, -ía. → grc:μονόγαμος
+  grc τρίγλυφος: composé de τρεῖς, treís (« trois ») et de γλυφίς, gluphís (« entaille »). → grc:τρεῖς + grc:γλυφίς
+  grc ἀκοή: Dérivé de ἀκούω, akoúō (« entendre »), avec le suffixe -η, -ē. → grc:ἀκούω
+  grc ἄμπελος: composé de ἀμφί, amphí (« autour ») et de εἴλω, eílō (« enrouler »), littéralement « [plan → grc:ἀμφί + grc:εἴλω
+  grc ὀνομασία: Voir ὀνομάζω, ὄνομα. → grc:ὀνομάζω
+  grc θόρυβος: composé de θρόος, thróos, βοή, boê et -ος, -os. → grc:θρόος + grc:βοή
+  grc ἐνέχω: Composé de ἐν, en et de ἔχω, ékhô. → grc:ἐν + grc:ἔχω
+  grc περιπατέω: Composé de περί, perí et de πατέω, patéô. → grc:περί + grc:πατέω
+  grc ξυρόν: De ξύω, xúô, ξέω, xéô. → grc:ξύω
+  grc, inizi non letti più frequenti: apparenté à (462); apparenté au (444); de l’indo-européen (364); composé de (71); forme collatérale (67); avec le (54); de l’hébreu (54); → voir (50); du proto-grec (42); du radical (35); variante de (31); il est (30); étymologie obscure (19); étymologie discutée (17); antonomase de (17); probablement apparenté (17); de l’égyptien (17); adjectif verbal (16); avec pour (14); du vieux (14); peut-être apparenté (13); voir le (12); d’origine inconnue. (12); neutre de (12); forme contractée (11); féminin substantivé (10); le sens (10); de l'indo-européen (9); de même (9); dérivé de (9)
