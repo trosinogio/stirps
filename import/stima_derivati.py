@@ -90,12 +90,24 @@ def main():
                     basi = [p for p in parti if p and not p.startswith('-') and not p.endswith('-')]
                     if len(basi) == 1 and parola(basi[0]):
                         coppie.setdefault(w, basi[0])
-                        primo.setdefault(w, (lingua, basi[0]))
+                        # per far entrare la voce valgono solo af, affix e compound: con {{prefix}} e {{suffix}}
+                        # entravano 128 mila voci invece di 35 mila (28 novembre 2026), un ambito da decidere a parte
+                        if n not in ('prefix', 'suffix'):
+                            primo.setdefault(w, (lingua, basi[0]))
                     break
                 if n in ('inh', 'bor', 'der', 'lbor', 'slbor', 'ubor', 'obor', 'bor+', 'inh+', 'der+', 'cal', 'calque'):
                     if a.get('2') and a.get('3'):
                         primo.setdefault(w, (a['2'].strip(), a['3'].strip().lstrip('*')))
                     break
+    mancano = [w for w in lemmi if w not in della_lingua]
+    # prima le voci con un etimo nel dizionario: entrano con la loro etimologia, e possono fare da base a un derivato
+    # (aeration < aerate, e aerate < latino aerātus); un livello solo, non a catena
+    entrano = {w for w in mancano if primo.get(w) and (primo[w] in nel or (primo[w][0] == lingua and primo[w][1] in della_lingua))}
+
+    def applicabile(b):
+        # una regola si applica solo con la base nel dizionario, o che entra: e lì si misura (accreditation <
+        # accreditate, una voce rara di Wiktionary senza etimologia, non conta contro «-ation al posto di -ate»)
+        return b in della_lingua or b in entrano
     # le regole, dalle coppie dell'80% di addestramento; misurate sul 20%
     addestra = [w for w in coppie if zlib.crc32(w.encode()) % 5]
     prova = [w for w in coppie if not zlib.crc32(w.encode()) % 5]
@@ -159,6 +171,8 @@ def main():
     sbagli = defaultdict(list)
     for w in addestra:
         for r, b in scatti(w, idx_regole):
+            if not applicabile(b):
+                continue
             es, fam = giudica(b, coppie[w])
             misura[r]['scatta'] += 1
             misura[r]['esatta'] += es
@@ -171,7 +185,7 @@ def main():
     idx_buone = indice(buone)
 
     def prevedi_regola(w):
-        ss = [(buone[r], len(r[1]), b, r) for r, b in scatti(w, idx_buone)]
+        ss = [(buone[r], len(r[1]), b, r) for r, b in scatti(w, idx_buone) if applicabile(b)]
         return max(ss)[2:] if ss else (None, None)
 
     def prevedi(w):
@@ -189,12 +203,8 @@ def main():
           f'{len(coppie)}; regole {len(buone)} (almeno {SUPPORTO} casi, {PRECISIONE:.0%} nella famiglia, {ESATTEZZA:.0%} esatte); '
           f'prova sul 20% tenuto da parte: su {previste}, nella famiglia {famiglia} ({famiglia / max(1, previste):.0%}), '
           f'esatte {esatte} ({esatte / max(1, previste):.0%}) → ' + ('passa' if passa else f'non passa: nessun derivato'))
-    mancano = [w for w in lemmi if w not in della_lingua]
     gruppi = defaultdict(list)
-    # prima le voci con un etimo nel dizionario: entrano con la loro etimologia, e possono fare da base a un derivato
-    # (aeration < aerate, e aerate < latino aerātus); un livello solo, non a catena
-    entrano = {w for w in mancano if primo.get(w) and (primo[w] in nel or (primo[w][0] == lingua and primo[w][1] in della_lingua))}
-    # e i derivati dichiarati di una di queste (aeration = aerate + -ion): anche loro un livello solo
+    # i derivati dichiarati di una di queste (aeration = aerate + -ion): anche loro un livello solo
     dichiarati = {w for w in mancano if w not in entrano and coppie.get(w) in entrano}
     for w in mancano:
         p = primo.get(w)
@@ -204,7 +214,7 @@ def main():
             gruppi['con un etimo che entra con il gruppo di sopra'].append((w, f'{p[0]}:{p[1]}'))
         elif w not in primo:
             b = prevedi(w)
-            if passa and b and (b in della_lingua or b in entrano):
+            if passa and b:
                 gruppi['senza etimologia, derivato trasparente di una voce che c\'è'].append((w, b))
             else:
                 gruppi['senza etimologia, nient\'altro'].append((w, None))
