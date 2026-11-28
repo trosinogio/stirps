@@ -50,9 +50,9 @@ jobs:
       # l'arabo intero come l'ebraico, senza nomi propri né locuzioni (19 novembre 2026, «completare l'arabo»)
       SENZA_NOMI: he,ar
       # la stima dopo ogni giro (stima_import.py), per le lingue slave
-      STIMA_LINGUE: ar,mt,am,gez
-      STIMA_ATTUALE: '2580'
-      STIMA_FREQUENZE: ar=dati/frequenze_ar.tsv.gz
+      STIMA_LINGUE: en
+      STIMA_ATTUALE: '2622'
+      STIMA_FREQUENZE: en=dati/frequenze_en.tsv.gz
       # sotto le voci dei rami antichi e del latino entrano anche i discendenti dichiarati che il dizionario non ha
       # (import/wiktionary.py; il latino dal 15 novembre 2026, decisione di Giovanni: le lingue romanze)
       # e sotto il protobaltoslavo e il protoceltico (16 novembre 2026: lituano e irlandese antico, con l'ittita, per il
@@ -76,6 +76,11 @@ jobs:
       COMUNI: it=../dati/frequenze_it.tsv.gz
       ELENCHI: en=../dati/frequenze_en.tsv.gz
       ESTERNI: en
+      # e le voci inglesi che stanno in una famiglia che c'è già (decisione di Giovanni del 28 novembre 2026, «Continua»
+      # dopo la stima del ramo dati-stima-derivati): con un etimo che il dizionario ha (musicality < musical), e i derivati
+      # trasparenti senza etimologia di una voce che c'è (aeration < aerate), con l'analisi della forma
+      IN_FAMIGLIA: en
+      DERIVATI: en
       GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
       # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
       DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq

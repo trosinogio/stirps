@@ -1326,6 +1326,12 @@ class Importatore:
             return False
         if elenco is None:
             return True
+        # --in-famiglia en=elenco.tsv: anche le voci il cui primo etimo è una voce del pacchetto pubblicato (musicality <
+        # musical, abolitionist = abolition + -ist), dall'elenco di stima_derivati.py --scrivi-etimi; non un etimo
+        # qualunque, anche entrato nello stesso giro: il 28 novembre 2026 così entravano 292 mila voci invece di 36 mila
+        if v['w'] in getattr(self, 'in_famiglia', {}).get(lingua, ()):
+            self.stat[f'in_famiglia_{lingua}'] += 1
+            return True
         return v['w'].lower() in elenco or (lingua in self.esterni and etimo_esterno(lingua, v))
 
     def chiudi(self, passi=1):
@@ -1432,6 +1438,16 @@ class Importatore:
             prima = len(self.lessemi)
             self.lemmi_da_glosse(lingua, percorso, lambda p: p.lower() in elenco and not p[:1].isupper() and ' ' not in p)
             self.stat['lemmi comuni senza etimologia'] += len(self.lessemi) - prima
+
+    def aggiungi_derivati(self, lingua, elenco):
+        """I derivati trasparenti senza etimologia (--derivati en=derivati.tsv, da stima_derivati.py --scrivi): aeration,
+        derivato di aerate, che il dizionario ha. Entrano come i lemmi del lessico comune; l'etimologia è l'analisi della
+        forma (righe «analisi» negli etimi dei dizionari, importa.sh), con certezza 2."""
+        percorso = (self.chiusura.get(lingua) or {}).get('file_glosse')
+        if elenco and percorso and os.path.exists(percorso):
+            prima = len(self.lessemi)
+            self.lemmi_da_glosse(lingua, percorso, lambda p: p in elenco)
+            self.stat[f'derivati_{lingua}'] += len(self.lessemi) - prima
 
     def lemmi_da_glosse(self, lingua, percorso, ammesso=None):
         for riga in open(percorso, encoding='utf-8'):
@@ -2425,6 +2441,8 @@ if __name__ == '__main__':
     #               [--glosse-precedenti ../dati/lessemi.tsv.gz]
     args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti, comuni = [], [], 1, set(), set(), {}, set(), {}, {}
     senza_nomi = set()
+    in_famiglia = {}    # --in-famiglia en=elenco.tsv: entrano anche le voci con un etimo nel pacchetto (stima_derivati.py)
+    derivati = {}       # --derivati en=derivati.tsv: i derivati trasparenti senza etimologia (stima_derivati.py --scrivi)
     risali = set()      # --risali hit,xcl: lingue antiche di cui entrano i lemmi con un etimo già nel dizionario
     semina = set()      # --semina-discendenti ine-pro,grc: sotto le voci di queste lingue entrano anche le parole nuove
     discendenti = []    # --discendenti la=discendenti.tsv: gli alberi dei discendenti dichiarati (filtra.py con DISCENDENTI)
@@ -2464,6 +2482,12 @@ if __name__ == '__main__':
             forme_base = next(it_)
         elif x == '--senza-nomi':
             senza_nomi = {c for c in next(it_).split(',') if c}
+        elif x == '--in-famiglia':
+            lingua_f, percorso_f = next(it_).split('=', 1)
+            in_famiglia[lingua_f] = {r.split('\t')[0] for r in open(percorso_f, encoding='utf-8') if r.strip()}
+        elif x == '--derivati':
+            lingua_d, percorso_d = next(it_).split('=', 1)
+            derivati[lingua_d] = {r.split('\t')[0] for r in open(percorso_d, encoding='utf-8') if r.strip()}
         elif x == '--con-etimologia':
             con_etimologia = {c for c in next(it_).split(',') if c}
         else:
@@ -2473,6 +2497,7 @@ if __name__ == '__main__':
     imp.risalita = risali
     imp.con_etimologia = con_etimologia
     imp.senza_nomi = senza_nomi
+    imp.in_famiglia = in_famiglia
     imp.elenco = elenchi
     imp.comuni = comuni
     imp.esterni = esterni
@@ -2527,6 +2552,8 @@ if __name__ == '__main__':
     # prima dei lemmi interi: un lemma latino o greco seminato e rimasto senza legami rientra come ogni lemma (Dionysia)
     passo('togli_seminati_orfani', imp.togli_seminati_orfani)
     passo('aggiungi_lemmi_interi', imp.aggiungi_lemmi_interi)
+    for lingua_d, elenco_d in sorted(derivati.items()):
+        passo(f'aggiungi_derivati_{lingua_d}', imp.aggiungi_derivati, lingua_d, elenco_d)
     if len(args) > 2:
         passo('aggiungi_lemmi_comuni', imp.aggiungi_lemmi_comuni, LINGUA, args[2])
     passo('togli_archi_impossibili', imp.togli_archi_impossibili)

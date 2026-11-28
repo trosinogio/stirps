@@ -21,6 +21,8 @@ CON_ETIMOLOGIA=${CON_ETIMOLOGIA-}   # lingue di chiusura di cui entrano tutte le
 ELENCHI=${ELENCHI-}   # per quelle lingue, i soli lemmi ammessi: ELENCHI="en=../dati/frequenze_en.tsv.gz" (il lessico comune)
 COMUNI=${COMUNI-}     # nella lingua principale, anche i lemmi senza etimologia del lessico comune: COMUNI="it=../dati/frequenze_it.tsv.gz"
 ESTERNI=${ESTERNI-}   # e con l'elenco, anche le voci con l'etimo in un'altra lingua: ESTERNI=en
+IN_FAMIGLIA=${IN_FAMIGLIA-}   # e con l'elenco, anche le voci il cui primo etimo è nel pacchetto pubblicato: IN_FAMIGLIA=en (con DERIVATI)
+DERIVATI=${DERIVATI-}   # e i derivati trasparenti senza etimologia di una voce che c'è (aeration < aerate): DERIVATI=en
 PRECEDENTI=${PRECEDENTI-}   # il lessemi.tsv.gz pubblicato: le glosse non cambiano se sono ancora tra le candidate
 SOLO_ANALISI=${SOLO_ANALISI:-0}
 DIZIONARI=${DIZIONARI:-1}   # i lemmi del Lewis & Short e dell'LSJ che Wiktionary non ha (Perseus, CC BY-SA 4.0)
@@ -88,6 +90,20 @@ if [ "$WIKIZIONARIO" = 1 ]; then
   curl -sf "https://kaikki.org/itwiktionary/All%20languages%20combined/kaikki.org-dictionary-all.jsonl" | python3 filtra_wikizionario.py "$DATI/glosse_it.tsv"
 fi
 
+# i derivati trasparenti senza etimologia (aeration < aerate): le regole di stima_derivati.py, imparate dalle coppie
+# parola–base dichiarate e misurate sul 20% tenuto da parte; le basi sono le voci del pacchetto pubblicato. Con
+# IN_FAMIGLIA anche l'elenco delle voci il cui primo etimo è nel pacchetto pubblicato (abolitionist < abolition)
+for d in $(echo "$DERIVATI" | tr ',' ' '); do
+  if [ -s "dati/$d/glosse.tsv" ] && [ -s ../dati/lessemi.tsv.gz ]; then
+    ETIMI_D=()
+    case ",$IN_FAMIGLIA," in *",$d,"*) ETIMI_D=(--scrivi-etimi "$DATI/in_famiglia_$d.tsv") ;; esac
+    python3 stima_derivati.py "$d" "dati/$d/glosse.tsv" "dati/$d/lemmi.jsonl" ../dati/lessemi.tsv.gz "../dati/frequenze_$d.tsv.gz" \
+      --scrivi "$DATI/derivati_$d.tsv" ${ETIMI_D[@]+"${ETIMI_D[@]}"} ${MOSTRA_DERIVATI:+--mostra "$MOSTRA_DERIVATI"} | tee "$DATI/rapporto_derivati_$d.txt"
+    ARGOMENTI+=(--derivati "$d=$DATI/derivati_$d.tsv")
+    if [ ${#ETIMI_D[@]} -gt 0 ]; then ARGOMENTI+=(--in-famiglia "$d=$DATI/in_famiglia_$d.tsv"); fi
+  fi
+done
+
 echo "2/4  leggo le etimologie"
 python3 wiktionary.py "$DATI/lemmi.jsonl" "$DATI/tsv" "$DATI/glosse.tsv" ${ARGOMENTI[@]+"${ARGOMENTI[@]}"} --passi "$PASSI" \
   --forme-base "$LINGUA=$DATI/forme.tsv" --discendenti "$LINGUA=$DATI/discendenti.tsv" \
@@ -125,6 +141,16 @@ if [ "$DIZIONARI" = 1 ]; then
     cat "$DATI/rapporto_derivati.txt" >&2; exit 1
   fi
   cat "$DATI/rapporto_derivati.txt"
+  # e i derivati trasparenti di DERIVATI: la loro etimologia è l'analisi della forma (parola < base, con l'affisso);
+  # dove apprendi_derivati.py ha già scritto la sua analisi (la lingua passa la misura sul dizionario), vale quella
+  for d in $(echo "$DERIVATI" | tr ',' ' '); do
+    if [ -s "$DATI/derivati_$d.tsv" ]; then
+      awk -F'\t' -v l="$d" 'BEGIN{OFS="\t"} NR==FNR {c[$1]; next} !(("analisi:enwikt:" l ":" $1) in c) {print "analisi:enwikt:" l ":" $1, l, $1, 1, l, $2, "derivazione", $3, "analisi"}' \
+        "$DATI/tsv/etimi_dizionari.tsv" "$DATI/derivati_$d.tsv" > "$DATI/derivati_$d.righe"
+      cat "$DATI/derivati_$d.righe" >> "$DATI/tsv/etimi_dizionari.tsv"
+      echo "     derivati trasparenti ($d): $(wc -l < "$DATI/derivati_$d.righe") analisi della forma dall'elenco della stima"
+    fi
+  done
   # stime della prima attestazione: l'autore datato più antico citato nella voce (DATAZIONI.md, passo 1)
   python3 datatore_dizionari.py autori "$DATI/tsv/autori.tsv"
   python3 datatore_dizionari.py stime "$DATI/tsv/autori.tsv" "$DATI/tsv/stime.tsv" "${locali[@]}"
