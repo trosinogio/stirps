@@ -82,6 +82,11 @@ def main():
                 n, a = t.get('n'), t.get('a') or {}
                 if n in ('af', 'affix', 'suffix', 'prefix', 'compound'):
                     parti = [(a.get(str(i)) or '').strip() for i in range(2, 6)]
+                    # {{prefix|en|hyper|inflate}} e {{suffix|en|inflate|ion}} scrivono l'affisso senza trattino
+                    if n == 'prefix':
+                        parti = parti[1:]
+                    elif n == 'suffix':
+                        parti = parti[:1]
                     basi = [p for p in parti if p and not p.startswith('-') and not p.endswith('-')]
                     if len(basi) == 1 and parola(basi[0]):
                         coppie.setdefault(w, basi[0])
@@ -159,7 +164,7 @@ def main():
             misura[r]['esatta'] += es
             misura[r]['famiglia'] += fam
             if not fam:
-                sbagli[r].append(f'{w}: {b}, dichiarata {coppie[w]}')
+                sbagli[r].append(f'{w}: {b} {sorted(cime(b))[:2]}, dichiarata {coppie[w]} {sorted(cime(coppie[w]))[:2]}')
     buone = {r: m['famiglia'] / m['scatta'] for r, m in misura.items()
              if m['scatta'] >= SUPPORTO and m['famiglia'] >= PRECISIONE * m['scatta'] and m['esatta'] >= ESATTEZZA * m['scatta']}
 
