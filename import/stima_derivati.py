@@ -74,6 +74,8 @@ def main():
                 lemmi.setdefault(c[0], (c[2], c[3]))
     # le etimologie: il primo etimo, e le coppie parola–base della lingua per imparare le regole
     primo, coppie = {}, {}
+    # le voci con un'etimologia qualunque: tra i derivati senza etimologia non vanno
+    con_etimo = set()
     with apri(lemmi_p) as f:
         for r in f:
             v = json.loads(r)
@@ -88,6 +90,7 @@ def main():
                     elif n == 'suffix':
                         parti = parti[:1]
                     basi = [p for p in parti if p and not p.startswith('-') and not p.endswith('-')]
+                    con_etimo.add(w)
                     if len(basi) == 1 and parola(basi[0]):
                         coppie.setdefault(w, basi[0])
                         # per far entrare la voce valgono solo af, affix e compound: con {{prefix}} e {{suffix}}
@@ -97,6 +100,7 @@ def main():
                     break
                 if n in ('inh', 'bor', 'der', 'lbor', 'slbor', 'ubor', 'obor', 'bor+', 'inh+', 'der+', 'cal', 'calque'):
                     if a.get('2') and a.get('3'):
+                        con_etimo.add(w)
                         primo.setdefault(w, (a['2'].strip(), a['3'].strip().lstrip('*')))
                     break
     mancano = [w for w in lemmi if w not in della_lingua]
@@ -212,14 +216,19 @@ def main():
             gruppi['con un etimo nel dizionario'].append((w, f'{p[0]}:{p[1]}'))
         elif w in dichiarati:
             gruppi['con un etimo che entra con il gruppo di sopra'].append((w, f'{p[0]}:{p[1]}'))
-        elif w not in primo:
+        elif w not in con_etimo:
             b = prevedi(w)
             if passa and b:
                 gruppi['senza etimologia, derivato trasparente di una voce che c\'è'].append((w, b))
             else:
                 gruppi['senza etimologia, nient\'altro'].append((w, None))
-        else:
+        elif w in primo:
             gruppi['con un etimo fuori dal dizionario'].append((w, f'{primo[w][0]}:{primo[w][1]}'))
+        elif applicabile(coppie.get(w)):
+            # {{prefix}} o {{suffix}} su una voce del dizionario (unhelpful < helpful): un ambito da decidere a parte
+            gruppi['con un prefisso o un suffisso su una voce del dizionario (non entrano)'].append((w, coppie[w]))
+        else:
+            gruppi['con un prefisso o un suffisso su una voce fuori dal dizionario'].append((w, coppie.get(w)))
     print(f'lemmi comuni che il dizionario non ha: {len(mancano)}')
     # --mostra aeration,…: perché una parola entra o no (regole che scattano, con la loro misura sull'addestramento)
     for w in (sys.argv[sys.argv.index('--mostra') + 1].split(',') if '--mostra' in sys.argv else []):

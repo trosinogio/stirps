@@ -81,7 +81,6 @@ jobs:
       # trasparenti senza etimologia di una voce che c'è (aeration < aerate), con l'analisi della forma
       IN_FAMIGLIA: en
       DERIVATI: en
-      MOSTRA_DERIVATI: aeration,activation,oxygenation,aerate
       GLOSSE_TRADOTTE: '1'   # 0: si contano le voci da tradurre senza tradurle (per una stima)
       # esempi grezzi dei modelli italiani che il filtro non legge ancora, nel registro (filtra.py), per imparare a leggerli
       DIAGNOSI_MODELLI: internationalism,it-verb-verb,m+,clq
