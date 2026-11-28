@@ -3,7 +3,8 @@
 «aeration è senza etimologia, è chiaro che derivi dal latino aer»). Dai file del filtro della lingua (glosse.tsv: tutti i
 lemmi; lemmi.jsonl: quelli con un'etimologia) e dal pacchetto, conta i lemmi comuni (niente nomi propri, locuzioni,
 cifre) che mancano, in tre gruppi:
-- con un'etimologia il cui primo etimo è già una voce del dizionario (abolitionist < abolition);
+- con un'etimologia il cui primo etimo è già una voce del dizionario (abolitionist < abolition), e i derivati
+  dichiarati di una di queste (aeration = aerate + -ion, aerate < latino aerātus), un livello solo;
 - senza etimologia, ma derivati trasparenti di una voce della lingua che c'è già, o che entra con il gruppo di sopra
   (aeration < aerate): le regole di
   suffisso e di prefisso di apprendi_derivati.py, imparate dalle coppie parola–base che le pagine dichiarano
@@ -138,10 +139,14 @@ def main():
     # prima le voci con un etimo nel dizionario: entrano con la loro etimologia, e possono fare da base a un derivato
     # (aeration < aerate, e aerate < latino aerātus); un livello solo, non a catena
     entrano = {w for w in mancano if primo.get(w) and (primo[w] in nel or (primo[w][0] == lingua and primo[w][1] in della_lingua))}
+    # e i derivati dichiarati di una di queste (aeration = aerate + -ion): anche loro un livello solo
+    dichiarati = {w for w in mancano if w not in entrano and coppie.get(w) in entrano}
     for w in mancano:
         p = primo.get(w)
         if w in entrano:
             gruppi['con un etimo nel dizionario'].append((w, f'{p[0]}:{p[1]}'))
+        elif w in dichiarati:
+            gruppi['con un etimo che entra con il gruppo di sopra'].append((w, f'{p[0]}:{p[1]}'))
         elif w not in primo:
             b = prevedi(w)
             if b and (b in della_lingua or b in entrano):
@@ -166,9 +171,10 @@ def main():
         print(f'scritti {len(gruppi["senza etimologia, derivato trasparente di una voce che c\'è"])} derivati in {scrivi}')
     if scrivi_etimi:
         with open(scrivi_etimi, 'w', encoding='utf-8') as out:
-            for w, e in sorted(gruppi['con un etimo nel dizionario']):
+            voci = gruppi['con un etimo nel dizionario'] + gruppi['con un etimo che entra con il gruppo di sopra']
+            for w, e in sorted(voci):
                 out.write(f'{w}\t{e}\n')
-        print(f'scritte {len(gruppi["con un etimo nel dizionario"])} voci con un etimo nel dizionario in {scrivi_etimi}')
+        print(f'scritte {len(voci)} voci con un etimo nel dizionario o che entra in {scrivi_etimi}')
 
 
 if __name__ == '__main__':
