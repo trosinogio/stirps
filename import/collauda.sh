@@ -366,6 +366,19 @@ assert _ops == [imp_i.chiave_di('grc', 'ὄψ') + ':2'], ('l\'omografo dell\'ide
 from apprendi_derivati import regole_della_coppia as rdc
 assert ('S', 'ition', 'ish') in rdc('abolition', 'abolish') and ('P', 're') in rdc('reaeration', 'aeration'), rdc('abolition', 'abolish')
 assert not rdc('cane', 'gatto'), 'senza una parte comune nessuna regola'
+# --in-famiglia en: entra una voce inglese con un etimo, anche un elemento di un composto, che il dizionario ha già
+imp_f = Importatore()
+imp_f.in_famiglia, imp_f.elenco, imp_f.intere, imp_f.senza_nomi, imp_f.esterni = {'en'}, {'en': set()}, set(), set(), set()
+imp_f.lessema('en', 'abolition')
+assert imp_f.ammessa('en', {'w': 'abolitionist', 'p': 'noun', 'tpl': [{'n': 'af', 'a': {'1': 'en', '2': 'abolition', '3': '-ist'}}]})
+assert not imp_f.ammessa('en', {'w': 'zymurgy', 'p': 'noun', 'tpl': [{'n': 'af', 'a': {'1': 'en', '2': 'zyme', '3': '-urgy'}}]}), 'base assente'
+assert not imp_f.ammessa('en', {'w': 'Abolitionist', 'p': 'name', 'tpl': [{'n': 'af', 'a': {'1': 'en', '2': 'abolition', '3': '-ist'}}]}), 'nome proprio'
+# --derivati en: aeration entra dalle glosse della lingua, senza etimologia (l'avrà dall'analisi della forma)
+import tempfile as _tf
+_g = _tf.NamedTemporaryFile('w', suffix='.tsv', delete=False, encoding='utf-8'); _g.write('aeration\t1\tnoun\tthe process of aerating\t\t\n'); _g.close()
+imp_d = Importatore(); imp_d.chiusura['en'] = {'file_glosse': _g.name}
+imp_d.aggiungi_derivati('en', {'aeration'})
+assert imp_d.chiave_di('en', 'aeration') in imp_d.lessemi and imp_d.stat['derivati_en'] == 1, imp_d.stat
 # il protosemitico ha due notazioni: *ʾil- e *ʔil- sono la stessa voce
 from wiktionary import nome_pagina as np_
 assert np_('sem-pro', '*ʾil-') == '*ʔil-' and np_('sem-pro', '*ʿayn-') == '*ʕayn-' and np_('ar', 'ʿayn') == 'ʿayn'

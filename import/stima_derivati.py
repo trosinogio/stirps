@@ -11,8 +11,10 @@ cifre) che mancano, in tre gruppi:
 Per ogni gruppo lo spazio stimato e un campione da guardare.
 
     python3 stima_derivati.py lingua dati/<lingua>/glosse.tsv dati/<lingua>/lemmi.jsonl lessemi.tsv.gz [frequenze.tsv.gz]
+        [--scrivi derivati.tsv]
 
-Il rapporto va sullo standard output.
+Il rapporto va sullo standard output. Con --scrivi, i derivati trasparenti (parola, base, affisso) per l'import
+(importa.sh, DERIVATI=en): il parser fa entrare la parola (--derivati) e l'etimologia è un'analisi della forma.
 """
 import gzip, json, random, sys, zlib
 from collections import Counter, defaultdict
@@ -29,10 +31,12 @@ def apri(p):
 
 
 def main():
-    lingua, glosse_p, lemmi_p, lessemi_p = sys.argv[1:5]
+    scrivi = sys.argv[sys.argv.index('--scrivi') + 1] if '--scrivi' in sys.argv else None
+    a = [x for i, x in enumerate(sys.argv) if not x.startswith('--') and sys.argv[i - 1] != '--scrivi']
+    lingua, glosse_p, lemmi_p, lessemi_p = a[1:5]
     freq = set()
-    if len(sys.argv) > 5:
-        with apri(sys.argv[5]) as f:
+    if len(a) > 5:
+        with apri(a[5]) as f:
             # dati/frequenze_<lingua>.tsv.gz: lingua, forma, rango, conteggio, fonte
             freq = {c[1].lower() for c in (r.split('\t') for r in f) if len(c) > 1}
     # le voci del dizionario: per la lingua, i lemmi; per tutte, (lingua, lemma)
@@ -106,9 +110,12 @@ def main():
 
     idx_buone = indice(buone)
 
+    def prevedi_regola(w):
+        ss = [(buone[r], len(r[1]), b, r) for r, b in scatti(w, idx_buone)]
+        return max(ss)[2:] if ss else (None, None)
+
     def prevedi(w):
-        ss = [(buone[r], len(r[1]), b) for r, b in scatti(w, idx_buone)]
-        return max(ss)[2] if ss else None
+        return prevedi_regola(w)[0]
     esatte = previste = 0
     for w in prova:
         b = prevedi(w)
@@ -139,6 +146,13 @@ def main():
         print(f'  {nome}: {len(vv)} voci, circa {len(vv) * BYTE_VOCE / 1048576:.0f} MB'
               + (f'; nel lessico comune {comuni}' if comuni is not None else ''))
         print('    ' + '; '.join(f'{w} < {b}' if b else w for w, b in rnd.sample(vv, min(15, len(vv)))))
+    if scrivi:
+        with open(scrivi, 'w', encoding='utf-8') as out:
+            for w, b in sorted(gruppi['senza etimologia, derivato trasparente di una voce che c\'è']):
+                r = prevedi_regola(w)[1]
+                affisso = '-' + w[len(w) - len(r[1]):] if r[0] == 'S' else w[:len(r[1])] + '-'
+                out.write(f'{w}\t{b}\t{affisso}\n')
+        print(f'scritti {len(gruppi["senza etimologia, derivato trasparente di una voce che c\'è"])} derivati in {scrivi}')
 
 
 if __name__ == '__main__':
