@@ -10,7 +10,8 @@ cifre) che mancano, in tre gruppi:
   suffisso e di prefisso di apprendi_derivati.py, imparate dalle coppie parola–base che le pagine dichiarano
   ({{af|en|aerate|-ion}}), con le soglie di apprendi_derivati.py (almeno SUPPORTO casi, PRECISIONE nella famiglia,
   ESATTEZZA esatte) e misurate sul 20% tenuto da parte: la lingua passa con SOGLIA_LINGUA nella famiglia su almeno
-  MINIMO_PROVA prove. La famiglia qui è la catena delle coppie dichiarate (activate < active), ed è esatta anche la base
+  MINIMO_PROVA prove. La famiglia è la catena delle coppie dichiarate fino a una voce del pacchetto, e da lì la sua
+  catena accolta (ipotesi.tsv.gz e relazioni.tsv.gz accanto a lessemi.tsv.gz); è esatta anche la base
   che è un passaggio intermedio verso quella dichiarata: Wiktionary scrive activation = active + -ation, la regola dà
   activate < active (il 28 novembre 2026 «-ation al posto di -ate» era esatta solo nel 21%, e aeration restava fuori);
 - gli altri: con un etimo fuori dal dizionario, o senza niente.
@@ -24,7 +25,7 @@ Il rapporto va sullo standard output. Con --scrivi, i derivati trasparenti (paro
 --scrivi-etimi, le voci con un etimo nel dizionario (parola, etimo): il parser le fa entrare (--in-famiglia) con la
 loro etimologia. In tutti e due gli elenchi niente varianti («alternative form of», VARIANTI).
 """
-import gzip, json, random, sys, zlib
+import gzip, json, os, random, sys, zlib
 from collections import Counter, defaultdict
 
 from apprendi_derivati import (ESATTEZZA, MAX_SUFFISSO, MIN_RADICE, MINIMO_PROVA, PRECISIONE, SOGLIA_LINGUA, SUPPORTO, nudo,
@@ -55,12 +56,14 @@ def main():
     # le voci del dizionario: per la lingua, i lemmi; per tutte, (lingua, lemma)
     nel = set()
     della_lingua = set()
+    chiavi = defaultdict(list)
     with apri(lessemi_p) as f:
         for r in f:
             c = r.split('\t')
             if len(c) > 4 and c[4] == 'f':
                 nel.add((c[1], c[2]))
                 if c[1] == lingua:
+                    chiavi[c[2]].append(c[0])
                     della_lingua.add(c[2])
     # tutti i lemmi della lingua (glosse.tsv), una volta per lemma
     lemmi = {}
@@ -98,17 +101,38 @@ def main():
     for x in tutti:
         per_nudo[nudo(x)].append(x)
 
-    def cima(x):
+    # la famiglia: le coppie dichiarate fino a una voce del pacchetto, poi la sua catena accolta fino alla cima (come
+    # apprendi_derivati.py): hyperinflation < hyperinflate < inflate e inflation arrivano tutte e due a inflo
+    primo_pacchetto = {}
+    cartella = os.path.dirname(lessemi_p)
+    try:
+        with apri(os.path.join(cartella, 'ipotesi.tsv.gz')) as f:
+            accolte = {c[0] for c in (r.split('\t') for r in f) if len(c) > 3 and c[3] == 'accolta'}
+        with apri(os.path.join(cartella, 'relazioni.tsv.gz')) as f:
+            for c in (r.split('\t') for r in f):
+                if len(c) > 5 and c[1] in accolte and c[5] == '1':
+                    primo_pacchetto.setdefault(c[2], c[3])
+    except FileNotFoundError:
+        pass
+
+    def cime(x):
         visti = set()
         while x in coppie and x not in visti:
             visti.add(x)
             x = coppie[x]
-        return nudo(x)
+        out = {nudo(x)}
+        for k in chiavi.get(x, ()):
+            v = {k}
+            while k in primo_pacchetto and primo_pacchetto[k] not in v:
+                k = primo_pacchetto[k]
+                v.add(k)
+            out.add(k)
+        return out
 
     def giudica(b, c):
         # (esatta, nella famiglia): la base dichiarata, o un passaggio intermedio verso di essa; la stessa cima
         esatta = nudo(b) == nudo(c) or nudo(coppie.get(b, '')) == nudo(c)
-        return esatta, esatta or cima(b) == cima(c)
+        return esatta, esatta or bool(cime(b) & cime(c))
 
     def indice(ammesse):
         idx = defaultdict(list)
@@ -190,7 +214,7 @@ def main():
             m = misura.get(r, {})
             print(f'    regola {r} → {b} (nel dizionario {b in della_lingua}, entra {b in entrano}, omografi '
                   f'{per_nudo.get(nudo(b))}): scatta {m.get("scatta", 0)}, esatte {m.get("esatta", 0)}, nella famiglia '
-                  f'{m.get("famiglia", 0)}, buona {r in buone}; fuori dalla famiglia: {"; ".join(sbagli[r][:8])}')
+                  f'{m.get("famiglia", 0)}, buona {r in buone}; fuori dalla famiglia: {"; ".join(sbagli[r][:20])}')
     rnd = random.Random(22)
     for nome, vv in sorted(gruppi.items(), key=lambda x: -len(x[1])):
         comuni = sum(1 for w, _ in vv if w.lower() in freq) if freq else None
