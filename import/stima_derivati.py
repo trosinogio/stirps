@@ -41,7 +41,7 @@ def apri(p):
 def main():
     scrivi = sys.argv[sys.argv.index('--scrivi') + 1] if '--scrivi' in sys.argv else None
     scrivi_etimi = sys.argv[sys.argv.index('--scrivi-etimi') + 1] if '--scrivi-etimi' in sys.argv else None
-    a = [x for i, x in enumerate(sys.argv) if not x.startswith('--') and sys.argv[i - 1] not in ('--scrivi', '--scrivi-etimi')]
+    a = [x for i, x in enumerate(sys.argv) if not x.startswith('--') and sys.argv[i - 1] not in ('--scrivi', '--scrivi-etimi', '--mostra')]
     lingua, glosse_p, lemmi_p, lessemi_p = a[1:5]
     freq = set()
     if len(a) > 5:
@@ -156,6 +156,14 @@ def main():
         else:
             gruppi['con un etimo fuori dal dizionario'].append((w, f'{primo[w][0]}:{primo[w][1]}'))
     print(f'lemmi comuni che il dizionario non ha: {len(mancano)}')
+    # --mostra aeration,…: perché una parola entra o no (regole che scattano, con la loro misura sull'addestramento)
+    for w in (sys.argv[sys.argv.index('--mostra') + 1].split(',') if '--mostra' in sys.argv else []):
+        print(f'  [mostra] {w}: tra i lemmi {w in lemmi}, nel dizionario {w in della_lingua}, primo etimo {primo.get(w)}, '
+              f'coppia {coppie.get(w)}, entra con un etimo {w in entrano}, derivato dichiarato {w in dichiarati}')
+        for r, b in scatti(w, idx_regole):
+            m = misura.get(r, {})
+            print(f'    regola {r} → {b} (nel dizionario {b in della_lingua}, entra {b in entrano}, omografi '
+                  f'{per_nudo.get(nudo(b))}): scatta {m.get("scatta", 0)}, esatte {m.get("esatta", 0)}, buona {r in buone}')
     rnd = random.Random(22)
     for nome, vv in sorted(gruppi.items(), key=lambda x: -len(x[1])):
         comuni = sum(1 for w, _ in vv if w.lower() in freq) if freq else None

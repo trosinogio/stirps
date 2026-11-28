@@ -98,7 +98,7 @@ for d in $(echo "$DERIVATI" | tr ',' ' '); do
     ETIMI_D=()
     case ",$IN_FAMIGLIA," in *",$d,"*) ETIMI_D=(--scrivi-etimi "$DATI/in_famiglia_$d.tsv") ;; esac
     python3 stima_derivati.py "$d" "dati/$d/glosse.tsv" "dati/$d/lemmi.jsonl" ../dati/lessemi.tsv.gz "../dati/frequenze_$d.tsv.gz" \
-      --scrivi "$DATI/derivati_$d.tsv" ${ETIMI_D[@]+"${ETIMI_D[@]}"} | tee "$DATI/rapporto_derivati_$d.txt"
+      --scrivi "$DATI/derivati_$d.tsv" ${ETIMI_D[@]+"${ETIMI_D[@]}"} ${MOSTRA_DERIVATI:+--mostra "$MOSTRA_DERIVATI"} | tee "$DATI/rapporto_derivati_$d.txt"
     ARGOMENTI+=(--derivati "$d=$DATI/derivati_$d.tsv")
     if [ ${#ETIMI_D[@]} -gt 0 ]; then ARGOMENTI+=(--in-famiglia "$d=$DATI/in_famiglia_$d.tsv"); fi
   fi
