@@ -205,7 +205,7 @@ def main():
           f'esatte {esatte} ({esatte / max(1, previste):.0%}) → ' + ('passa' if passa else f'non passa: nessun derivato'))
     gruppi = defaultdict(list)
     # i derivati dichiarati di una di queste (aeration = aerate + -ion): anche loro un livello solo
-    dichiarati = {w for w in mancano if w not in entrano and coppie.get(w) in entrano}
+    dichiarati = {w for w in mancano if w not in entrano and w in primo and coppie.get(w) in entrano}
     for w in mancano:
         p = primo.get(w)
         if w in entrano:
