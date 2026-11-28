@@ -4,7 +4,8 @@
 lemmi; lemmi.jsonl: quelli con un'etimologia) e dal pacchetto, conta i lemmi comuni (niente nomi propri, locuzioni,
 cifre) che mancano, in tre gruppi:
 - con un'etimologia il cui primo etimo è già una voce del dizionario (abolitionist < abolition);
-- senza etimologia, ma derivati trasparenti di una voce della lingua che c'è già (aeration < aerate): le regole di
+- senza etimologia, ma derivati trasparenti di una voce della lingua che c'è già, o che entra con il gruppo di sopra
+  (aeration < aerate): le regole di
   suffisso e di prefisso di apprendi_derivati.py, imparate dalle coppie parola–base che le pagine dichiarano
   ({{af|en|aerate|-ion}}) e misurate sul 20% tenuto da parte (la base prevista è quella dichiarata);
 - gli altri: con un etimo fuori dal dizionario, o senza niente.
@@ -134,13 +135,16 @@ def main():
           f'{esatte} esatte su {previste} ({esatte / max(1, previste):.0%})')
     mancano = [w for w in lemmi if w not in della_lingua]
     gruppi = defaultdict(list)
+    # prima le voci con un etimo nel dizionario: entrano con la loro etimologia, e possono fare da base a un derivato
+    # (aeration < aerate, e aerate < latino aerātus); un livello solo, non a catena
+    entrano = {w for w in mancano if primo.get(w) and (primo[w] in nel or (primo[w][0] == lingua and primo[w][1] in della_lingua))}
     for w in mancano:
         p = primo.get(w)
-        if p and (p in nel or (p[0] == lingua and p[1] in della_lingua)):
+        if w in entrano:
             gruppi['con un etimo nel dizionario'].append((w, f'{p[0]}:{p[1]}'))
         elif w not in primo:
             b = prevedi(w)
-            if b and b in della_lingua:
+            if b and (b in della_lingua or b in entrano):
                 gruppi['senza etimologia, derivato trasparente di una voce che c\'è'].append((w, b))
             else:
                 gruppi['senza etimologia, nient\'altro'].append((w, None))

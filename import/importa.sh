@@ -141,10 +141,15 @@ if [ "$DIZIONARI" = 1 ]; then
     cat "$DATI/rapporto_derivati.txt" >&2; exit 1
   fi
   cat "$DATI/rapporto_derivati.txt"
-  # e i derivati trasparenti di DERIVATI: la loro etimologia è l'analisi della forma (parola < base, con l'affisso)
+  # e i derivati trasparenti di DERIVATI: la loro etimologia è l'analisi della forma (parola < base, con l'affisso);
+  # dove apprendi_derivati.py ha già scritto la sua analisi (la lingua passa la misura sul dizionario), vale quella
   for d in $(echo "$DERIVATI" | tr ',' ' '); do
-    [ -s "$DATI/derivati_$d.tsv" ] && awk -F'\t' -v l="$d" 'BEGIN{OFS="\t"} {print "analisi:enwikt:" l ":" $1, l, $1, 1, l, $2, "derivazione", $3, "analisi"}' \
-      "$DATI/derivati_$d.tsv" >> "$DATI/tsv/etimi_dizionari.tsv"
+    if [ -s "$DATI/derivati_$d.tsv" ]; then
+      awk -F'\t' -v l="$d" 'BEGIN{OFS="\t"} NR==FNR {c[$1]; next} !(("analisi:enwikt:" l ":" $1) in c) {print "analisi:enwikt:" l ":" $1, l, $1, 1, l, $2, "derivazione", $3, "analisi"}' \
+        "$DATI/tsv/etimi_dizionari.tsv" "$DATI/derivati_$d.tsv" > "$DATI/derivati_$d.righe"
+      cat "$DATI/derivati_$d.righe" >> "$DATI/tsv/etimi_dizionari.tsv"
+      echo "     derivati trasparenti ($d): $(wc -l < "$DATI/derivati_$d.righe") analisi della forma dall'elenco della stima"
+    fi
   done
   # stime della prima attestazione: l'autore datato più antico citato nella voce (DATAZIONI.md, passo 1)
   python3 datatore_dizionari.py autori "$DATI/tsv/autori.tsv"
