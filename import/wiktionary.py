@@ -1326,9 +1326,10 @@ class Importatore:
             return False
         if elenco is None:
             return True
-        # --in-famiglia en: anche le voci la cui pagina cita come etimo, anche in un composto, una voce che il dizionario
-        # ha già (musicality < musical, abolitionist = abolition + -ist): stanno in una famiglia che c'è
-        if lingua in getattr(self, 'in_famiglia', ()) and self.etimo_presente(v, composti=True):
+        # --in-famiglia en=elenco.tsv: anche le voci il cui primo etimo è una voce del pacchetto pubblicato (musicality <
+        # musical, abolitionist = abolition + -ist), dall'elenco di stima_derivati.py --scrivi-etimi; non un etimo
+        # qualunque, anche entrato nello stesso giro: il 28 novembre 2026 così entravano 292 mila voci invece di 36 mila
+        if v['w'] in getattr(self, 'in_famiglia', {}).get(lingua, ()):
             self.stat[f'in_famiglia_{lingua}'] += 1
             return True
         return v['w'].lower() in elenco or (lingua in self.esterni and etimo_esterno(lingua, v))
@@ -1372,7 +1373,7 @@ class Importatore:
                 break
 
 
-    def etimo_presente(self, v, composti=False):
+    def etimo_presente(self, v):
         """Le lingue antiche del confronto (--risali: ittita, armeno antico, avestico…) entrano solo con le parole che
         stanno in una famiglia: un lemma la cui pagina non è raggiunta da nessuna catena entra se uno dei suoi etimi (o la
         radice che dichiara) è già una voce del dizionario. Mai un nome proprio o una locuzione; i confronti («cognate»)
@@ -1385,10 +1386,6 @@ class Importatore:
                 lingua, termini = a.get('2'), [a.get('3')]
             elif n == 'root':
                 lingua, termini = a.get('2'), [a.get(str(i)) for i in range(3, 6)]
-            elif composti and n in AFFISSI:
-                # gli elementi del composto che sono parole (non affissi), nella lingua della voce o in quella dichiarata
-                lingua = a.get('1')
-                termini = [x for x in (a.get(str(i)) for i in range(2, 8)) if x and not e_affisso(pulisci_parte(x)[0])]
             else:
                 continue
             for x in termini:
@@ -2444,7 +2441,7 @@ if __name__ == '__main__':
     #               [--glosse-precedenti ../dati/lessemi.tsv.gz]
     args, chiusure, passi, intere, con_etimologia, elenchi, esterni, precedenti, comuni = [], [], 1, set(), set(), {}, set(), {}, {}
     senza_nomi = set()
-    in_famiglia = set()  # --in-famiglia en: entrano anche le voci con un etimo che il dizionario ha già
+    in_famiglia = {}    # --in-famiglia en=elenco.tsv: entrano anche le voci con un etimo nel pacchetto (stima_derivati.py)
     derivati = {}       # --derivati en=derivati.tsv: i derivati trasparenti senza etimologia (stima_derivati.py --scrivi)
     risali = set()      # --risali hit,xcl: lingue antiche di cui entrano i lemmi con un etimo già nel dizionario
     semina = set()      # --semina-discendenti ine-pro,grc: sotto le voci di queste lingue entrano anche le parole nuove
@@ -2486,7 +2483,8 @@ if __name__ == '__main__':
         elif x == '--senza-nomi':
             senza_nomi = {c for c in next(it_).split(',') if c}
         elif x == '--in-famiglia':
-            in_famiglia = {c for c in next(it_).split(',') if c}
+            lingua_f, percorso_f = next(it_).split('=', 1)
+            in_famiglia[lingua_f] = {r.split('\t')[0] for r in open(percorso_f, encoding='utf-8') if r.strip()}
         elif x == '--derivati':
             lingua_d, percorso_d = next(it_).split('=', 1)
             derivati[lingua_d] = {r.split('\t')[0] for r in open(percorso_d, encoding='utf-8') if r.strip()}

@@ -21,7 +21,7 @@ CON_ETIMOLOGIA=${CON_ETIMOLOGIA-}   # lingue di chiusura di cui entrano tutte le
 ELENCHI=${ELENCHI-}   # per quelle lingue, i soli lemmi ammessi: ELENCHI="en=../dati/frequenze_en.tsv.gz" (il lessico comune)
 COMUNI=${COMUNI-}     # nella lingua principale, anche i lemmi senza etimologia del lessico comune: COMUNI="it=../dati/frequenze_it.tsv.gz"
 ESTERNI=${ESTERNI-}   # e con l'elenco, anche le voci con l'etimo in un'altra lingua: ESTERNI=en
-IN_FAMIGLIA=${IN_FAMIGLIA-}   # e con l'elenco, anche le voci con un etimo che il dizionario ha già: IN_FAMIGLIA=en
+IN_FAMIGLIA=${IN_FAMIGLIA-}   # e con l'elenco, anche le voci il cui primo etimo è nel pacchetto pubblicato: IN_FAMIGLIA=en (con DERIVATI)
 DERIVATI=${DERIVATI-}   # e i derivati trasparenti senza etimologia di una voce che c'è (aeration < aerate): DERIVATI=en
 PRECEDENTI=${PRECEDENTI-}   # il lessemi.tsv.gz pubblicato: le glosse non cambiano se sono ancora tra le candidate
 SOLO_ANALISI=${SOLO_ANALISI:-0}
@@ -91,12 +91,16 @@ if [ "$WIKIZIONARIO" = 1 ]; then
 fi
 
 # i derivati trasparenti senza etimologia (aeration < aerate): le regole di stima_derivati.py, imparate dalle coppie
-# parola–base dichiarate e misurate sul 20% tenuto da parte; le basi sono le voci del pacchetto pubblicato
+# parola–base dichiarate e misurate sul 20% tenuto da parte; le basi sono le voci del pacchetto pubblicato. Con
+# IN_FAMIGLIA anche l'elenco delle voci il cui primo etimo è nel pacchetto pubblicato (abolitionist < abolition)
 for d in $(echo "$DERIVATI" | tr ',' ' '); do
   if [ -s "dati/$d/glosse.tsv" ] && [ -s ../dati/lessemi.tsv.gz ]; then
+    ETIMI_D=()
+    case ",$IN_FAMIGLIA," in *",$d,"*) ETIMI_D=(--scrivi-etimi "$DATI/in_famiglia_$d.tsv") ;; esac
     python3 stima_derivati.py "$d" "dati/$d/glosse.tsv" "dati/$d/lemmi.jsonl" ../dati/lessemi.tsv.gz "../dati/frequenze_$d.tsv.gz" \
-      --scrivi "$DATI/derivati_$d.tsv" | tee "$DATI/rapporto_derivati_$d.txt"
+      --scrivi "$DATI/derivati_$d.tsv" ${ETIMI_D[@]+"${ETIMI_D[@]}"} | tee "$DATI/rapporto_derivati_$d.txt"
     ARGOMENTI+=(--derivati "$d=$DATI/derivati_$d.tsv")
+    if [ ${#ETIMI_D[@]} -gt 0 ]; then ARGOMENTI+=(--in-famiglia "$d=$DATI/in_famiglia_$d.tsv"); fi
   fi
 done
 
@@ -104,7 +108,7 @@ echo "2/4  leggo le etimologie"
 python3 wiktionary.py "$DATI/lemmi.jsonl" "$DATI/tsv" "$DATI/glosse.tsv" ${ARGOMENTI[@]+"${ARGOMENTI[@]}"} --passi "$PASSI" \
   --forme-base "$LINGUA=$DATI/forme.tsv" --discendenti "$LINGUA=$DATI/discendenti.tsv" \
   ${INTERE:+--intere "$INTERE"} ${SEMINA_DISCENDENTI:+--semina-discendenti "$SEMINA_DISCENDENTI"} ${RISALI:+--risali "$RISALI"} ${CON_ETIMOLOGIA:+--con-etimologia "$CON_ETIMOLOGIA"} ${SENZA_NOMI:+--senza-nomi "$SENZA_NOMI"} ${COMUNI:+--comuni "$COMUNI"} \
-  $(for e in $ELENCHI; do printf -- "--elenco %s " "$e"; done) ${ESTERNI:+--esterni "$ESTERNI"} ${IN_FAMIGLIA:+--in-famiglia "$IN_FAMIGLIA"} \
+  $(for e in $ELENCHI; do printf -- "--elenco %s " "$e"; done) ${ESTERNI:+--esterni "$ESTERNI"} \
   ${PRECEDENTI:+--glosse-precedenti "$PRECEDENTI"} > "$DATI/rapporto_parser.json"
 if [ "$DIZIONARI" = 1 ]; then
   echo "     dizionari del Perseus: Lewis & Short e Liddell–Scott–Jones"

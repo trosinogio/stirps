@@ -11,10 +11,12 @@ cifre) che mancano, in tre gruppi:
 Per ogni gruppo lo spazio stimato e un campione da guardare.
 
     python3 stima_derivati.py lingua dati/<lingua>/glosse.tsv dati/<lingua>/lemmi.jsonl lessemi.tsv.gz [frequenze.tsv.gz]
-        [--scrivi derivati.tsv]
+        [--scrivi derivati.tsv] [--scrivi-etimi etimi.tsv]
 
 Il rapporto va sullo standard output. Con --scrivi, i derivati trasparenti (parola, base, affisso) per l'import
-(importa.sh, DERIVATI=en): il parser fa entrare la parola (--derivati) e l'etimologia è un'analisi della forma.
+(importa.sh, DERIVATI=en): il parser fa entrare la parola (--derivati) e l'etimologia è un'analisi della forma. Con
+--scrivi-etimi, le voci con un etimo nel dizionario (parola, etimo): il parser le fa entrare (--in-famiglia) con la
+loro etimologia. In tutti e due gli elenchi niente varianti («alternative form of», VARIANTI).
 """
 import gzip, json, random, sys, zlib
 from collections import Counter, defaultdict
@@ -24,6 +26,10 @@ from apprendi_derivati import MAX_SUFFISSO, MIN_RADICE, nudo, parola, regole_del
 # byte per voce nel database (stima_import.py): voce, ipotesi, un passaggio, la famiglia, la glossa italiana
 BYTE_VOCE = 510 + 425 + 355 + 100 + 340
 SUPPORTO, ESATTEZZA = 10, 0.85
+# le glosse delle grafie e delle forme di un'altra parola: non sono voci nuove da far entrare
+VARIANTI = ('alternative form of', 'alternative spelling of', 'misspelling of', 'obsolete form of', 'obsolete spelling of',
+            'archaic form of', 'archaic spelling of', 'nonstandard spelling of', 'nonstandard form of', 'dated form of',
+            'dated spelling of', 'eye dialect spelling of', 'pronunciation spelling of', 'synonym of', 'abbreviation of')
 
 
 def apri(p):
@@ -32,7 +38,8 @@ def apri(p):
 
 def main():
     scrivi = sys.argv[sys.argv.index('--scrivi') + 1] if '--scrivi' in sys.argv else None
-    a = [x for i, x in enumerate(sys.argv) if not x.startswith('--') and sys.argv[i - 1] != '--scrivi']
+    scrivi_etimi = sys.argv[sys.argv.index('--scrivi-etimi') + 1] if '--scrivi-etimi' in sys.argv else None
+    a = [x for i, x in enumerate(sys.argv) if not x.startswith('--') and sys.argv[i - 1] not in ('--scrivi', '--scrivi-etimi')]
     lingua, glosse_p, lemmi_p, lessemi_p = a[1:5]
     freq = set()
     if len(a) > 5:
@@ -54,7 +61,7 @@ def main():
     with apri(glosse_p) as f:
         for r in f:
             c = r.rstrip('\n').split('\t')
-            if len(c) > 5 and c[5] != '1' and parola(c[0]):
+            if len(c) > 5 and c[5] != '1' and parola(c[0]) and not c[3].lower().startswith(VARIANTI):
                 lemmi.setdefault(c[0], (c[2], c[3]))
     # le etimologie: il primo etimo, e le coppie parola–base della lingua per imparare le regole
     primo, coppie = {}, {}
@@ -153,6 +160,11 @@ def main():
                 affisso = '-' + w[len(w) - len(r[1]):] if r[0] == 'S' else w[:len(r[1])] + '-'
                 out.write(f'{w}\t{b}\t{affisso}\n')
         print(f'scritti {len(gruppi["senza etimologia, derivato trasparente di una voce che c\'è"])} derivati in {scrivi}')
+    if scrivi_etimi:
+        with open(scrivi_etimi, 'w', encoding='utf-8') as out:
+            for w, e in sorted(gruppi['con un etimo nel dizionario']):
+                out.write(f'{w}\t{e}\n')
+        print(f'scritte {len(gruppi["con un etimo nel dizionario"])} voci con un etimo nel dizionario in {scrivi_etimi}')
 
 
 if __name__ == '__main__':
