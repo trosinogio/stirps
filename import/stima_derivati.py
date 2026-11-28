@@ -8,7 +8,11 @@ cifre) che mancano, in tre gruppi:
 - senza etimologia, ma derivati trasparenti di una voce della lingua che c'è già, o che entra con il gruppo di sopra
   (aeration < aerate): le regole di
   suffisso e di prefisso di apprendi_derivati.py, imparate dalle coppie parola–base che le pagine dichiarano
-  ({{af|en|aerate|-ion}}) e misurate sul 20% tenuto da parte (la base prevista è quella dichiarata);
+  ({{af|en|aerate|-ion}}), con le soglie di apprendi_derivati.py (almeno SUPPORTO casi, PRECISIONE nella famiglia,
+  ESATTEZZA esatte) e misurate sul 20% tenuto da parte: la lingua passa con SOGLIA_LINGUA nella famiglia su almeno
+  MINIMO_PROVA prove. La famiglia qui è la catena delle coppie dichiarate (activate < active), ed è esatta anche la base
+  che è un passaggio intermedio verso quella dichiarata: Wiktionary scrive activation = active + -ation, la regola dà
+  activate < active (il 28 novembre 2026 «-ation al posto di -ate» era esatta solo nel 21%, e aeration restava fuori);
 - gli altri: con un etimo fuori dal dizionario, o senza niente.
 Per ogni gruppo lo spazio stimato e un campione da guardare.
 
@@ -23,11 +27,11 @@ loro etimologia. In tutti e due gli elenchi niente varianti («alternative form 
 import gzip, json, random, sys, zlib
 from collections import Counter, defaultdict
 
-from apprendi_derivati import MAX_SUFFISSO, MIN_RADICE, nudo, parola, regole_della_coppia
+from apprendi_derivati import (ESATTEZZA, MAX_SUFFISSO, MIN_RADICE, MINIMO_PROVA, PRECISIONE, SOGLIA_LINGUA, SUPPORTO, nudo,
+                                parola, regole_della_coppia)
 
 # byte per voce nel database (stima_import.py): voce, ipotesi, un passaggio, la famiglia, la glossa italiana
 BYTE_VOCE = 510 + 425 + 355 + 100 + 340
-SUPPORTO, ESATTEZZA = 10, 0.85
 # le glosse delle grafie e delle forme di un'altra parola: non sono voci nuove da far entrare
 VARIANTI = ('alternative form of', 'alternative spelling of', 'misspelling of', 'obsolete form of', 'obsolete spelling of',
             'archaic form of', 'archaic spelling of', 'nonstandard spelling of', 'nonstandard form of', 'dated form of',
@@ -94,6 +98,18 @@ def main():
     for x in tutti:
         per_nudo[nudo(x)].append(x)
 
+    def cima(x):
+        visti = set()
+        while x in coppie and x not in visti:
+            visti.add(x)
+            x = coppie[x]
+        return nudo(x)
+
+    def giudica(b, c):
+        # (esatta, nella famiglia): la base dichiarata, o un passaggio intermedio verso di essa; la stessa cima
+        esatta = nudo(b) == nudo(c) or nudo(coppie.get(b, '')) == nudo(c)
+        return esatta, esatta or cima(b) == cima(c)
+
     def indice(ammesse):
         idx = defaultdict(list)
         for r in ammesse:
@@ -111,11 +127,17 @@ def main():
         return out
     idx_regole = indice(regole)
     misura = defaultdict(Counter)
+    sbagli = defaultdict(list)
     for w in addestra:
         for r, b in scatti(w, idx_regole):
+            es, fam = giudica(b, coppie[w])
             misura[r]['scatta'] += 1
-            misura[r]['esatta'] += nudo(b) == nudo(coppie[w])
-    buone = {r: m['esatta'] / m['scatta'] for r, m in misura.items() if m['scatta'] >= SUPPORTO and m['esatta'] >= ESATTEZZA * m['scatta']}
+            misura[r]['esatta'] += es
+            misura[r]['famiglia'] += fam
+            if not fam:
+                sbagli[r].append(f'{w}: {b}, dichiarata {coppie[w]}')
+    buone = {r: m['famiglia'] / m['scatta'] for r, m in misura.items()
+             if m['scatta'] >= SUPPORTO and m['famiglia'] >= PRECISIONE * m['scatta'] and m['esatta'] >= ESATTEZZA * m['scatta']}
 
     idx_buone = indice(buone)
 
@@ -125,15 +147,19 @@ def main():
 
     def prevedi(w):
         return prevedi_regola(w)[0]
-    esatte = previste = 0
+    esatte = famiglia = previste = 0
     for w in prova:
         b = prevedi(w)
         if b:
+            es, fam = giudica(b, coppie[w])
             previste += 1
-            esatte += nudo(b) == nudo(coppie[w])
+            esatte += es
+            famiglia += fam
+    passa = previste >= MINIMO_PROVA and famiglia >= SOGLIA_LINGUA * previste
     print(f'{lingua}: {len(lemmi)} lemmi comuni nel filtro, {len(della_lingua)} voci nel dizionario; coppie parola–base dichiarate '
-          f'{len(coppie)}; regole {len(buone)} (almeno {SUPPORTO} casi, {ESATTEZZA:.0%} esatte); prova sul 20% tenuto da parte: '
-          f'{esatte} esatte su {previste} ({esatte / max(1, previste):.0%})')
+          f'{len(coppie)}; regole {len(buone)} (almeno {SUPPORTO} casi, {PRECISIONE:.0%} nella famiglia, {ESATTEZZA:.0%} esatte); '
+          f'prova sul 20% tenuto da parte: su {previste}, nella famiglia {famiglia} ({famiglia / max(1, previste):.0%}), '
+          f'esatte {esatte} ({esatte / max(1, previste):.0%}) → ' + ('passa' if passa else f'non passa: nessun derivato'))
     mancano = [w for w in lemmi if w not in della_lingua]
     gruppi = defaultdict(list)
     # prima le voci con un etimo nel dizionario: entrano con la loro etimologia, e possono fare da base a un derivato
@@ -149,7 +175,7 @@ def main():
             gruppi['con un etimo che entra con il gruppo di sopra'].append((w, f'{p[0]}:{p[1]}'))
         elif w not in primo:
             b = prevedi(w)
-            if b and (b in della_lingua or b in entrano):
+            if passa and b and (b in della_lingua or b in entrano):
                 gruppi['senza etimologia, derivato trasparente di una voce che c\'è'].append((w, b))
             else:
                 gruppi['senza etimologia, nient\'altro'].append((w, None))
@@ -163,7 +189,8 @@ def main():
         for r, b in scatti(w, idx_regole):
             m = misura.get(r, {})
             print(f'    regola {r} → {b} (nel dizionario {b in della_lingua}, entra {b in entrano}, omografi '
-                  f'{per_nudo.get(nudo(b))}): scatta {m.get("scatta", 0)}, esatte {m.get("esatta", 0)}, buona {r in buone}')
+                  f'{per_nudo.get(nudo(b))}): scatta {m.get("scatta", 0)}, esatte {m.get("esatta", 0)}, nella famiglia '
+                  f'{m.get("famiglia", 0)}, buona {r in buone}; fuori dalla famiglia: {"; ".join(sbagli[r][:8])}')
     rnd = random.Random(22)
     for nome, vv in sorted(gruppi.items(), key=lambda x: -len(x[1])):
         comuni = sum(1 for w, _ in vv if w.lower() in freq) if freq else None
